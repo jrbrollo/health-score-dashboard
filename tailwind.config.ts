@@ -57,6 +57,16 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        health: {
+          excellent: "hsl(var(--health-excellent))",
+          "excellent-bg": "hsl(var(--health-excellent-bg))",
+          stable: "hsl(var(--health-stable))",
+          "stable-bg": "hsl(var(--health-stable-bg))",
+          warning: "hsl(var(--health-warning))",
+          "warning-bg": "hsl(var(--health-warning-bg))",
+          critical: "hsl(var(--health-critical))",
+          "critical-bg": "hsl(var(--health-critical-bg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
