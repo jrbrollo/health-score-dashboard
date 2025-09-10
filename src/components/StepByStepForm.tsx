@@ -14,7 +14,7 @@ interface StepByStepFormProps {
   onCancel: () => void;
 }
 
-const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraão", "Murilo", "Felipe", "Hélio", "Vinícius"];
+const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
 const steps = [
   { id: 1, title: "Informações Básicas", description: "Nome do cliente e planejador responsável" },
@@ -336,7 +336,7 @@ export function StepByStepForm({ onClientSubmit, onCancel }: StepByStepFormProps
             {currentStep === steps.length ? (
               <Button
                 onClick={handleSubmit}
-                className="flex items-center gap-2 bg-[var(--gradient-primary)]"
+                className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={!isStepValid()}
               >
                 <CheckCircle className="h-4 w-4" />

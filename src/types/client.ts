@@ -3,10 +3,10 @@ export type Planner =
   | "Rossetti" 
   | "Ton" 
   | "Bizelli" 
-  | "Abraão" 
+  | "Abraao" 
   | "Murilo" 
   | "Felipe" 
-  | "Hélio" 
+  | "Helio" 
   | "Vinícius";
 
 export type LastMeeting = "< 30 dias" | "31-60 dias" | "> 60 dias";

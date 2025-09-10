@@ -11,22 +11,27 @@ import {
   AlertCircle, 
   Award, 
   Filter, 
-  BarChart3 
+  BarChart3,
+  Edit
 } from "lucide-react";
 import { Client, Planner, HealthScore } from "@/types/client";
 import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AnalyticsView } from "./AnalyticsView";
+import { BulkImport } from "./BulkImport";
 
 interface DashboardProps {
   clients: Client[];
   onAddClient: () => void;
+  onBulkImport?: (clients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => void;
+  onManageClients?: (planner?: Planner | "all") => void;
 }
 
-const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraão", "Murilo", "Felipe", "Hélio", "Vinícius"];
+const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
-export function Dashboard({ clients, onAddClient }: DashboardProps) {
+export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients }: DashboardProps) {
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   // Filter clients by selected planner
   const filteredClients = useMemo(() => {
@@ -74,6 +79,22 @@ export function Dashboard({ clients, onAddClient }: DashboardProps) {
     }).filter(stat => stat.clientCount > 0);
   }, [clients, selectedPlanner]);
 
+  const handleBulkImport = (importedClients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => {
+    if (onBulkImport) {
+      onBulkImport(importedClients);
+    }
+    setShowBulkImport(false);
+  };
+
+  if (showBulkImport) {
+    return (
+      <BulkImport
+        onImport={handleBulkImport}
+        onClose={() => setShowBulkImport(false)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -103,13 +124,37 @@ export function Dashboard({ clients, onAddClient }: DashboardProps) {
               </SelectContent>
             </Select>
             
-            <Button 
-              onClick={onAddClient} 
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Cliente
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={onAddClient} 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Cliente
+              </Button>
+              
+              {onBulkImport && (
+                <Button 
+                  onClick={() => setShowBulkImport(true)}
+                  variant="outline"
+                  className="shadow-lg"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Importar CSV
+                </Button>
+              )}
+
+              {onManageClients && clients.length > 0 && (
+                <Button 
+                  onClick={() => onManageClients(selectedPlanner)}
+                  variant="outline"
+                  className="shadow-lg"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Gerenciar Clientes
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 

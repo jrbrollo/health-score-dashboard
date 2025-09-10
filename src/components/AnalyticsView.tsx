@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts";
-import { TrendingUp, TrendingDown, Target, Award, AlertTriangle, Users, Lightbulb } from "lucide-react";
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts";
+import { TrendingUp, TrendingDown, Target, Award, AlertTriangle, Users, Lightbulb, BarChart } from "lucide-react";
 import { Client, Planner, HealthCategory } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
@@ -14,7 +14,7 @@ interface AnalyticsViewProps {
   selectedPlanner: Planner | "all";
 }
 
-const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraão", "Murilo", "Felipe", "Hélio", "Vinícius"];
+const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
 export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) {
   // Calculate comprehensive analytics
@@ -172,27 +172,45 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
         <Card className="bg-[var(--gradient-card)] border-0 shadow-[var(--shadow-card)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart className="h-5 w-5" />
+              <Target className="h-5 w-5" />
               Performance por Pilar
             </CardTitle>
             <CardDescription>Análise detalhada dos 5 pilares</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                avg: { label: "Média Atual", color: "hsl(var(--primary))" },
-                max: { label: "Máximo Possível", color: "hsl(var(--muted))" }
-              }}
-              className="h-[300px] w-full"
-            >
-              <BarChart data={analytics.pillarAnalysis} layout="horizontal" width={400} height={300}>
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={120} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="max" fill="hsl(var(--muted))" opacity={0.3} />
-                <Bar dataKey="avg" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ChartContainer>
+            <div className="space-y-4">
+              {analytics.pillarAnalysis.map((pillar, index) => {
+                const percentage = pillar.max > 0 ? (pillar.avg / pillar.max) * 100 : 0;
+                const getColorClass = (pct: number) => {
+                  if (pct >= 80) return "bg-green-500";
+                  if (pct >= 60) return "bg-blue-500";
+                  if (pct >= 40) return "bg-yellow-500";
+                  return "bg-red-500";
+                };
+                
+                return (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-sm">{pillar.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {pillar.avg.toFixed(1)} / {pillar.max}
+                        </span>
+                        <Badge variant={percentage >= 70 ? "default" : percentage >= 50 ? "secondary" : "destructive"}>
+                          {percentage.toFixed(0)}%
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${getColorClass(percentage)}`}
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       </div>

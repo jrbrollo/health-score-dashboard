@@ -1,0 +1,8 @@
+Planejador;Cliente;Última reunião;Próxima reunião;Uso app (categorização);Pagamento;Indicações;Nota NPS;Uso outras áreas
+;João;<30 dias;Sim;Acessou e categorizou (15 dias);Em dia;Sim;Promotor (9-10);Usou 2+ áreas
+;Ana;<30 dias;Não;Acessou, sem categorizar;Em dia;Não;Neutro/SR (7-8);Usou 1 área
+;Carlos;31-60 dias;Sim;Não acessou/categorizou (30+ dias);Em dia;Não;Neutro/SR (7-8);Nenhuma
+;Maria;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela em atraso;Não;Neutro/SR (7-8);Nenhuma
+;Leonardo;<30 dias;Sim;Acessou, sem categorizar;Em dia;Não;Neutro/SR (7-8);Nenhuma
+;Jeferson;31-60 dias;Sim;Acessou e categorizou (15 dias);1 parcela em atraso;Não;Neutro/SR (7-8);Usou 1 área
+;Antônio;<30 dias;Sim;Acessou, sem categorizar;Em dia;Sim;Promotor (9-10);Usou 1 área
