@@ -103,7 +103,10 @@ export function Dashboard({ clients, onAddClient }: DashboardProps) {
               </SelectContent>
             </Select>
             
-            <Button onClick={onAddClient} className="bg-[var(--gradient-primary)] shadow-[var(--shadow-health)]">
+            <Button 
+              onClick={onAddClient} 
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente
             </Button>
