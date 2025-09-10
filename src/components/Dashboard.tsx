@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Users, TrendingUp, AlertCircle, Award, Filter, BarChart3 } from "lucide-react";
+import { 
+  Plus, 
+  Users, 
+  TrendingUp, 
+  AlertCircle, 
+  Award, 
+  Filter, 
+  BarChart3 
+} from "lucide-react";
 import { Client, Planner, HealthScore } from "@/types/client";
 import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";

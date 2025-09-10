@@ -147,25 +147,23 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
               config={{
                 value: { label: "Clientes", color: "hsl(var(--primary))" }
               }}
-              className="h-[300px]"
+              className="h-[300px] w-full"
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={analytics.healthDistribution}
-                    dataKey="value"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {analytics.healthDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ResponsiveContainer>
+              <PieChart width={400} height={300}>
+                <Pie
+                  data={analytics.healthDistribution}
+                  dataKey="value"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label={({ name, value }) => `${name}: ${value}`}
+                >
+                  {analytics.healthDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </PieChart>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -185,17 +183,15 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
                 avg: { label: "Média Atual", color: "hsl(var(--primary))" },
                 max: { label: "Máximo Possível", color: "hsl(var(--muted))" }
               }}
-              className="h-[300px]"
+              className="h-[300px] w-full"
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics.pillarAnalysis} layout="horizontal">
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={120} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="max" fill="hsl(var(--muted))" opacity={0.3} />
-                  <Bar dataKey="avg" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={analytics.pillarAnalysis} layout="horizontal" width={400} height={300}>
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={120} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="max" fill="hsl(var(--muted))" opacity={0.3} />
+                <Bar dataKey="avg" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+              </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
