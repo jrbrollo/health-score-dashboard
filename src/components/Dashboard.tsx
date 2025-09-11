@@ -21,6 +21,7 @@ import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AnalyticsView } from "./AnalyticsView";
 import { BulkImport } from "./BulkImport";
 import { ThemeToggle } from "./ui/theme-toggle";
+import TemporalAnalysisComponent from "./TemporalAnalysis";
 
 interface DashboardProps {
   clients: Client[];
@@ -172,7 +173,7 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Visão Geral
@@ -180,6 +181,10 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Análise Avançada
+            </TabsTrigger>
+            <TabsTrigger value="temporal" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Análise Temporal
             </TabsTrigger>
           </TabsList>
 
@@ -358,6 +363,10 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
 
           <TabsContent value="analytics">
             <AnalyticsView clients={clients} selectedPlanner={selectedPlanner} isDarkMode={isDarkMode} />
+          </TabsContent>
+
+          <TabsContent value="temporal">
+            <TemporalAnalysisComponent isDarkMode={isDarkMode} />
           </TabsContent>
         </Tabs>
       </div>
