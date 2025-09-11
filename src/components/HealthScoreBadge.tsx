@@ -10,13 +10,26 @@ interface HealthScoreBadgeProps {
 }
 
 export function HealthScoreBadge({ category, score, className }: HealthScoreBadgeProps) {
-  const colorClass = getHealthCategoryColor(category);
+  const getBadgeClass = (category: HealthCategory) => {
+    switch (category) {
+      case "Ótimo":
+        return "health-badge-otimo";
+      case "Estável":
+        return "health-badge-estavel";
+      case "Atenção":
+        return "health-badge-atencao";
+      case "Crítico":
+        return "health-badge-critico";
+      default:
+        return "health-badge-critico";
+    }
+  };
   
   return (
     <Badge 
       className={cn(
-        "font-semibold px-3 py-1 text-sm",
-        `text-${colorClass} bg-${colorClass}-bg border border-${colorClass}/20`,
+        "px-4 py-2 text-sm font-bold transition-all duration-200 hover:scale-105",
+        getBadgeClass(category),
         className
       )}
     >

@@ -11,9 +11,10 @@ import { toast } from "@/hooks/use-toast";
 interface BulkImportProps {
   onImport: (clients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => void;
   onClose: () => void;
+  isDarkMode?: boolean;
 }
 
-export function BulkImport({ onImport, onClose }: BulkImportProps) {
+export function BulkImport({ onImport, onClose, isDarkMode = false }: BulkImportProps) {
   const [csvData, setCsvData] = useState<string>("");
   const [preview, setPreview] = useState<any[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -66,7 +67,7 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
       ];
 
       // Validar headers simples (comparação exata)
-      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));E
       if (missingHeaders.length > 0) {
         setErrors([`Headers obrigatórios faltando: ${missingHeaders.join(', ')}`]);
         setPreview([]);
@@ -214,29 +215,30 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Importação em Massa de Clientes
-          </CardTitle>
-          <CardDescription>
-            Faça upload de um arquivo CSV para adicionar múltiplos clientes de uma vez
-          </CardDescription>
-        </CardHeader>
+    <div className={`min-h-screen p-6 transition-colors duration-300 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
+      <div className="max-w-4xl mx-auto space-y-8">
+        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              <Upload className="h-6 w-6" />
+              Importação em Massa de Clientes
+            </CardTitle>
+            <CardDescription className="text-lg">
+              Faça upload de um arquivo CSV para adicionar múltiplos clientes de uma vez
+            </CardDescription>
+          </CardHeader>
         
         <CardContent className="space-y-6">
           {/* Template Download */}
-          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+          <div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${isDarkMode ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'}`}>
             <div className="flex items-center gap-3">
-              <FileText className="h-5 w-5 text-blue-600" />
+              <FileText className={`h-5 w-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
               <div>
-                <p className="font-medium text-blue-900">Baixe o template CSV</p>
-                <p className="text-sm text-blue-700">Use este modelo para organizar seus dados</p>
+                <p className={`font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>Baixe o template CSV</p>
+                <p className={`text-sm ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>Use este modelo para organizar seus dados</p>
               </div>
             </div>
-            <Button variant="outline" onClick={downloadTemplate}>
+            <Button variant="outline" onClick={downloadTemplate} className="shadow-lg">
               <Download className="h-4 w-4 mr-2" />
               Baixar Template
             </Button>
@@ -282,7 +284,7 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
               
               <div className="max-h-60 overflow-auto border rounded-lg">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
                     <tr>
                       <th className="p-2 text-left">Cliente</th>
                       <th className="p-2 text-left">Planejador</th>
@@ -302,7 +304,7 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
                   </tbody>
                 </table>
                 {preview.length > 5 && (
-                  <div className="p-2 text-center text-gray-500 bg-gray-50">
+                  <div className={`p-2 text-center text-muted-foreground ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
                     ... e mais {preview.length - 5} cliente(s)
                   </div>
                 )}
@@ -312,13 +314,13 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
 
           {/* Actions */}
           <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="shadow-lg">
               Cancelar
             </Button>
             <Button 
               onClick={handleImport}
               disabled={preview.length === 0 || errors.length > 0}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 btn-gradient"
             >
               <Upload className="h-4 w-4" />
               Importar {preview.length} Cliente(s)
@@ -326,6 +328,7 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

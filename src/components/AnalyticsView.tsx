@@ -12,11 +12,12 @@ import { HealthScoreBadge } from "./HealthScoreBadge";
 interface AnalyticsViewProps {
   clients: Client[];
   selectedPlanner: Planner | "all";
+  isDarkMode?: boolean;
 }
 
 const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
-export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) {
+export function AnalyticsView({ clients, selectedPlanner, isDarkMode = false }: AnalyticsViewProps) {
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
     const filteredClients = selectedPlanner === "all" ? clients : clients.filter(c => c.planner === selectedPlanner);
@@ -38,12 +39,12 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
       };
     }).filter(p => p.clientCount > 0).sort((a, b) => b.avgScore - a.avgScore);
 
-    // Health distribution
+    // Health distribution with simple colors that work in both light and dark modes
     const healthDistribution = [
-      { name: "Ótimo", value: healthScores.filter(s => s.category === "Ótimo").length, color: "hsl(var(--health-excellent))" },
-      { name: "Estável", value: healthScores.filter(s => s.category === "Estável").length, color: "hsl(var(--health-stable))" },
-      { name: "Atenção", value: healthScores.filter(s => s.category === "Atenção").length, color: "hsl(var(--health-warning))" },
-      { name: "Crítico", value: healthScores.filter(s => s.category === "Crítico").length, color: "hsl(var(--health-critical))" }
+      { name: "Ótimo", value: healthScores.filter(s => s.category === "Ótimo").length, color: "#10b981" }, // green-500
+      { name: "Estável", value: healthScores.filter(s => s.category === "Estável").length, color: "#3b82f6" }, // blue-500
+      { name: "Atenção", value: healthScores.filter(s => s.category === "Atenção").length, color: "#f59e0b" }, // amber-500
+      { name: "Crítico", value: healthScores.filter(s => s.category === "Crítico").length, color: "#ef4444" } // red-500
     ];
 
     // Pillar analysis
@@ -107,34 +108,49 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
 
       {/* Key Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {analytics.insights.map((insight, index) => (
-          <Card key={index} className={`bg-gradient-to-br ${insight.type === "positive" ? "from-health-excellent-bg to-health-excellent-bg/50" : insight.type === "negative" ? "from-health-critical-bg to-health-critical-bg/50" : "from-health-warning-bg to-health-warning-bg/50"} border-0 shadow-[var(--shadow-card)]`}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                {insight.type === "positive" ? (
-                  <TrendingUp className="h-5 w-5 text-health-excellent" />
-                ) : insight.type === "negative" ? (
-                  <TrendingDown className="h-5 w-5 text-health-critical" />
-                ) : (
-                  <Lightbulb className="h-5 w-5 text-health-warning" />
-                )}
-                <CardTitle className="text-lg">{insight.title}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm mb-3">{insight.description}</p>
-              <Badge variant="outline" className="text-xs">
-                Impacto: +{insight.impact} pontos
-              </Badge>
-            </CardContent>
-          </Card>
-        ))}
+        {analytics.insights.map((insight, index) => {
+          const getInsightIcon = (type: string) => {
+            if (type === "positive") return "✨";
+            if (type === "negative") return "⚠️";
+            return "💡";
+          };
+          
+          const getInsightAccent = (type: string) => {
+            if (type === "positive") return "border-l-4 border-l-green-500";
+            if (type === "negative") return "border-l-4 border-l-red-500";
+            return "border-l-4 border-l-blue-500";
+          };
+          
+          
+          return (
+            <Card key={index} className={`animate-fade-in-up animate-delay-${(index + 1) * 100} ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'} ${getInsightAccent(insight.type)}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">
+                    {getInsightIcon(insight.type)}
+                  </div>
+                  <CardTitle className="text-sm font-medium">
+                    {insight.title}
+                  </CardTitle>
+                </div>
+                <Badge variant="outline" className="text-xs font-medium">
+                  +{insight.impact} pts
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {insight.description}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Health Score Distribution */}
-        <Card className="bg-[var(--gradient-card)] border-0 shadow-[var(--shadow-card)]">
+        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
@@ -169,7 +185,7 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
         </Card>
 
         {/* Pillar Performance */}
-        <Card className="bg-[var(--gradient-card)] border-0 shadow-[var(--shadow-card)]">
+        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
@@ -217,7 +233,7 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
 
       {/* Planner Rankings */}
       {selectedPlanner === "all" && (
-        <Card className="bg-[var(--gradient-card)] border-0 shadow-[var(--shadow-card)]">
+        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Award className="h-5 w-5" />
@@ -263,7 +279,7 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
       )}
 
       {/* Action Items */}
-      <Card className="bg-[var(--gradient-card)] border-0 shadow-[var(--shadow-card)]">
+      <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Target className="h-5 w-5" />
@@ -275,20 +291,48 @@ export function AnalyticsView({ clients, selectedPlanner }: AnalyticsViewProps) 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {analytics.insights.filter(i => i.type === "action").slice(0, 3).map((action, index) => (
-              <div key={index} className="flex items-start gap-4 p-4 rounded-lg border bg-health-warning-bg/30">
-                <div className="w-6 h-6 rounded-full bg-health-warning text-health-warning-foreground flex items-center justify-center text-sm font-bold">
-                  {index + 1}
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium mb-1">{action.title}</h4>
-                  <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
-                  <Badge variant="outline" className="text-xs">
-                    ROI: +{action.impact} pontos médios
-                  </Badge>
-                </div>
-              </div>
-            ))}
+            {analytics.insights.filter(i => i.type === "action").slice(0, 3).map((action, index) => {
+              const getActionIcon = (title: string) => {
+                if (title.includes("App") || title.includes("Planilha")) return "📱";
+                if (title.includes("Reuniões") || title.includes("Reunião")) return "📅";
+                if (title.includes("Pagamento")) return "💳";
+                if (title.includes("Promotores")) return "⭐";
+                if (title.includes("Ecossistema")) return "🔗";
+                return "🎯";
+              };
+              
+              const getPriorityBadge = (index: number) => {
+                if (index === 0) return "bg-red-100 text-red-800 border-red-300";
+                if (index === 1) return "bg-yellow-100 text-yellow-800 border-yellow-300";
+                return "bg-blue-100 text-blue-800 border-blue-300";
+              };
+              
+              return (
+                <Card key={index} className={`animate-fade-in-up animate-delay-${(index + 1) * 100} ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'} border-l-4 ${index === 0 ? 'border-l-red-500' : index === 1 ? 'border-l-yellow-500' : 'border-l-blue-500'}`}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl">
+                        {getActionIcon(action.title)}
+                      </div>
+                      <CardTitle className="text-sm font-medium">
+                        {action.title}
+                      </CardTitle>
+                    </div>
+                    <Badge className={`text-xs font-medium px-2 py-1 ${getPriorityBadge(index)} border`}>
+                      #{index + 1}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                      {action.description}
+                    </p>
+                    <Badge variant="outline" className="text-xs">
+                      💰 Impacto: +{action.impact} pontos
+                    </Badge>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

@@ -12,11 +12,21 @@ const Index = () => {
   const [showClientManager, setShowClientManager] = useState(false);
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [loading, setLoading] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Carregar clientes do Supabase ao inicializar
   useEffect(() => {
     loadClients();
   }, []);
+
+  // Aplicar modo escuro ao documento
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   const loadClients = async () => {
     try {
@@ -148,6 +158,8 @@ const Index = () => {
         selectedPlanner={selectedPlanner}
         onUpdateClient={handleUpdateClient}
         onBack={handleBackToDashboard}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
       />
     );
   }
@@ -158,6 +170,8 @@ const Index = () => {
       onAddClient={() => setShowForm(true)}
       onBulkImport={handleBulkImport}
       onManageClients={handleManageClients}
+      isDarkMode={isDarkMode}
+      onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
     />
   );
 };

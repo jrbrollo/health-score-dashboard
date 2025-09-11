@@ -53,3 +53,4 @@ SELECT
 FROM information_schema.columns 
 WHERE table_name = 'clients' 
 ORDER BY ordinal_position;
+

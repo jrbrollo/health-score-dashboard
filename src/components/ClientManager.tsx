@@ -22,6 +22,7 @@ import {
 import { Client, Planner, LastMeeting, AppUsage, PaymentStatus, NPSScore, EcosystemUsage } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
+import { ThemeToggle } from "./ui/theme-toggle";
 import { toast } from "@/hooks/use-toast";
 
 interface ClientManagerProps {
@@ -29,11 +30,13 @@ interface ClientManagerProps {
   selectedPlanner: Planner | "all";
   onUpdateClient: (clientId: string, updatedData: Partial<Client>) => void;
   onBack: () => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
-export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack }: ClientManagerProps) {
+export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingClient, setEditingClient] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Client>>({});
@@ -98,12 +101,22 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
   };
 
   const getHealthScoreColor = (category: string) => {
-    switch (category) {
-      case "Ótimo": return "text-green-600 bg-green-100";
-      case "Estável": return "text-blue-600 bg-blue-100";
-      case "Atenção": return "text-yellow-600 bg-yellow-100";
-      case "Crítico": return "text-red-600 bg-red-100";
-      default: return "text-gray-600 bg-gray-100";
+    if (isDarkMode) {
+      switch (category) {
+        case "Ótimo": return "text-green-300 bg-green-900/30 border border-green-700";
+        case "Estável": return "text-blue-300 bg-blue-900/30 border border-blue-700";
+        case "Atenção": return "text-yellow-300 bg-yellow-900/30 border border-yellow-700";
+        case "Crítico": return "text-red-300 bg-red-900/30 border border-red-700";
+        default: return "text-gray-300 bg-gray-800/30 border border-gray-600";
+      }
+    } else {
+      switch (category) {
+        case "Ótimo": return "text-green-600 bg-green-100";
+        case "Estável": return "text-blue-600 bg-blue-100";
+        case "Atenção": return "text-yellow-600 bg-yellow-100";
+        case "Crítico": return "text-red-600 bg-red-100";
+        default: return "text-gray-600 bg-gray-100";
+      }
     }
   };
 
@@ -111,7 +124,7 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
     if (editingClient !== client.id) return null;
 
     return (
-      <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
+      <div className={`mt-4 p-4 rounded-lg space-y-4 ${isDarkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Última Reunião */}
           <div>
@@ -275,26 +288,34 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className={`min-h-screen p-6 transition-colors duration-300 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Gerenciar Clientes</h1>
-            <p className="text-muted-foreground">
-              {filterPlanner === "all" 
-                ? `Visualizando clientes de todos os planejadores (${filteredClients.length} clientes)`
-                : `Visualizando clientes de ${filterPlanner} (${filteredClients.length} clientes)`
-              }
-            </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                Gerenciar Clientes
+              </h1>
+              <p className="text-muted-foreground text-lg mt-2">
+                {filterPlanner === "all" 
+                  ? `Visualizando clientes de todos os planejadores (${filteredClients.length} clientes)`
+                  : `Visualizando clientes de ${filterPlanner} (${filteredClients.length} clientes)`
+                }
+              </p>
+            </div>
+            <ThemeToggle 
+              isDark={isDarkMode} 
+              onToggle={onToggleDarkMode || (() => {})} 
+            />
           </div>
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={onBack} className="shadow-lg">
             Voltar ao Dashboard
           </Button>
         </div>
 
         {/* Filtros */}
-        <Card>
+        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />
@@ -356,11 +377,11 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
         {/* Lista de Clientes */}
         <div className="space-y-4">
           {filteredClients.length === 0 ? (
-            <Card>
+            <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Users className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum cliente encontrado</h3>
-                <p className="text-gray-600 text-center">
+                <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Nenhum cliente encontrado</h3>
+                <p className="text-muted-foreground text-center">
                   {searchTerm ? "Tente ajustar os filtros de busca." : "Não há clientes cadastrados ainda."}
                 </p>
               </CardContent>
@@ -370,13 +391,13 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
               const healthScore = calculateHealthScore(client);
               
               return (
-                <Card key={client.id} className="hover:shadow-md transition-shadow">
+                <Card key={client.id} className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div>
                           <h3 className="text-lg font-semibold">{client.name}</h3>
-                          <p className="text-sm text-gray-600">
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                             Planejador: {client.planner} • 
                             Última atualização: {new Date(client.updatedAt).toLocaleDateString('pt-BR')}
                           </p>
@@ -402,19 +423,19 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
                     {/* Informações rápidas */}
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-500">Última reunião:</span>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Última reunião:</span>
                         <p className="font-medium">{client.lastMeeting}</p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Próxima reunião:</span>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Próxima reunião:</span>
                         <p className="font-medium">{client.hasScheduledMeeting ? "Agendada" : "Não agendada"}</p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Status pagamento:</span>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status pagamento:</span>
                         <p className="font-medium">{client.paymentStatus}</p>
                       </div>
                       <div>
-                        <span className="text-gray-500">NPS:</span>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NPS:</span>
                         <p className="font-medium">{client.npsScore}</p>
                       </div>
                     </div>

@@ -50,6 +50,32 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## Troubleshooting
+
+### Terminal Command Issues (Windows PowerShell)
+
+Se você está tendo problemas com comandos no terminal devido a espaços no nome da pasta:
+
+1. **Renomeie a pasta** de `Health Score` para `Health-Score`
+2. **Navegue até** `C:\Users\User\Health-Score\health-score-dashboard`
+3. **Execute** `npm run dev`
+
+### Comandos Úteis
+
+```sh
+# Navegar para o projeto
+cd health-score-dashboard
+
+# Instalar dependências
+npm install
+
+# Executar em desenvolvimento
+npm run dev
+
+# Build para produção
+npm run build
+```
+
 ## What technologies are used for this project?
 
 This project is built with:
