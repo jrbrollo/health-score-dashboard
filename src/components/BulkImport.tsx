@@ -117,9 +117,9 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
 
         // Mapear uso do app
         const usoApp = row['Uso app categorizacao'];
-        if (usoApp === 'Não acessou/categorizou (30+ dias)' || usoApp === 'Nao acessou/categorizou (30+ dias)') {
+        if (usoApp === 'Nao acessou/categorizou (30+ dias)') {
           row.appUsage = 'Sem acesso/categorização (30+ dias)';
-        } else if (usoApp === 'Acessou, sem categorizar' || usoApp === 'Acessou, sem categorizacao') {
+        } else if (usoApp === 'Acessou, sem categorizacao') {
           row.appUsage = 'Acessou, sem categorização';
         } else {
           row.appUsage = usoApp;
@@ -143,9 +143,9 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
 
         // Mapear outras áreas
         const outrasAreas = row['Uso outras areas'];
-        if (outrasAreas === 'Usou 2+ áreas' || outrasAreas === 'Usou 2+ areas') {
+        if (outrasAreas === 'Usou 2+ areas') {
           row.ecosystemUsage = 'Usou 2+ áreas';
-        } else if (outrasAreas === 'Usou 1 área' || outrasAreas === 'Usou 1 area') {
+        } else if (outrasAreas === 'Usou 1 area') {
           row.ecosystemUsage = 'Usou 1 área';
         } else if (outrasAreas === 'Nenhuma') {
           row.ecosystemUsage = 'Não usou';
