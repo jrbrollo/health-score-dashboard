@@ -89,6 +89,13 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
           row[header] = values[index];
         });
 
+        // Normalizar valores removendo espaços extras e caracteres invisíveis
+        Object.keys(row).forEach(key => {
+          if (typeof row[key] === 'string') {
+            row[key] = row[key].trim().replace(/\s+/g, ' ');
+          }
+        });
+
         // Validações específicas
         if (!row['Cliente'] || row['Cliente'].length < 2) {
           newErrors.push(`Linha ${i + 1}: Nome do cliente inválido`);
@@ -105,10 +112,11 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
           newErrors.push(`Linha ${i + 1}: Valor inválido em 'Ultima reuniao': ${row['Ultima reuniao']}`);
         }
 
-        // Validar valores de Proxima reuniao
-        const validProximaReuniao = ["Sim", "Nao"];
-        if (!validProximaReuniao.includes(row['Proxima reuniao'])) {
-          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Proxima reuniao': ${row['Proxima reuniao']}`);
+        // Validar valores de Proxima reuniao (aceitar com e sem acentos)
+        const proximaReuniao = row['Proxima reuniao'];
+        const validProximaReuniao = ["Sim", "Nao", "Não"];
+        if (!validProximaReuniao.includes(proximaReuniao)) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Proxima reuniao': ${proximaReuniao}`);
         }
 
         // Validar valores de Pagamento
@@ -117,10 +125,11 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
           newErrors.push(`Linha ${i + 1}: Valor inválido em 'Pagamento': ${row['Pagamento']}`);
         }
 
-        // Validar valores de Indicacoes
-        const validIndicacoes = ["Sim", "Nao"];
-        if (!validIndicacoes.includes(row['Indicacoes'])) {
-          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Indicacoes': ${row['Indicacoes']}`);
+        // Validar valores de Indicacoes (aceitar com e sem acentos)
+        const indicacoes = row['Indicacoes'];
+        const validIndicacoes = ["Sim", "Nao", "Não"];
+        if (!validIndicacoes.includes(indicacoes)) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Indicacoes': ${indicacoes}`);
         }
 
         // Validar valores de Nota NPS
@@ -132,8 +141,13 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
         // Converter e mapear campos para o formato esperado
         row.name = row['Cliente'];
         row.planner = row['Planejador'];
-        row.hasScheduledMeeting = row['Proxima reuniao']?.toLowerCase() === 'sim';
-        row.hasReferrals = row['Indicacoes']?.toLowerCase() === 'sim';
+        
+        // Normalizar valores com acentos para comparação
+        const proximaReuniaoNormalized = row['Proxima reuniao'].toLowerCase().replace('ã', 'a');
+        const indicacoesNormalized = row['Indicacoes'].toLowerCase().replace('ã', 'a');
+        
+        row.hasScheduledMeeting = proximaReuniaoNormalized === 'sim';
+        row.hasReferrals = indicacoesNormalized === 'sim';
 
         // Mapear campos específicos com conversões necessárias
         const ultimaReuniao = row['Ultima reuniao'];
