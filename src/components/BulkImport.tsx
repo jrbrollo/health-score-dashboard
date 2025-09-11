@@ -67,7 +67,7 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
       ];
 
       // Validar headers simples (comparação exata)
-      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));E
+      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
       if (missingHeaders.length > 0) {
         setErrors([`Headers obrigatórios faltando: ${missingHeaders.join(', ')}`]);
         setPreview([]);
@@ -97,6 +97,36 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
         const validPlanners = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
         if (!validPlanners.includes(row['Planejador'])) {
           newErrors.push(`Linha ${i + 1}: Planejador inválido: ${row['Planejador']}`);
+        }
+
+        // Validar valores de Ultima reuniao
+        const validLastMeeting = ["<30 dias", "31-60 dias", ">60 dias"];
+        if (!validLastMeeting.includes(row['Ultima reuniao'])) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Ultima reuniao': ${row['Ultima reuniao']}`);
+        }
+
+        // Validar valores de Proxima reuniao
+        const validProximaReuniao = ["Sim", "Nao"];
+        if (!validProximaReuniao.includes(row['Proxima reuniao'])) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Proxima reuniao': ${row['Proxima reuniao']}`);
+        }
+
+        // Validar valores de Pagamento
+        const validPayment = ["Em dia", "1 parcela em atraso", "2 parcelas em atraso", "3+ parcelas em atraso"];
+        if (!validPayment.includes(row['Pagamento'])) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Pagamento': ${row['Pagamento']}`);
+        }
+
+        // Validar valores de Indicacoes
+        const validIndicacoes = ["Sim", "Nao"];
+        if (!validIndicacoes.includes(row['Indicacoes'])) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Indicacoes': ${row['Indicacoes']}`);
+        }
+
+        // Validar valores de Nota NPS
+        const validNPS = ["Promotor (9-10)", "Neutro/SR (7-8)", "Detrator (0-6)"];
+        if (!validNPS.includes(row['Nota NPS'])) {
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Nota NPS': ${row['Nota NPS']}`);
         }
 
         // Converter e mapear campos para o formato esperado
@@ -199,13 +229,13 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
     const clients = preview.map(row => ({
       name: row.name,
       planner: row.planner as Planner,
-      lastMeeting: row.lastMeeting,
+      lastMeeting: row.lastMeeting as LastMeeting,
       hasScheduledMeeting: row.hasScheduledMeeting,
-      appUsage: row.appUsage,
-      paymentStatus: row.paymentStatus,
+      appUsage: row.appUsage as AppUsage,
+      paymentStatus: row.paymentStatus as PaymentStatus,
       hasReferrals: row.hasReferrals,
-      npsScore: row.npsScore,
-      ecosystemUsage: row.ecosystemUsage,
+      npsScore: row.npsScore as NPSScore,
+      ecosystemUsage: row.ecosystemUsage as EcosystemUsage,
     }));
 
     // Debug: verificar dados antes de importar
