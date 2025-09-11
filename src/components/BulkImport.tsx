@@ -21,9 +21,9 @@ export function BulkImport({ onImport, onClose, isDarkMode = false }: BulkImport
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const csvTemplate = `Planejador;Cliente;Ultima reuniao;Proxima reuniao;Uso app categorizacao;Pagamento;Indicacoes;Nota NPS;Uso outras areas
-Barroso;João Silva;<30 dias;Sim;Acessou e categorizou (15 dias);Em dia;Sim;Promotor (9-10);Usou 2+ áreas
-Helio;Maria Santos;31-60 dias;Não;Acessou, sem categorizar;Em dia;Não;Neutro/SR (7-8);Usou 1 área
-Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela em atraso;Não;Detrator (0-6);Nenhuma`;
+Barroso;Joao Silva;<30 dias;Sim;Acessou e categorizou (15 dias);Em dia;Sim;Promotor (9-10);Usou 2+ areas
+Helio;Maria Santos;31-60 dias;Nao;Acessou, sem categorizacao;Em dia;Nao;Neutro/SR (7-8);Usou 1 area
+Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em atraso;Nao;Detrator (0-6);Nenhuma`;
 
   const downloadTemplate = () => {
     const blob = new Blob([csvTemplate], { type: 'text/csv' });
@@ -117,9 +117,9 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
 
         // Mapear uso do app
         const usoApp = row['Uso app categorizacao'];
-        if (usoApp === 'Não acessou/categorizou (30+ dias)') {
+        if (usoApp === 'Não acessou/categorizou (30+ dias)' || usoApp === 'Nao acessou/categorizou (30+ dias)') {
           row.appUsage = 'Sem acesso/categorização (30+ dias)';
-        } else if (usoApp === 'Acessou, sem categorizar') {
+        } else if (usoApp === 'Acessou, sem categorizar' || usoApp === 'Acessou, sem categorizacao') {
           row.appUsage = 'Acessou, sem categorização';
         } else {
           row.appUsage = usoApp;
@@ -143,8 +143,10 @@ Abraao;Pedro Costa;>60 dias;Não;Não acessou/categorizou (30+ dias);1 parcela e
 
         // Mapear outras áreas
         const outrasAreas = row['Uso outras areas'];
-        if (outrasAreas === 'Usou 2+ áreas') {
+        if (outrasAreas === 'Usou 2+ áreas' || outrasAreas === 'Usou 2+ areas') {
           row.ecosystemUsage = 'Usou 2+ áreas';
+        } else if (outrasAreas === 'Usou 1 área' || outrasAreas === 'Usou 1 area') {
+          row.ecosystemUsage = 'Usou 1 área';
         } else if (outrasAreas === 'Nenhuma') {
           row.ecosystemUsage = 'Não usou';
         } else {
