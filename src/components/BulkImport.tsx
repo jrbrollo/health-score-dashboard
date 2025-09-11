@@ -117,12 +117,16 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
 
         // Mapear uso do app
         const usoApp = row['Uso app categorizacao'];
-        if (usoApp === 'Nao acessou/categorizou (30+ dias)') {
-          row.appUsage = 'Sem acesso/categorização (30+ dias)';
+        if (usoApp === 'Acessou e categorizou (15 dias)') {
+          row.appUsage = 'Acessou e categorizou (15 dias)';
         } else if (usoApp === 'Acessou, sem categorizacao') {
           row.appUsage = 'Acessou, sem categorização';
+        } else if (usoApp === 'Nao acessou/categorizou (30+ dias)') {
+          row.appUsage = 'Sem acesso/categorização (30+ dias)';
         } else {
-          row.appUsage = usoApp;
+          // Fallback para valores não mapeados
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Uso app categorizacao': ${usoApp}`);
+          row.appUsage = 'Sem acesso/categorização (30+ dias)'; // Valor padrão
         }
 
         // Mapear status de pagamento
@@ -150,7 +154,9 @@ Abraao;Pedro Costa;>60 dias;Nao;Nao acessou/categorizou (30+ dias);1 parcela em 
         } else if (outrasAreas === 'Nenhuma') {
           row.ecosystemUsage = 'Não usou';
         } else {
-          row.ecosystemUsage = outrasAreas;
+          // Fallback para valores não mapeados
+          newErrors.push(`Linha ${i + 1}: Valor inválido em 'Uso outras areas': ${outrasAreas}`);
+          row.ecosystemUsage = 'Não usou'; // Valor padrão
         }
 
         // Para a preview, manter os valores originais dos headers
