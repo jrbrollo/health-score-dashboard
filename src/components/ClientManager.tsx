@@ -17,7 +17,8 @@ import {
   Smartphone,
   UserCheck,
   Star,
-  Building
+  Building,
+  Trash2
 } from "lucide-react";
 import { Client, Planner, LastMeeting, AppUsage, PaymentStatus, NPSScore, EcosystemUsage } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
@@ -29,6 +30,7 @@ interface ClientManagerProps {
   clients: Client[];
   selectedPlanner: Planner | "all";
   onUpdateClient: (clientId: string, updatedData: Partial<Client>) => void;
+  onDeleteClient: (clientId: string) => void;
   onBack: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
@@ -36,12 +38,13 @@ interface ClientManagerProps {
 
 const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
-export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
+export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDeleteClient, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingClient, setEditingClient] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Client>>({});
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterPlanner, setFilterPlanner] = useState<Planner | "all">(selectedPlanner);
+  const [deletingClient, setDeletingClient] = useState<string | null>(null);
 
   // Filtrar clientes
   const filteredClients = useMemo(() => {
@@ -98,6 +101,25 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
   const handleCancel = () => {
     setEditingClient(null);
     setEditForm({});
+  };
+
+  const handleDelete = (clientId: string) => {
+    setDeletingClient(clientId);
+  };
+
+  const confirmDelete = () => {
+    if (deletingClient) {
+      onDeleteClient(deletingClient);
+      setDeletingClient(null);
+      toast({
+        title: "Cliente excluído!",
+        description: "O cliente foi removido da carteira.",
+      });
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeletingClient(null);
   };
 
   const getHealthScoreColor = (category: string) => {
@@ -409,15 +431,26 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
                           </Badge>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(client)}
-                        disabled={editingClient === client.id}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        {editingClient === client.id ? "Editando..." : "Editar"}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(client)}
+                          disabled={editingClient === client.id}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          {editingClient === client.id ? "Editando..." : "Editar"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(client.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Informações rápidas */}
@@ -448,6 +481,34 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onBack
           )}
         </div>
       </div>
+
+      {/* Modal de confirmação de exclusão */}
+      {deletingClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-xl max-w-md w-full mx-4`}>
+            <h3 className="text-lg font-semibold mb-4 text-red-600">
+              Confirmar Exclusão
+            </h3>
+            <p className="mb-6 text-gray-600">
+              Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={cancelDelete}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+              >
+                Excluir Cliente
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -118,6 +118,28 @@ const Index = () => {
     }
   };
 
+  const handleDeleteClient = async (clientId: string) => {
+    try {
+      const success = await clientService.deleteClient(clientId);
+      if (success) {
+        setClients(prev => prev.filter(client => client.id !== clientId));
+        toast({
+          title: "Cliente excluído!",
+          description: "O cliente foi removido da carteira.",
+        });
+      } else {
+        throw new Error('Falha ao excluir cliente');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir cliente:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o cliente. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleManageClients = (planner?: Planner | "all") => {
     if (planner) {
       setSelectedPlanner(planner);
@@ -157,6 +179,7 @@ const Index = () => {
         clients={clients}
         selectedPlanner={selectedPlanner}
         onUpdateClient={handleUpdateClient}
+        onDeleteClient={handleDeleteClient}
         onBack={handleBackToDashboard}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}

@@ -28,13 +28,14 @@ interface DashboardProps {
   onAddClient: () => void;
   onBulkImport?: (clients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => void;
   onManageClients?: (planner?: Planner | "all") => void;
+  onDeleteClient?: (clientId: string) => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
 
 const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
 
-export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
+export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients, onDeleteClient, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [showBulkImport, setShowBulkImport] = useState(false);
 
