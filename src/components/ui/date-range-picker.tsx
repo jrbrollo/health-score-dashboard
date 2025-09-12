@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,33 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
   onDateChange,
   className
 }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) return;
+
+    // Se temos uma data inicial, mas não uma final, mantemos a data inicial
+    if (range.from && !range.to) {
+      onDateChange({
+        from: range.from,
+        to: range.from
+      });
+      return;
+    }
+
+    // Se temos ambas as datas, atualizamos normalmente
+    if (range.from && range.to) {
+      onDateChange({
+        from: range.from,
+        to: range.to
+      });
+      setIsOpen(false); // Fecha o popover quando a seleção está completa
+      return;
+    }
+  };
+
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -52,14 +77,7 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
           mode="range"
           defaultMonth={date?.from}
           selected={date}
-          onSelect={(range) => {
-            if (range?.from && range?.to) {
-              onDateChange({
-                from: range.from,
-                to: range.to
-              });
-            }
-          }}
+          onSelect={handleSelect}
           numberOfMonths={2}
           locale={ptBR}
         />
