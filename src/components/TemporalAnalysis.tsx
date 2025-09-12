@@ -131,6 +131,8 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
             <YAxis 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
               fontSize={12}
+              domain={['dataMin - 5', 'dataMax + 5']}
+              tickCount={8}
             />
             <Tooltip 
               contentStyle={{
