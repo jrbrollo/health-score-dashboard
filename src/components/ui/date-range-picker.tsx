@@ -22,32 +22,55 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
   className
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [tempRange, setTempRange] = useState<{ from?: Date; to?: Date }>({});
 
-  const handleSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (!range) return;
+  const handleDateSelect = (selectedDate: Date | undefined) => {
+    if (!selectedDate) return;
 
-    // Se temos uma data inicial, mas não uma final, mantemos a data inicial
-    if (range.from && !range.to) {
-      onDateChange({
-        from: range.from,
-        to: range.from
-      });
+    // Se não temos data inicial, define como data inicial
+    if (!tempRange.from) {
+      setTempRange({ from: selectedDate, to: undefined });
       return;
     }
 
-    // Se temos ambas as datas, atualizamos normalmente
-    if (range.from && range.to) {
-      onDateChange({
-        from: range.from,
-        to: range.to
-      });
-      setIsOpen(false); // Fecha o popover quando a seleção está completa
+    // Se já temos data inicial, define como data final
+    if (tempRange.from && !tempRange.to) {
+      const newRange = {
+        from: tempRange.from,
+        to: selectedDate
+      };
+      
+      // Garante que 'from' seja sempre menor ou igual a 'to'
+      if (selectedDate < tempRange.from) {
+        newRange.from = selectedDate;
+        newRange.to = tempRange.from;
+      }
+      
+      onDateChange(newRange);
+      setTempRange({});
+      setIsOpen(false);
       return;
+    }
+
+    // Se já temos ambas, reseta e começa nova seleção
+    setTempRange({ from: selectedDate, to: undefined });
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      // Quando abre, inicializa com o range atual
+      setTempRange({ from: date.from, to: date.to });
+    } else {
+      // Quando fecha, reseta o range temporário
+      setTempRange({});
     }
   };
 
+  const currentRange = tempRange.from ? tempRange : date;
+
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -73,14 +96,28 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="range"
-          defaultMonth={date?.from}
-          selected={date}
-          onSelect={handleSelect}
-          numberOfMonths={2}
-          locale={ptBR}
-        />
+        <div className="p-3">
+          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            {!tempRange.from ? "Clique na data inicial" : 
+             !tempRange.to ? "Clique na data final" : 
+             "Período selecionado"}
+          </div>
+          <Calendar
+            mode="single"
+            defaultMonth={currentRange.from}
+            selected={tempRange.from}
+            onSelect={handleDateSelect}
+            numberOfMonths={2}
+            locale={ptBR}
+            disabled={(date) => {
+              // Se já temos data inicial, desabilita datas antes dela
+              if (tempRange.from && !tempRange.to) {
+                return date < tempRange.from;
+              }
+              return false;
+            }}
+          />
+        </div>
       </PopoverContent>
     </Popover>
   );

@@ -167,12 +167,17 @@ export const temporalService = {
   // Calcular análise de tendência
   async getTrendAnalysis(
     planner: Planner | "all",
-    periodDays: number = 30
+    periodDays: number = 30,
+    customStartDate?: Date,
+    customEndDate?: Date
   ): Promise<TrendAnalysis | null> {
     try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - periodDays);
+      const endDate = customEndDate || new Date();
+      const startDate = customStartDate || (() => {
+        const date = new Date();
+        date.setDate(date.getDate() - periodDays);
+        return date;
+      })();
 
       const currentData = planner === "all" 
         ? await this.getAggregatedTemporalAnalysis(startDate, endDate)

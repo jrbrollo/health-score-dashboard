@@ -48,7 +48,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
   // Carregar análise de tendência
   useEffect(() => {
     loadTrendAnalysis();
-  }, [selectedPlanner]);
+  }, [selectedPlanner, dateRange]);
 
   const loadAnalysisData = async () => {
     setLoading(true);
@@ -67,7 +67,9 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
 
   const loadTrendAnalysis = async () => {
     try {
-      const trend = await temporalService.getTrendAnalysis(selectedPlanner, 30);
+      // Calcular o número de dias do período selecionado
+      const daysDiff = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+      const trend = await temporalService.getTrendAnalysis(selectedPlanner, daysDiff, dateRange.from, dateRange.to);
       setTrendData(trend);
     } catch (error) {
       console.error('Erro ao carregar análise de tendência:', error);
@@ -339,7 +341,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {renderTrendIcon(trendData.overallTrend)}
-              Análise de Tendência (30 dias)
+              Análise de Tendência ({Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24))} dias)
             </CardTitle>
           </CardHeader>
           <CardContent>
