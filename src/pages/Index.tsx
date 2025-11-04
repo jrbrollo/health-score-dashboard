@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
-import { Client, Planner } from "@/types/client";
+import { Client, Planner, BulkImportPayload } from "@/types/client";
 import { Dashboard } from "@/components/Dashboard";
-import { StepByStepForm } from "@/components/StepByStepForm";
-import { ClientManager } from "@/components/ClientManager";
 import { clientService } from "@/services/clientService";
 import { toast } from "@/hooks/use-toast";
 
@@ -32,6 +30,23 @@ const Index = () => {
     try {
       setLoading(true);
       const clientsData = await clientService.getAllClients();
+      // Debug: distribuição de Cross Sell para diagnóstico
+      try {
+        const dist = clientsData.reduce((acc: any, c) => {
+          const v = c.crossSellCount ?? 0;
+          if (v >= 3) acc['3+'] = (acc['3+'] || 0) + 1; else acc[String(v)] = (acc[String(v)] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('📊 Distribuição crossSellCount:', dist);
+        const referrals = clientsData.reduce((acc, c) => {
+          const key = c.hasNpsReferral ? 'com_indicacao' : 'sem_indicacao';
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('📊 Distribuição hasNpsReferral:', referrals);
+      } catch (e) {
+        console.warn('Warn ao calcular distribuição de crossSellCount:', e);
+      }
       setClients(clientsData);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -72,23 +87,27 @@ const Index = () => {
     setShowForm(false);
   };
 
-  const handleBulkImport = async (importedClients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => {
+  const handleBulkImport = async ({ clients: importedClients, sheetDate }: BulkImportPayload) => {
     try {
-      const newClients = await clientService.createMultipleClients(importedClients);
+      console.log('📤 Iniciando importação de', importedClients.length, 'clientes', sheetDate ? `para a data ${sheetDate}` : '');
+      const newClients = await clientService.createMultipleClients(importedClients, { sheetDate });
       if (newClients.length > 0) {
-        setClients(prev => [...prev, ...newClients]);
+        // Após import/upsert, recarregar do banco para garantir dados atualizados (evita manter versões antigas no estado)
+        await loadClients();
         toast({
           title: "Importação concluída!",
-          description: `${newClients.length} clientes foram importados com sucesso.`,
+          description: `${newClients.length} clientes foram importados/atualizados com sucesso.`,
         });
       } else {
         throw new Error('Nenhum cliente foi importado');
       }
-    } catch (error) {
-      console.error('Erro ao importar clientes:', error);
+    } catch (error: any) {
+      console.error('❌ Erro ao importar clientes:', error);
+      const errorMessage = error?.message || 'Erro desconhecido';
+      const errorDetails = error?.details || error?.hint || '';
       toast({
         title: "Erro na importação",
-        description: "Não foi possível importar os clientes. Tente novamente.",
+        description: `${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`,
         variant: "destructive",
       });
     }
@@ -190,9 +209,7 @@ const Index = () => {
   return (
     <Dashboard
       clients={clients}
-      onAddClient={() => setShowForm(true)}
       onBulkImport={handleBulkImport}
-      onManageClients={handleManageClients}
       isDarkMode={isDarkMode}
       onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
     />

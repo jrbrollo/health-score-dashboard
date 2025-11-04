@@ -5,26 +5,28 @@ import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, TrendingDown, Target, Award, AlertTriangle, Users, Lightbulb, BarChart } from "lucide-react";
-import { Client, Planner, HealthCategory } from "@/types/client";
+import { Client, HealthCategory } from "@/types/client";
+import { uniqueById } from "@/lib/filters";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 
 interface AnalyticsViewProps {
   clients: Client[];
-  selectedPlanner: Planner | "all";
+  selectedPlanner?: string | null;
   isDarkMode?: boolean;
 }
 
-const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
+// planners derivam dos clientes recebidos
 
-export function AnalyticsView({ clients, selectedPlanner, isDarkMode = false }: AnalyticsViewProps) {
+export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = false }: AnalyticsViewProps) {
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
-    const filteredClients = selectedPlanner === "all" ? clients : clients.filter(c => c.planner === selectedPlanner);
+    const filteredClients = uniqueById(!selectedPlanner ? clients : clients.filter(c => c.planner === selectedPlanner));
     const healthScores = filteredClients.map(client => calculateHealthScore(client));
     
-    // Planner rankings
-    const plannerRankings = planners.map(planner => {
+    // Planner rankings (dinâmico)
+    const dynamicPlanners = Array.from(new Set(clients.filter(c => c.planner && c.planner !== '0').map(c => c.planner)));
+    const plannerRankings = dynamicPlanners.map(planner => {
       const plannerClients = clients.filter(c => c.planner === planner);
       const plannerScores = plannerClients.map(c => calculateHealthScore(c));
       const avgScore = plannerScores.length > 0 
@@ -47,38 +49,19 @@ export function AnalyticsView({ clients, selectedPlanner, isDarkMode = false }: 
       { name: "Crítico", value: healthScores.filter(s => s.category === "Crítico").length, color: "#ef4444" } // red-500
     ];
 
-    // Pillar analysis
+    // Pillar analysis (v3): NPS (20), Indicação (10), Inadimplência (40), Cross Sell (15), Tenure (15)
+    const avgFrom = (key: keyof typeof healthScores[0]['breakdown']) => {
+      if (healthScores.length === 0) return 0;
+      const total = healthScores.reduce((sum, s) => sum + (s.breakdown as any)[key], 0);
+      return total / healthScores.length;
+    };
+
     const pillarAnalysis = [
-      {
-        name: "Engajamento Reuniões",
-        avg: Math.round(healthScores.reduce((sum, s) => sum + s.breakdown.meetingEngagement, 0) / healthScores.length || 0),
-        max: 40,
-        impact: "Alto"
-      },
-      {
-        name: "Uso do App",
-        avg: Math.round(healthScores.reduce((sum, s) => sum + s.breakdown.appUsage, 0) / healthScores.length || 0),
-        max: 30,
-        impact: "Médio"
-      },
-      {
-        name: "Status Pagamento",
-        avg: Math.round(healthScores.reduce((sum, s) => sum + s.breakdown.paymentStatus, 0) / healthScores.length || 0),
-        max: 30,
-        impact: "Alto"
-      },
-      {
-        name: "Ecossistema",
-        avg: Math.round(healthScores.reduce((sum, s) => sum + s.breakdown.ecosystemEngagement, 0) / healthScores.length || 0),
-        max: 15,
-        impact: "Baixo"
-      },
-      {
-        name: "NPS",
-        avg: Math.round(healthScores.reduce((sum, s) => sum + s.breakdown.npsScore, 0) / healthScores.length || 0),
-        max: 15,
-        impact: "Médio"
-      }
+      { name: "NPS", avg: avgFrom('nps'), max: 20, impact: "Médio" },
+      { name: "Indicação", avg: avgFrom('referral'), max: 10, impact: "Baixo" },
+      { name: "Pagamentos", avg: avgFrom('payment'), max: 40, impact: "Alto" },
+      { name: "Cross Sell", avg: avgFrom('crossSell'), max: 15, impact: "Médio" },
+      { name: "Tempo de Relacionamento", avg: avgFrom('tenure'), max: 15, impact: "Médio" },
     ];
 
     // Generate insights
@@ -99,7 +82,7 @@ export function AnalyticsView({ clients, selectedPlanner, isDarkMode = false }: 
       {/* Header */}
       <div className="text-center">
         <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-          Análise Avançada - {selectedPlanner === "all" ? "Equipe Completa" : selectedPlanner}
+          Análise Avançada - {selectedPlanner ? selectedPlanner : "Equipe Filtrada"}
         </h2>
         <p className="text-muted-foreground mt-2">
           Insights detalhados e recomendações estratégicas
@@ -264,7 +247,7 @@ export function AnalyticsView({ clients, selectedPlanner, isDarkMode = false }: 
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <div className="text-lg font-semibold">{planner.avgScore}</div>
-                      <Progress value={(planner.avgScore / 135) * 100} className="w-20 h-2" />
+                      <Progress value={planner.avgScore} className="w-20 h-2" />
                     </div>
                     <HealthScoreBadge
                       category={planner.category as HealthCategory}
@@ -340,61 +323,73 @@ export function AnalyticsView({ clients, selectedPlanner, isDarkMode = false }: 
   );
 }
 
-function generateInsights(clients: Client[], healthScores: any[], pillarAnalysis: any[], selectedPlanner: string) {
+function generateInsights(clients: Client[], healthScores: any[], pillarAnalysis: any[], selectedPlanner?: string | null) {
   const insights = [];
   
-  // App usage insight
-  const lowAppUsage = clients.filter(c => c.appUsage === "Sem acesso/categorização (30+ dias)").length;
-  if (lowAppUsage > 0) {
+  // v3 insights
+  const overdue2 = clients.filter(c => (c.overdueInstallments ?? 0) >= 2 && (c.overdueInstallments ?? 0) < 3).length;
+  if (overdue2 > 0) {
     insights.push({
-      type: "action",
-      title: "Ativar Uso do App/Planilha",
-      description: `${lowAppUsage} clientes não usam o app há 30+ dias. Reativar pode gerar +30 pontos por cliente.`,
-      impact: 30
+      type: "negative",
+      title: "Risco de Inadimplência Elevado",
+      description: `${overdue2} clientes com 2 parcelas em atraso. Aja antes de virar 3+ (score zera).`,
+      impact: 20
     });
   }
 
-  // Meeting engagement
-  const noScheduledMeetings = clients.filter(c => !c.hasScheduledMeeting).length;
-  if (noScheduledMeetings > 0) {
+  const overdue1_30plus = clients.filter(c => (c.overdueInstallments ?? 0) === 1 && (c.overdueDays ?? 0) > 30).length;
+  if (overdue1_30plus > 0) {
     insights.push({
-      type: "action", 
-      title: "Agendar Reuniões Futuras",
-      description: `${noScheduledMeetings} clientes sem reunião agendada. Agendar pode gerar +10 pontos por cliente.`,
+      type: "negative",
+      title: "1 Parcela >30 dias",
+      description: `${overdue1_30plus} clientes com 1 parcela >30 dias. Regularizar evita perda de até 20 pontos.`,
+      impact: 20
+    });
+  }
+
+  const noNps = clients.filter(c => c.npsScoreV3 === null || c.npsScoreV3 === undefined).length;
+  if (noNps > 0) {
+    insights.push({
+      type: "action",
+      title: "Coletar NPS Pendente",
+      description: `${noNps} clientes sem nota de NPS. Coletar pode elevar até +20 pontos.`,
+      impact: 20
+    });
+  }
+
+  const promotersV3 = clients.filter(c => (c.npsScoreV3 ?? -1) >= 9).length;
+  if (promotersV3 > 0) {
+    insights.push({
+      type: "positive",
+      title: "Ativar Indicações de Promotores",
+      description: `${promotersV3} promotores. Incentive indicações (+10 pontos por cliente).`,
       impact: 10
     });
   }
 
-  // Payment status
-  const latePayments = clients.filter(c => c.paymentStatus.includes("atraso")).length;
-  if (latePayments > 0) {
+  const lowCross = clients.filter(c => (c.crossSellCount ?? 0) === 0).length;
+  if (lowCross > 0) {
     insights.push({
-      type: "negative",
-      title: "Atenção aos Pagamentos",
-      description: `${latePayments} clientes com parcelas em atraso impactando negativamente o Health Score.`,
+      type: "action",
+      title: "Oportunidade de Cross Sell",
+      description: `${lowCross} clientes sem produtos adicionais. Oferecer pode render até +15 pontos.`,
       impact: 15
     });
   }
 
-  // Positive insight
-  const promoters = clients.filter(c => c.npsScore === "Promotor (9-10)").length;
-  if (promoters > 0) {
+  // Tempo de Relacionamento (insight informativo baseado no pilar Tenure)
+  const tenureDefined = clients.filter(c => c.monthsSinceClosing !== null && c.monthsSinceClosing !== undefined);
+  if (tenureDefined.length > 0) {
+    const t0_3 = tenureDefined.filter(c => (c.monthsSinceClosing as number) <= 3).length;
+    const t4_6 = tenureDefined.filter(c => (c.monthsSinceClosing as number) > 3 && (c.monthsSinceClosing as number) <= 6).length;
+    const t7_12 = tenureDefined.filter(c => (c.monthsSinceClosing as number) > 6 && (c.monthsSinceClosing as number) <= 12).length;
+    const t13_24 = tenureDefined.filter(c => (c.monthsSinceClosing as number) > 12 && (c.monthsSinceClosing as number) <= 24).length;
+    const t25p = tenureDefined.filter(c => (c.monthsSinceClosing as number) > 24).length;
     insights.push({
-      type: "positive",
-      title: "Base de Promotores Forte",
-      description: `${promoters} clientes são promotores. Aproveitar para gerar indicações (+5 pontos).`,
-      impact: 5
-    });
-  }
-
-  // Ecosystem usage
-  const noEcosystem = clients.filter(c => c.ecosystemUsage === "Não usou").length;
-  if (noEcosystem > 0) {
-    insights.push({
-      type: "action",
-      title: "Expandir Uso do Ecossistema",
-      description: `${noEcosystem} clientes não usam outras áreas. Apresentar pode gerar +5-10 pontos.`,
-      impact: 7
+      type: "info",
+      title: "Tempo de Relacionamento",
+      description: `${t0_3} até 3m • ${t4_6} de 4‑6m • ${t7_12} de 7‑12m • ${t13_24} de 13‑24m • ${t25p} 25m+`,
+      impact: 10
     });
   }
 

@@ -25,6 +25,7 @@ import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { toast } from "@/hooks/use-toast";
+import { buildUniqueList, applyHierarchyFilters } from "@/lib/filters";
 
 interface ClientManagerProps {
   clients: Client[];
@@ -36,7 +37,7 @@ interface ClientManagerProps {
   onToggleDarkMode?: () => void;
 }
 
-const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
+// planners dinâmicos a partir dos clientes
 
 export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDeleteClient, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,29 +45,35 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
   const [editForm, setEditForm] = useState<Partial<Client>>({});
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterPlanner, setFilterPlanner] = useState<Planner | "all">(selectedPlanner);
+  const [filterManager, setFilterManager] = useState<string | "all">("all");
+  const [filterMediator, setFilterMediator] = useState<string | "all">("all");
+  const [filterLeader, setFilterLeader] = useState<string | "all">("all");
   const [deletingClient, setDeletingClient] = useState<string | null>(null);
+
+  const planners = useMemo(() => buildUniqueList(clients, 'planner') as Planner[], [clients]);
+  const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
+  const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
+  const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
 
   // Filtrar clientes
   const filteredClients = useMemo(() => {
-    let filtered = filterPlanner === "all" 
-      ? clients 
-      : clients.filter(c => c.planner === filterPlanner);
+    let filtered = applyHierarchyFilters(clients, {
+      selectedPlanner: filterPlanner === 'all' ? null : filterPlanner,
+      managers: filterManager === 'all' ? [] : [filterManager],
+      mediators: filterMediator === 'all' ? [] : [filterMediator],
+      leaders: filterLeader === 'all' ? [] : [filterLeader],
+    });
 
     if (searchTerm) {
-      filtered = filtered.filter(c => 
-        c.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      filtered = filtered.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
 
     if (filterCategory !== "all") {
-      filtered = filtered.filter(c => {
-        const healthScore = calculateHealthScore(c);
-        return healthScore.category === filterCategory;
-      });
+      filtered = filtered.filter(c => calculateHealthScore(c).category === filterCategory);
     }
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, filterPlanner, searchTerm, filterCategory]);
+  }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, searchTerm, filterCategory]);
 
   const handleEdit = (client: Client) => {
     setEditingClient(client.id);
@@ -372,6 +379,51 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
                       <SelectItem key={planner} value={planner}>
                         {planner}
                       </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Gerente</Label>
+                <Select value={filterManager} onValueChange={(v) => setFilterManager(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {managers.map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Mediador</Label>
+                <Select value={filterMediator} onValueChange={(v) => setFilterMediator(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {mediators.map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Líder em formação</Label>
+                <Select value={filterLeader} onValueChange={(v) => setFilterLeader(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {leaders.map(l => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

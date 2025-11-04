@@ -5,46 +5,59 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Plus, 
   Users, 
   TrendingUp, 
   AlertCircle, 
   Award, 
   Filter, 
   BarChart3,
-  Edit,
   AlertTriangle
 } from "lucide-react";
-import { Client, Planner, HealthScore } from "@/types/client";
+import { Client, Planner, HealthScore, BulkImportPayload } from "@/types/client";
 import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
+import { buildUniqueList, applyHierarchyFilters, uniqueById } from "@/lib/filters";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AnalyticsView } from "./AnalyticsView";
-import { BulkImport } from "./BulkImport";
+import { BulkImportV3 } from "./BulkImportV3";
 import { ThemeToggle } from "./ui/theme-toggle";
 import TemporalAnalysisComponent from "./TemporalAnalysis";
+import AdvancedAnalytics from "./AdvancedAnalytics";
+import DataQuality from "./DataQuality";
 
 interface DashboardProps {
   clients: Client[];
-  onAddClient: () => void;
-  onBulkImport?: (clients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => void;
-  onManageClients?: (planner?: Planner | "all") => void;
+  onBulkImport?: (payload: BulkImportPayload) => void;
   onDeleteClient?: (clientId: string) => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
 
-const planners: Planner[] = ["Barroso", "Rossetti", "Ton", "Bizelli", "Abraao", "Murilo", "Felipe", "Helio", "Vinícius"];
+// Lista de planejadores dinâmica, derivada dos clientes (sem nomes fixos)
 
-export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients, onDeleteClient, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
-  const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
+export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
+  const [selectedPlanner, setSelectedPlanner] = useState<string | null>(null);
+  const [selectedManager, setSelectedManager] = useState<string | "all">("all");
+  const [selectedMediator, setSelectedMediator] = useState<string | "all">("all");
+  const [selectedLeader, setSelectedLeader] = useState<string | "all">("all");
   const [showBulkImport, setShowBulkImport] = useState(false);
 
 
-  // Filter clients by selected planner
+  // Unique planners & hierarchy lists (normalizados)
+  const planners = useMemo(() => buildUniqueList(clients, 'planner'), [clients]);
+  const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
+  const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
+  const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
+
+  // Filter clients by planner + hierarchy
   const filteredClients = useMemo(() => {
-    if (selectedPlanner === "all") return clients;
-    return clients.filter(client => client.planner === selectedPlanner);
-  }, [clients, selectedPlanner]);
+    const filtered = applyHierarchyFilters(clients, {
+      selectedPlanner,
+      managers: selectedManager === 'all' ? [] : [selectedManager],
+      mediators: selectedMediator === 'all' ? [] : [selectedMediator],
+      leaders: selectedLeader === 'all' ? [] : [selectedLeader]
+    });
+    return uniqueById(filtered);
+  }, [clients, selectedPlanner, selectedManager, selectedMediator, selectedLeader]);
 
   // Calculate health scores for filtered clients
   const healthScores = useMemo(() => {
@@ -53,7 +66,7 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const total = healthScores.length;
+    const total = filteredClients.filter(c => c.isActive !== false).length;
     const excellent = healthScores.filter(score => score.category === "Ótimo").length;
     const stable = healthScores.filter(score => score.category === "Estável").length;
     const warning = healthScores.filter(score => score.category === "Atenção").length;
@@ -68,10 +81,17 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
 
   // Group clients by planner for team view
   const plannerStats = useMemo(() => {
-    if (selectedPlanner !== "all") return [];
+    if (selectedPlanner) return [];
     
     return planners.map(planner => {
-      const plannerClients = clients.filter(client => client.planner === planner);
+      const plannerClients = clients.filter(client => {
+        if (!client.planner || client.planner === '0') return false;
+        if (selectedManager !== "all" && client.manager !== selectedManager) return false;
+        if (selectedMediator !== "all" && client.mediator !== selectedMediator) return false;
+        if (selectedLeader !== "all" && client.leader !== selectedLeader) return false;
+        if (client.isActive === false) return false;
+        return client.planner === planner;
+      });
       const plannerScores = plannerClients.map(client => calculateHealthScore(client));
       const avgScore = plannerScores.length > 0 
         ? Math.round(plannerScores.reduce((sum, score) => sum + score.score, 0) / plannerScores.length)
@@ -86,16 +106,16 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
     }).filter(stat => stat.clientCount > 0);
   }, [clients, selectedPlanner]);
 
-  const handleBulkImport = (importedClients: Omit<Client, "id" | "createdAt" | "updatedAt">[]) => {
+  const handleBulkImport = (payload: BulkImportPayload) => {
     if (onBulkImport) {
-      onBulkImport(importedClients);
+      onBulkImport(payload);
     }
     setShowBulkImport(false);
   };
 
   if (showBulkImport) {
     return (
-      <BulkImport
+      <BulkImportV3
         onImport={handleBulkImport}
         onClose={() => setShowBulkImport(false)}
         isDarkMode={isDarkMode}
@@ -123,13 +143,14 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
             />
           </div>
           
-          <div className="flex items-center gap-4">
-            <Select value={selectedPlanner} onValueChange={(value: Planner | "all") => setSelectedPlanner(value)}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Seletor de Planejador (sem opção de visão geral) */}
+            <Select value={selectedPlanner ?? 'all'} onValueChange={(value: string) => setSelectedPlanner(value === 'all' ? null : value)}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Planejador" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">🎯 Visão Geral da Equipe</SelectItem>
+                <SelectItem value="all">Todos os Planejadores</SelectItem>
                 {planners.map(planner => (
                   <SelectItem key={planner} value={planner}>
                     👤 {planner}
@@ -137,16 +158,47 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Filtro: Gerente */}
+            <Select value={selectedManager} onValueChange={(value: string | "all") => setSelectedManager(value)}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Gerente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Gerentes</SelectItem>
+                {managers.map(m => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Filtro: Mediador */}
+            <Select value={selectedMediator} onValueChange={(value: string | "all") => setSelectedMediator(value)}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Mediador" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Mediadores</SelectItem>
+                {mediators.map(m => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Filtro: Líder em formação */}
+            <Select value={selectedLeader} onValueChange={(value: string | "all") => setSelectedLeader(value)}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Líder em Formação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Líderes</SelectItem>
+                {leaders.map(l => (
+                  <SelectItem key={l} value={l}>{l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
             <div className="flex gap-2">
-              <Button 
-                onClick={onAddClient} 
-                className="btn-gradient"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Cliente
-              </Button>
-              
               {onBulkImport && (
                 <Button 
                   onClick={() => setShowBulkImport(true)}
@@ -157,35 +209,32 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
                   Importar CSV
                 </Button>
               )}
-
-              {onManageClients && clients.length > 0 && (
-                <Button 
-                  onClick={() => onManageClients(selectedPlanner)}
-                  variant="outline"
-                  className="shadow-lg"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Gerenciar Clientes
-                </Button>
-              )}
             </div>
           </div>
         </div>
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Visão Geral
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              Análise Avançada
+              Análise de Indicadores
             </TabsTrigger>
             <TabsTrigger value="temporal" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Análise Temporal
+            </TabsTrigger>
+            <TabsTrigger value="advanced" className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Análises Avançadas
+            </TabsTrigger>
+            <TabsTrigger value="quality" className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Qualidade de Dados
             </TabsTrigger>
           </TabsList>
 
@@ -200,7 +249,7 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.total}</div>
                   <p className="text-xs text-muted-foreground">
-                    {selectedPlanner === "all" ? "em toda equipe" : `de ${selectedPlanner}`}
+                    {selectedPlanner ? `de ${selectedPlanner}` : "em toda equipe"}
                   </p>
                 </CardContent>
               </Card>
@@ -363,11 +412,33 @@ export function Dashboard({ clients, onAddClient, onBulkImport, onManageClients,
           </TabsContent>
 
           <TabsContent value="analytics">
-            <AnalyticsView clients={clients} selectedPlanner={selectedPlanner} isDarkMode={isDarkMode} />
+            <AnalyticsView clients={filteredClients} selectedPlanner={selectedPlanner} isDarkMode={isDarkMode} />
           </TabsContent>
 
           <TabsContent value="temporal">
-            <TemporalAnalysisComponent isDarkMode={isDarkMode} />
+            <TemporalAnalysisComponent 
+              isDarkMode={isDarkMode}
+              selectedPlanner={selectedPlanner}
+              selectedManager={selectedManager}
+              selectedMediator={selectedMediator}
+              selectedLeader={selectedLeader}
+              currentClientCount={filteredClients.length}
+            />
+          </TabsContent>
+
+          <TabsContent value="advanced">
+            <AdvancedAnalytics 
+              clients={filteredClients} 
+              selectedPlanner={selectedPlanner ?? 'all'} 
+              isDarkMode={isDarkMode}
+              manager={selectedManager}
+              mediator={selectedMediator}
+              leader={selectedLeader}
+            />
+          </TabsContent>
+
+          <TabsContent value="quality">
+            <DataQuality isDarkMode={isDarkMode} />
           </TabsContent>
         </Tabs>
       </div>

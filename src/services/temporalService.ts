@@ -51,59 +51,107 @@ function databaseToHealthScoreHistory(dbData: any): HealthScoreHistory {
 }
 
 export const temporalService = {
-  // Obter análise temporal para um período específico
+  // Obter análise temporal para um período específico (AS-OF)
   async getTemporalAnalysis(
     startDate: Date,
     endDate: Date,
-    planner?: Planner | "all"
+    planner?: Planner | "all",
+    hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
-      let query = supabase
-        .from('temporal_health_analysis')
-        .select('*')
-        .gte('recorded_date', startDate.toISOString().split('T')[0])
-        .lte('recorded_date', endDate.toISOString().split('T')[0])
-        .order('recorded_date', { ascending: true });
+      // Tenta RPC as-of; se não existir (404), volta para view antiga
+      const { data, error } = await supabase
+        .rpc('get_temporal_analysis_asof', {
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          planner_filter: planner ?? 'all',
+          managers: hierarchyFilters?.managers ?? null,
+          mediators: hierarchyFilters?.mediators ?? null,
+          leaders: hierarchyFilters?.leaders ?? null,
+          include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
+          include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
+          include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
+        });
 
-      if (planner && planner !== "all") {
-        query = query.eq('planner', planner);
+      if (error || !data) {
+        // Fallback
+        let query = supabase
+          .from('temporal_health_analysis')
+          .select('*')
+          .gte('recorded_date', startDate.toISOString().split('T')[0])
+          .lte('recorded_date', endDate.toISOString().split('T')[0])
+          .order('recorded_date', { ascending: true });
+
+        if (planner && planner !== 'all') {
+          query = query.eq('planner', planner);
+        }
+
+        const { data: fallbackData, error: fbErr } = await query;
+        if (fbErr) {
+          console.error('Erro ao buscar análise temporal (fallback):', fbErr);
+          throw fbErr;
+        }
+        return fallbackData ? fallbackData.map(databaseToTemporalAnalysis) : [];
       }
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Erro ao buscar análise temporal:', error);
-        throw error;
-      }
-
-      return data ? data.map(databaseToTemporalAnalysis) : [];
+      return data.map(databaseToTemporalAnalysis);
     } catch (error) {
       console.error('Erro no getTemporalAnalysis:', error);
       return [];
     }
   },
 
-  // Obter análise temporal agregada (todos os planejadores)
+  // Obter análise temporal agregada (todos os planejadores) AS-OF
   async getAggregatedTemporalAnalysis(
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
+      // Se houver filtros hierárquicos, calcular manualmente a partir do histórico
+      if (hierarchyFilters && (
+        (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) ||
+        (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) ||
+        (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0)
+      )) {
+        return this.calculateAggregatedAnalysis(startDate, endDate, hierarchyFilters);
+      }
       const { data, error } = await supabase
-        .rpc('get_aggregated_temporal_analysis', {
+        .rpc('get_temporal_analysis_asof', {
           start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0]
+          end_date: endDate.toISOString().split('T')[0],
+          planner_filter: 'all',
+          managers: hierarchyFilters?.managers ?? null,
+          mediators: hierarchyFilters?.mediators ?? null,
+          leaders: hierarchyFilters?.leaders ?? null,
+          include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
+          include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
+          include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
         });
 
-      if (error) {
-        console.error('Erro ao buscar análise temporal agregada:', error);
-        throw error;
+      if (error || !data) {
+        // Fallback para função antiga agregada
+        const { data: aggData, error: aggErr } = await supabase
+          .rpc('get_aggregated_temporal_analysis', {
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0]
+          });
+
+        if (aggErr) {
+          console.error('Erro ao buscar análise temporal agregada (fallback):', aggErr);
+          throw aggErr;
+        }
+
+        return aggData ? aggData.map((item: any) => ({
+          ...databaseToTemporalAnalysis(item),
+          planner: 'all' as const
+        })) : [];
       }
 
-      return data ? data.map((item: any) => ({
+      return data.map((item: any) => ({
         ...databaseToTemporalAnalysis(item),
-        planner: "all" as const
-      })) : [];
+        planner: 'all' as const
+      }));
     } catch (error) {
       console.error('Erro no getAggregatedTemporalAnalysis:', error);
       // Fallback: agregar manualmente
@@ -114,14 +162,32 @@ export const temporalService = {
   // Calcular análise agregada manualmente (fallback)
   async calculateAggregatedAnalysis(
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('health_score_history')
         .select('*')
         .gte('recorded_date', startDate.toISOString().split('T')[0])
         .lte('recorded_date', endDate.toISOString().split('T')[0]);
+
+      if (hierarchyFilters) {
+        if (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) {
+          query = query.in('manager', hierarchyFilters.managers);
+        }
+        if (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) {
+          query = query.in('mediator', hierarchyFilters.mediators);
+        }
+        if (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0) {
+          query = query.in('leader', hierarchyFilters.leaders);
+        }
+      }
+
+      // Ignorar placeholders '0'
+      query = query.neq('planner', '0').neq('client_name', '0');
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -164,12 +230,13 @@ export const temporalService = {
     }
   },
 
-  // Calcular análise de tendência
+  // Calcular análise de tendência (janelas ancoradas e ponderadas)
   async getTrendAnalysis(
     planner: Planner | "all",
     periodDays: number = 30,
     customStartDate?: Date,
-    customEndDate?: Date
+    customEndDate?: Date,
+    hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[] }
   ): Promise<TrendAnalysis | null> {
     try {
       const endDate = customEndDate || new Date();
@@ -180,25 +247,35 @@ export const temporalService = {
       })();
 
       const currentData = planner === "all" 
-        ? await this.getAggregatedTemporalAnalysis(startDate, endDate)
-        : await this.getTemporalAnalysis(startDate, endDate, planner);
+        ? await this.getAggregatedTemporalAnalysis(startDate, endDate, hierarchyFilters)
+        : await this.getTemporalAnalysis(startDate, endDate, planner, hierarchyFilters);
 
       if (currentData.length < 2) {
         return null; // Dados insuficientes para análise de tendência
       }
 
-      const firstPeriod = currentData.slice(0, Math.floor(currentData.length / 2));
-      const secondPeriod = currentData.slice(Math.floor(currentData.length / 2));
+      // Definir janelas: últimos N/2 dias (janela atual) vs N/2 dias anteriores (janela anterior)
+      const windowSize = Math.max(1, Math.floor(currentData.length / 2));
+      const recent = currentData.slice(-windowSize);
+      const prior = currentData.slice(-2 * windowSize, -windowSize);
 
-      const firstAvg = firstPeriod.reduce((sum, d) => sum + d.avgHealthScore, 0) / firstPeriod.length;
-      const secondAvg = secondPeriod.reduce((sum, d) => sum + d.avgHealthScore, 0) / secondPeriod.length;
+      // Médias ponderadas por totalClients
+      const weightedAvg = (arr: typeof currentData, selector: (d: any) => number) => {
+        const totalWeight = arr.reduce((w, d) => w + (d.totalClients || 0), 0);
+        if (totalWeight === 0) return 0;
+        const weightedSum = arr.reduce((sum, d) => sum + selector(d) * (d.totalClients || 0), 0);
+        return weightedSum / totalWeight;
+      };
 
-      const firstClientCount = firstPeriod.reduce((sum, d) => sum + d.totalClients, 0) / firstPeriod.length;
-      const secondClientCount = secondPeriod.reduce((sum, d) => sum + d.totalClients, 0) / secondPeriod.length;
+      const avgRecent = weightedAvg(recent, d => d.avgHealthScore);
+      const avgPrior = weightedAvg(prior, d => d.avgHealthScore);
 
-      const scoreChange = secondAvg - firstAvg;
-      const scoreChangePercent = firstAvg > 0 ? (scoreChange / firstAvg) * 100 : 0;
-      const clientCountChange = secondClientCount - firstClientCount;
+      const clientRecent = Math.round(recent.reduce((s, d) => s + d.totalClients, 0) / recent.length);
+      const clientPrior = Math.round(prior.reduce((s, d) => s + d.totalClients, 0) / Math.max(1, prior.length));
+
+      const scoreChange = avgRecent - avgPrior;
+      const scoreChangePercent = avgPrior > 0 ? (scoreChange / avgPrior) * 100 : 0;
+      const clientCountChange = clientRecent - clientPrior;
 
       // Determinar tendência geral
       let overallTrend: 'improving' | 'declining' | 'stable' = 'stable';
@@ -210,17 +287,13 @@ export const temporalService = {
       const improvements = [];
       const concerns = [];
 
+      const weightedDelta = (selector: (d: any) => number) => weightedAvg(recent, selector) - weightedAvg(prior, selector);
       const pillarChanges = {
-        'Reuniões': (secondPeriod.reduce((sum, d) => sum + d.avgMeetingEngagement, 0) / secondPeriod.length) - 
-                   (firstPeriod.reduce((sum, d) => sum + d.avgMeetingEngagement, 0) / firstPeriod.length),
-        'App Usage': (secondPeriod.reduce((sum, d) => sum + d.avgAppUsage, 0) / secondPeriod.length) - 
-                    (firstPeriod.reduce((sum, d) => sum + d.avgAppUsage, 0) / firstPeriod.length),
-        'Pagamentos': (secondPeriod.reduce((sum, d) => sum + d.avgPaymentStatus, 0) / secondPeriod.length) - 
-                     (firstPeriod.reduce((sum, d) => sum + d.avgPaymentStatus, 0) / firstPeriod.length),
-        'Ecossistema': (secondPeriod.reduce((sum, d) => sum + d.avgEcosystemEngagement, 0) / secondPeriod.length) - 
-                      (firstPeriod.reduce((sum, d) => sum + d.avgEcosystemEngagement, 0) / firstPeriod.length),
-        'NPS': (secondPeriod.reduce((sum, d) => sum + d.avgNpsScore, 0) / secondPeriod.length) - 
-               (firstPeriod.reduce((sum, d) => sum + d.avgNpsScore, 0) / firstPeriod.length),
+        'Reuniões': weightedDelta(d => d.avgMeetingEngagement),
+        'App Usage': weightedDelta(d => d.avgAppUsage),
+        'Pagamentos': weightedDelta(d => d.avgPaymentStatus),
+        'Ecossistema': weightedDelta(d => d.avgEcosystemEngagement),
+        'NPS': weightedDelta(d => d.avgNpsScore),
       };
 
       Object.entries(pillarChanges).forEach(([category, change]) => {

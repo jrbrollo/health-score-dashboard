@@ -146,6 +146,109 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Função AS-OF: série temporal diária usando o último estado conhecido até cada data
+CREATE OR REPLACE FUNCTION get_temporal_analysis_asof(
+  start_date DATE,
+  end_date DATE,
+  planner_filter TEXT DEFAULT 'all',
+  managers TEXT[] DEFAULT NULL,
+  mediators TEXT[] DEFAULT NULL,
+  leaders TEXT[] DEFAULT NULL,
+  include_null_manager BOOLEAN DEFAULT FALSE,
+  include_null_mediator BOOLEAN DEFAULT FALSE,
+  include_null_leader BOOLEAN DEFAULT FALSE
+) RETURNS TABLE (
+  recorded_date DATE,
+  planner TEXT,
+  total_clients BIGINT,
+  avg_health_score NUMERIC,
+  excellent_count BIGINT,
+  stable_count BIGINT,
+  warning_count BIGINT,
+  critical_count BIGINT,
+  avg_meeting_engagement NUMERIC,
+  avg_app_usage NUMERIC,
+  avg_payment_status NUMERIC,
+  avg_ecosystem_engagement NUMERIC,
+  avg_nps_score NUMERIC
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH dates AS (
+    SELECT generate_series(start_date, end_date, interval '1 day')::date AS day
+  ),
+  last_snapshots AS (
+    SELECT 
+      d.day AS recorded_date,
+      s.planner,
+      s.manager,
+      s.mediator,
+      s.leader,
+      s.health_score,
+      s.health_category,
+      s.meeting_engagement,
+      s.app_usage,
+      s.payment_status,
+      s.ecosystem_engagement,
+      s.nps_score
+    FROM dates d
+    JOIN LATERAL (
+      SELECT DISTINCT ON (h.client_id)
+        h.client_id,
+        h.planner,
+        h.manager,
+        h.mediator,
+        h.leader,
+        h.health_score,
+        h.health_category,
+        h.meeting_engagement,
+        h.app_usage,
+        h.payment_status,
+        h.ecosystem_engagement,
+        h.nps_score,
+        h.recorded_date
+      FROM health_score_history h
+      WHERE h.recorded_date <= d.day
+      ORDER BY h.client_id, h.recorded_date DESC
+    ) s ON true
+    WHERE (planner_filter = 'all' OR s.planner = planner_filter)
+      AND s.planner <> '0'
+      AND (
+        managers IS NULL 
+        OR s.manager = ANY(managers)
+        OR (include_null_manager AND s.manager IS NULL)
+      )
+      AND (
+        mediators IS NULL 
+        OR s.mediator = ANY(mediators)
+        OR (include_null_mediator AND s.mediator IS NULL)
+      )
+      AND (
+        leaders IS NULL 
+        OR s.leader = ANY(leaders)
+        OR (include_null_leader AND s.leader IS NULL)
+      )
+  )
+  SELECT 
+    recorded_date,
+    CASE WHEN planner_filter = 'all' THEN 'all' ELSE planner END AS planner,
+    COUNT(*) AS total_clients,
+    ROUND(AVG(health_score), 2) AS avg_health_score,
+    COUNT(CASE WHEN health_category = 'Ótimo' THEN 1 END) AS excellent_count,
+    COUNT(CASE WHEN health_category = 'Estável' THEN 1 END) AS stable_count,
+    COUNT(CASE WHEN health_category = 'Atenção' THEN 1 END) AS warning_count,
+    COUNT(CASE WHEN health_category = 'Crítico' THEN 1 END) AS critical_count,
+    ROUND(AVG(meeting_engagement), 2) AS avg_meeting_engagement,
+    ROUND(AVG(app_usage), 2) AS avg_app_usage,
+    ROUND(AVG(payment_status), 2) AS avg_payment_status,
+    ROUND(AVG(ecosystem_engagement), 2) AS avg_ecosystem_engagement,
+    ROUND(AVG(nps_score), 2) AS avg_nps_score
+  FROM last_snapshots
+  GROUP BY recorded_date, CASE WHEN planner_filter = 'all' THEN 'all' ELSE planner END
+  ORDER BY recorded_date;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Função para registrar Health Score histórico
 CREATE OR REPLACE FUNCTION record_health_score_history(client_row clients)
 RETURNS VOID AS $$
@@ -250,7 +353,8 @@ CREATE TRIGGER clients_health_history_trigger
 -- Habilitar RLS na nova tabela
 ALTER TABLE health_score_history ENABLE ROW LEVEL SECURITY;
 
--- Política para permitir operações
+-- Política para permitir operações (idempotente)
+DROP POLICY IF EXISTS "Enable all operations for health_score_history" ON health_score_history;
 CREATE POLICY "Enable all operations for health_score_history" ON health_score_history
 FOR ALL USING (true);
 
@@ -271,6 +375,7 @@ SELECT
   ROUND(AVG(ecosystem_engagement), 2) as avg_ecosystem_engagement,
   ROUND(AVG(nps_score), 2) as avg_nps_score
 FROM health_score_history
+WHERE planner <> '0' AND client_name <> '0'
 GROUP BY recorded_date, planner
 ORDER BY recorded_date DESC, planner;
 
@@ -309,6 +414,7 @@ BEGIN
     ROUND(AVG(h.nps_score), 2) as avg_nps_score
   FROM health_score_history h
   WHERE h.recorded_date >= start_date AND h.recorded_date <= end_date
+    AND h.planner <> '0' AND h.client_name <> '0'
   GROUP BY h.recorded_date
   ORDER BY h.recorded_date;
 END;

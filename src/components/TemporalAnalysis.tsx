@@ -1,30 +1,72 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
-import { CalendarIcon, TrendingUp, TrendingDown, Minus, BarChart3, LineChart, PieChart } from 'lucide-react';
-import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Cell } from 'recharts';
+import { TrendingUp, TrendingDown, Minus, BarChart3, LineChart, PieChart } from 'lucide-react';
+import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
 import { temporalService } from '@/services/temporalService';
 import { TemporalAnalysis, TrendAnalysis, Planner } from '@/types/temporal';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface TemporalAnalysisProps {
   isDarkMode?: boolean;
+  selectedPlanner?: string | null;
+  selectedManager?: string | "all";
+  selectedMediator?: string | "all";
+  selectedLeader?: string | "all";
+  currentClientCount?: number;
 }
 
-const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode = false }) => {
+const DEFAULT_DAYS = 30;
+const QUICK_RANGES = [
+  { label: '30 dias', value: 30 },
+  { label: '60 dias', value: 60 },
+  { label: '90 dias', value: 90 },
+];
+
+const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
+  isDarkMode = false,
+  selectedPlanner = null,
+  selectedManager = 'all',
+  selectedMediator = 'all',
+  selectedLeader = 'all',
+  currentClientCount = 0,
+}) => {
   const [analysisData, setAnalysisData] = useState<TemporalAnalysis[]>([]);
   const [trendData, setTrendData] = useState<TrendAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [dateRange, setDateRange] = useState({
-    from: subDays(new Date(), 30),
-    to: new Date()
+    from: startOfDay(subDays(new Date(), DEFAULT_DAYS)),
+    to: endOfDay(new Date())
   });
   const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
   const [viewMode, setViewMode] = useState<'score' | 'distribution' | 'pillars'>('score');
+
+  const periodLength = useMemo(() => {
+    return Math.max(0, differenceInCalendarDays(dateRange.to, dateRange.from));
+  }, [dateRange]);
+
+  const activeQuickRange = useMemo(() => {
+    const match = QUICK_RANGES.find(range => range.value === periodLength);
+    return match?.value ?? null;
+  }, [periodLength]);
+
+  const handleQuickRange = (days: number) => {
+    const now = new Date();
+    setDateRange({
+      from: startOfDay(subDays(now, days)),
+      to: endOfDay(now)
+    });
+  };
+
+  const handleDateChange = (range: { from?: Date; to?: Date }) => {
+    if (!range?.from) return;
+    const from = startOfDay(range.from);
+    const to = range?.to ? endOfDay(range.to) : endOfDay(range.from);
+    setDateRange({ from, to });
+  };
 
   // Cores para os gráficos
   const colors = {
@@ -33,8 +75,6 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
     warning: isDarkMode ? '#f59e0b' : '#d97706',
     critical: isDarkMode ? '#ef4444' : '#dc2626',
     score: isDarkMode ? '#8b5cf6' : '#7c3aed',
-    meeting: isDarkMode ? '#06b6d4' : '#0891b2',
-    app: isDarkMode ? '#84cc16' : '#65a30d',
     payment: isDarkMode ? '#f97316' : '#ea580c',
     ecosystem: isDarkMode ? '#ec4899' : '#db2777',
     nps: isDarkMode ? '#6366f1' : '#4f46e5'
@@ -43,20 +83,32 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
   // Carregar dados
   useEffect(() => {
     loadAnalysisData();
-  }, [selectedPlanner, dateRange]);
+  }, [selectedPlanner, selectedManager, selectedMediator, selectedLeader, dateRange.from, dateRange.to]);
 
   // Carregar análise de tendência
   useEffect(() => {
     loadTrendAnalysis();
-  }, [selectedPlanner, dateRange]);
+  }, [selectedPlanner, selectedManager, selectedMediator, selectedLeader, dateRange.from, dateRange.to]);
 
   const loadAnalysisData = async () => {
     setLoading(true);
     try {
-      const data = selectedPlanner === "all" 
-        ? await temporalService.getAggregatedTemporalAnalysis(dateRange.from, dateRange.to)
-        : await temporalService.getTemporalAnalysis(dateRange.from, dateRange.to, selectedPlanner);
-      
+      const managerFilter = selectedManager !== 'all' ? [selectedManager] : undefined;
+      const mediatorFilter = selectedMediator !== 'all' ? [selectedMediator] : undefined;
+      const leaderFilter = selectedLeader !== 'all' ? [selectedLeader] : undefined;
+
+      const hierarchyFilters = managerFilter || mediatorFilter || leaderFilter
+        ? {
+            managers: managerFilter,
+            mediators: mediatorFilter,
+            leaders: leaderFilter,
+          }
+        : undefined;
+
+      const data = !selectedPlanner
+        ? await temporalService.getAggregatedTemporalAnalysis(dateRange.from, dateRange.to, hierarchyFilters)
+        : await temporalService.getTemporalAnalysis(dateRange.from, dateRange.to, selectedPlanner as Planner, hierarchyFilters);
+
       setAnalysisData(data);
     } catch (error) {
       console.error('Erro ao carregar dados temporais:', error);
@@ -68,8 +120,24 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
   const loadTrendAnalysis = async () => {
     try {
       // Calcular o número de dias do período selecionado
-      const daysDiff = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
-      const trend = await temporalService.getTrendAnalysis(selectedPlanner, daysDiff, dateRange.from, dateRange.to);
+      const daysDiff = Math.max(1, periodLength);
+      const managerFilter = selectedManager !== 'all' ? [selectedManager] : undefined;
+      const mediatorFilter = selectedMediator !== 'all' ? [selectedMediator] : undefined;
+      const leaderFilter = selectedLeader !== 'all' ? [selectedLeader] : undefined;
+
+      const trend = await temporalService.getTrendAnalysis(
+        (selectedPlanner as Planner | null) ?? 'all',
+        daysDiff,
+        dateRange.from,
+        dateRange.to,
+        managerFilter || mediatorFilter || leaderFilter
+          ? {
+              managers: managerFilter,
+              mediators: mediatorFilter,
+              leaders: leaderFilter,
+            }
+          : undefined
+      );
       setTrendData(trend);
     } catch (error) {
       console.error('Erro ao carregar análise de tendência:', error);
@@ -87,8 +155,6 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
       stable: item.stableCount,
       warning: item.warningCount,
       critical: item.criticalCount,
-      meeting: item.avgMeetingEngagement,
-      app: item.avgAppUsage,
       payment: item.avgPaymentStatus,
       ecosystem: item.avgEcosystemEngagement,
       nps: item.avgNpsScore
@@ -99,12 +165,22 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
 
   // Renderizar gráfico baseado no tipo e modo
   const renderChart = () => {
-    if (loading || chartData.length === 0) {
+    if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
             <p className="text-gray-500">Carregando dados...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!loading && chartData.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-gray-500">Sem dados no período selecionado.</p>
           </div>
         </div>
       );
@@ -221,8 +297,6 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
                 color: isDarkMode ? '#f9fafb' : '#111827'
               }}
             />
-            <Line type="monotone" dataKey="meeting" stroke={colors.meeting} strokeWidth={2} name="Reuniões" />
-            <Line type="monotone" dataKey="app" stroke={colors.app} strokeWidth={2} name="App Usage" />
             <Line type="monotone" dataKey="payment" stroke={colors.payment} strokeWidth={2} name="Pagamentos" />
             <Line type="monotone" dataKey="ecosystem" stroke={colors.ecosystem} strokeWidth={2} name="Ecossistema" />
             <Line type="monotone" dataKey="nps" stroke={colors.nps} strokeWidth={2} name="NPS" />
@@ -262,45 +336,31 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
 
       {/* Filtros */}
       <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Seletor de Planejador */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Planejador
-              </label>
-              <Select value={selectedPlanner} onValueChange={(value) => setSelectedPlanner(value as Planner | "all")}>
-                <SelectTrigger className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Planejadores</SelectItem>
-                  <SelectItem value="Barroso">Barroso</SelectItem>
-                  <SelectItem value="Rossetti">Rossetti</SelectItem>
-                  <SelectItem value="Ton">Ton</SelectItem>
-                  <SelectItem value="Bizelli">Bizelli</SelectItem>
-                  <SelectItem value="Abraao">Abraao</SelectItem>
-                  <SelectItem value="Murilo">Murilo</SelectItem>
-                  <SelectItem value="Felipe">Felipe</SelectItem>
-                  <SelectItem value="Helio">Helio</SelectItem>
-                  <SelectItem value="Vinícius">Vinícius</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <CardContent className="p-6 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {QUICK_RANGES.map(range => (
+              <Button
+                key={range.value}
+                variant={activeQuickRange === range.value ? 'default' : 'outline'}
+                onClick={() => handleQuickRange(range.value)}
+              >
+                Últimos {range.label}
+              </Button>
+            ))}
+          </div>
 
-            {/* Seletor de Período */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Período
               </label>
               <DatePickerWithRange
                 date={dateRange}
-                onDateChange={setDateRange}
+                onDateChange={handleDateChange}
                 className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
               />
             </div>
 
-            {/* Tipo de Gráfico */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Tipo de Gráfico
@@ -317,7 +377,6 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
               </Select>
             </div>
 
-            {/* Modo de Visualização */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Visualização
@@ -334,6 +393,26 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
               </Select>
             </div>
           </div>
+
+          <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+            <p>
+              <span className="font-medium">Planejador:</span> {selectedPlanner ?? 'Todos os planejadores'}
+            </p>
+            {selectedManager !== 'all' && (
+              <p><span className="font-medium">Gerente:</span> {selectedManager}</p>
+            )}
+            {selectedMediator !== 'all' && (
+              <p><span className="font-medium">Mediador:</span> {selectedMediator}</p>
+            )}
+            {selectedLeader !== 'all' && (
+              <p><span className="font-medium">Líder em Formação:</span> {selectedLeader}</p>
+            )}
+            {selectedManager === 'all' && selectedMediator === 'all' && selectedLeader === 'all' && (
+              <p className="text-xs text-muted-foreground">
+                Utilize os filtros gerais do topo do painel para segmentar por cargo.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -343,7 +422,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {renderTrendIcon(trendData.overallTrend)}
-              Análise de Tendência ({Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24))} dias)
+              Análise de Tendência (janela atual vs anterior, ponderado por clientes)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -445,7 +524,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({ isDarkMode
           <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
             <CardContent className="p-4 text-center">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {chartData[chartData.length - 1]?.totalClients || '0'}
+                {currentClientCount || chartData[chartData.length - 1]?.totalClients || 0}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Total de Clientes

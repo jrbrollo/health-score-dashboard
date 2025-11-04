@@ -1,30 +1,40 @@
 import { Client, HealthScore, HealthCategory } from "@/types/client";
 
+/**
+ * Calcula o Health Score v3 (escala 0-100)
+ * Pilares: NPS (20) + Indicação (10) + Inadimplência (40) + Cross Sell (15) + Meses Relacionamento (15)
+ */
 export function calculateHealthScore(client: Client): HealthScore {
   // Override rule: 3+ parcelas em atraso = Health Score = 0
-  if (client.paymentStatus === "3+ parcelas em atraso") {
+  if (client.overdueInstallments !== undefined && client.overdueInstallments >= 3) {
     return {
       clientId: client.id,
       score: 0,
       category: "Crítico",
       breakdown: {
-        meetingEngagement: 0,
-        appUsage: 0,
-        paymentStatus: 0,
-        ecosystemEngagement: 0,
-        npsScore: 0,
+        nps: 0,
+        referral: 0,
+        payment: 0,
+        crossSell: 0,
+        tenure: 0,
       },
     };
   }
 
-  // Calculate each pillar score
-  const meetingEngagement = calculateMeetingEngagement(client);
-  const appUsage = calculateAppUsage(client);
-  const paymentStatus = calculatePaymentStatus(client);
-  const ecosystemEngagement = calculateEcosystemEngagement(client);
-  const npsScore = calculateNPSScore(client);
+  // Calculate each pillar score (v3)
+  const nps = calculateNPS(client);
+  const referral = calculateReferral(client);
+  const payment = calculatePayment(client);
+  const crossSell = calculateCrossSell(client);
+  const tenure = calculateTenure(client);
 
-  const totalScore = meetingEngagement + appUsage + paymentStatus + ecosystemEngagement + npsScore;
+  let totalScore = nps + referral + payment + crossSell + tenure;
+  
+  // Garantir que não fica negativo
+  if (totalScore < 0) {
+    totalScore = 0;
+  }
+
   const category = getHealthCategory(totalScore);
 
   return {
@@ -32,111 +42,111 @@ export function calculateHealthScore(client: Client): HealthScore {
     score: totalScore,
     category,
     breakdown: {
-      meetingEngagement,
-      appUsage,
-      paymentStatus,
-      ecosystemEngagement,
-      npsScore,
+      nps,
+      referral,
+      payment,
+      crossSell,
+      tenure,
     },
   };
 }
 
-function calculateMeetingEngagement(client: Client): number {
-  let score = 0;
+/**
+ * 1. NPS (20 pontos máx)
+ */
+function calculateNPS(client: Client): number {
+  const npsValue = client.npsScoreV3;
   
-  // Última reunião (30% weight)
-  switch (client.lastMeeting) {
-    case "< 30 dias":
-      score += 30;
-      break;
-    case "31-60 dias":
-      score += 15;
-      break;
-    case "> 60 dias":
-      score -= 10;
-      break;
+  if (npsValue === null || npsValue === undefined) {
+    // "Não Encontrou" = neutro (cliente novo < 6 meses ou cônjuge)
+    return 10;
   }
-
-  // Reunião futura agendada (30% weight)
-  if (client.hasScheduledMeeting) {
-    score += 10;
-  }
-
-  return score;
-}
-
-function calculateAppUsage(client: Client): number {
-  // Uso do App de Finanças (20% weight)
-  switch (client.appUsage) {
-    case "Acessou e categorizou (15 dias)":
-      return 30;
-    case "Acessou, sem categorização":
-      return 15;
-    case "Sem acesso/categorização (30+ dias)":
-      return -10;
-    default:
-      return 0;
-  }
-}
-
-function calculatePaymentStatus(client: Client): number {
-  // Pagamentos e Status Financeiro (20% weight)
-  switch (client.paymentStatus) {
-    case "Pagamento em dia":
-      return 30;
-    case "1 parcela em atraso":
-      return -5;
-    case "2 parcelas em atraso":
-      return -15;
-    case "3+ parcelas em atraso":
-      return 0; // This case is handled by override rule
-    default:
-      return 0;
-  }
-}
-
-function calculateEcosystemEngagement(client: Client): number {
-  let score = 0;
   
-  // Uso de outras áreas (15% weight)
-  switch (client.ecosystemUsage) {
-    case "Usou 2+ áreas":
-      score += 10;
-      break;
-    case "Usou 1 área":
-      score += 5;
-      break;
-    case "Não usou":
-      score += 0;
-      break;
-  }
-
-  // Indicações (15% weight)
-  if (client.hasReferrals) {
-    score += 5;
-  }
-
-  return score;
-}
-
-function calculateNPSScore(client: Client): number {
-  // NPS (15% weight)
-  switch (client.npsScore) {
-    case "Promotor (9-10)":
-      return 15;
-    case "Neutro (7-8)":
-      return 0;
-    case "Detrator (0-6)":
-      return -15;
-    default:
+  if (npsValue >= 9) {
+    // Promotor (9-10)
+    return 20;
+  } else if (npsValue >= 7) {
+    // Neutro (7-8)
+    return 10;
+  } else {
+    // Detrator (0-6)
       return 0;
   }
 }
 
+/**
+ * 2. Indicação NPS (10 pontos máx)
+ */
+function calculateReferral(client: Client): number {
+  return client.hasNpsReferral ? 10 : 0;
+}
+
+/**
+ * 3. Inadimplência (40 pontos máx) - RIGOROSO
+ */
+function calculatePayment(client: Client): number {
+  const installments = client.overdueInstallments ?? 0;
+  const days = client.overdueDays ?? 0;
+
+  // Adimplente
+  if (installments === 0) {
+    return 40;
+  }
+
+  // 1 parcela atrasada - penalizar por dias
+  if (installments === 1) {
+    if (days <= 7) return 25;
+    if (days <= 15) return 15;
+    if (days <= 30) return 5;
+    if (days <= 60) return -5;
+    return -15; // 61+ dias
+  }
+
+  // 2 parcelas atrasadas - sempre penaliza
+  if (installments === 2) {
+    return -10;
+  }
+
+  // 3+ parcelas já é tratado no override
+  return 0;
+}
+
+/**
+ * 4. Cross Sell (15 pontos máx)
+ */
+function calculateCrossSell(client: Client): number {
+  const count = client.crossSellCount ?? 0;
+
+  if (count === 0) return 0;
+  if (count === 1) return 5;
+  if (count === 2) return 10;
+  return 15; // 3+ produtos
+}
+
+/**
+ * 5. Meses de Fechamento / Tenure (15 pontos máx)
+ */
+function calculateTenure(client: Client): number {
+  const months = client.monthsSinceClosing;
+
+  if (months === null || months === undefined || months < 0) {
+      return 0;
+  }
+
+  if (months <= 3) return 5;   // Onboarding (0-3 meses)
+  if (months <= 6) return 10;  // Consolidação inicial (4-6 meses)
+  if (months <= 12) return 15; // Consolidado (7-12 meses)
+  if (months <= 24) return 12; // Maduro (13-24 meses)
+  return 15; // Fidelizado (25+ meses)
+}
+
+/**
+ * Categorização v3 (escala 0-100)
+ */
 function getHealthCategory(score: number): HealthCategory {
-  if (score >= 100) return "Ótimo";
-  if (score >= 60) return "Estável";
-  if (score >= 35) return "Atenção";
+  if (score >= 75) return "Ótimo";
+  if (score >= 50) return "Estável";
+  if (score >= 30) return "Atenção";
   return "Crítico";
 }
 
