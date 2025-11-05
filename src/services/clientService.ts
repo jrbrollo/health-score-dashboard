@@ -91,7 +91,6 @@ export const clientService = {
         let query = supabase
           .from('clients')
           .select('*')
-          .or('is_spouse.is.null,is_spouse.eq.false')
           .neq('name', '0')
           .neq('planner', '0')
           .order('created_at', { ascending: false })

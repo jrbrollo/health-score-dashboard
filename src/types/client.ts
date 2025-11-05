@@ -21,7 +21,7 @@ export interface Client {
   manager?: string;     // Gerente
   
   // Flags
-  isSpouse?: boolean;   // Cônjuge (ignorar nas análises)
+  isSpouse?: boolean;   // Cônjuge (marcado explicitamente nas análises)
   
   // Métricas v3
   monthsSinceClosing?: number | null;  // Meses desde fechamento

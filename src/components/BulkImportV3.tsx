@@ -16,12 +16,22 @@ interface BulkImportV3Props {
   isDarkMode?: boolean;
 }
 
+type ParsedClientRow = {
+  client: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>;
+  nameNorm: string;
+  plannerNorm: string;
+  isSpouse: boolean;
+  spousePartnerRaw?: string | null;
+  spousePartnerNorm?: string | null;
+};
+
 export function BulkImportV3({ onImport, onClose, isDarkMode = false }: BulkImportV3Props) {
   const [csvData, setCsvData] = useState<string>("");
   const [preview, setPreview] = useState<any[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [spousesFiltered, setSpousesFiltered] = useState(0);
+  const [spousesMarked, setSpousesMarked] = useState(0);
+  const [parsedClients, setParsedClients] = useState<Omit<Client, 'id' | 'createdAt' | 'updatedAt'>[]>([]);
   const [sheetDateRaw, setSheetDateRaw] = useState<string | null>(null);
   const [sheetDateIso, setSheetDateIso] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +111,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
 
   const parseCsvV3 = async (text: string) => {
     try {
+      setParsedClients([]);
       const parsed = Papa.parse(text, {
         delimiter: ';',
         header: true,
@@ -122,20 +133,22 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
       const rows = (parsed.data as any[]).filter(Boolean);
       const newErrors: string[] = [];
       const newWarnings: string[] = [];
-      let spousesCount = 0;
-      const data: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+      const parsedRows: ParsedClientRow[] = [];
       const pairs: { name: string; planner: string }[] = [];
+      let spousesCount = 0;
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-      const missing = expected.filter((h) => !(h in row));
+        const missing = expected.filter((h) => !(h in row));
         if (missing.length) {
           newErrors.push(`Linha ${i + 2}: headers ausentes: ${missing.join(', ')}`);
           continue;
         }
 
-        const spouseVal = getField(row, 'Cônjuge', ['Conjuge']);
-        if (parseSpouse(spouseVal)) { spousesCount++; continue; }
+        const spouseRaw = getField(row, 'Cônjuge', ['Conjuge']);
+        const spouseRawString = (spouseRaw ?? '').toString().trim();
+        const isSpouse = parseSpouse(spouseRaw);
+        if (isSpouse) { spousesCount++; }
 
         const name = (row['Clientes'] || '').toString().trim();
         const planner = (row['Planejador'] || '').toString().trim();
@@ -166,7 +179,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
           ])
         );
 
-        data.push({
+        const clientPayload: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
           name,
           email: (row['Email'] || '').toString().trim() || undefined,
           phone,
@@ -174,7 +187,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
           leader: (row['Líder em Formação'] || '').toString().trim() || undefined,
           mediator: (row['Mediador'] || '').toString().trim() || undefined,
           manager: (row['Gerente'] || '').toString().trim() || undefined,
-          isSpouse: false,
+          isSpouse,
           monthsSinceClosing,
           npsScoreV3: npsScoreV3 ?? null,
           hasNpsReferral,
@@ -182,19 +195,61 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
           overdueDays,
           crossSellCount,
           meetingsEnabled: false,
+        };
+
+        parsedRows.push({
+          client: clientPayload,
+          nameNorm,
+          plannerNorm,
+          isSpouse,
+          spousePartnerRaw: isSpouse ? spouseRawString : undefined,
+          spousePartnerNorm: isSpouse && spouseRawString ? norm(spouseRawString) : undefined,
         });
-        // coletar par para diff
+
         pairs.push({ name: name.toLowerCase().trim(), planner: planner.toLowerCase().trim() });
       }
 
-      setSpousesFiltered(spousesCount);
+      const payersByKey = new Map<string, ParsedClientRow>();
+      const payersByName = new Map<string, ParsedClientRow>();
+      for (const row of parsedRows) {
+        if (!row.isSpouse) {
+          const key = `${row.nameNorm}|${row.plannerNorm}`;
+          if (!payersByKey.has(key)) {
+            payersByKey.set(key, row);
+          }
+          if (!payersByName.has(row.nameNorm)) {
+            payersByName.set(row.nameNorm, row);
+          }
+        }
+      }
+
+      for (const row of parsedRows) {
+        if (!row.isSpouse || !row.spousePartnerNorm) continue;
+        const partnerKey = `${row.spousePartnerNorm}|${row.plannerNorm}`;
+        let partner = payersByKey.get(partnerKey);
+        if (!partner) {
+          partner = payersByName.get(row.spousePartnerNorm);
+        }
+        if (partner) {
+          // Compartilhar apenas métricas que representam a jornada do relacionamento,
+          // deixando NPS, Indicação, Cross Sell e Inadimplência individuais para evitar duplicidades.
+          if (partner.client.monthsSinceClosing != null) {
+            row.client.monthsSinceClosing = partner.client.monthsSinceClosing;
+          }
+        }
+      }
+
+      const finalClients = parsedRows.map(row => row.client);
+
+      setSpousesMarked(spousesCount);
       setErrors(newErrors);
       const warningsWithDate = [...newWarnings];
       if (!parsedSheetDateIso) {
         warningsWithDate.push('Não foi possível identificar a data da planilha (coluna R). Usaremos a data atual como fallback.');
       }
       setWarnings(warningsWithDate);
-      setPreview(data.slice(0, 10));
+      setPreview(finalClients.slice(0, 10));
+      setParsedClients(finalClients);
 
       // Comparar com snapshot atual no Supabase (debug): quem está na planilha e não está no snapshot
       // Chamada assíncrona em background para não travar parsing
@@ -211,10 +266,10 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
         }
       }).catch((e: any) => console.warn('Warn ao comparar com snapshot:', e));
 
-      if (newErrors.length === 0 && data.length > 0) {
+      if (newErrors.length === 0 && finalClients.length > 0) {
         toast({
           title: 'CSV processado com sucesso!',
-          description: `${data.length} clientes prontos para importar. ${spousesCount} cônjuges filtrados.${parsedSheetDateIso ? ` Data da planilha: ${parsedSheetDateIso}.` : ''}`
+          description: `${finalClients.length} clientes prontos para importar. ${spousesCount} cônjuges marcados.${parsedSheetDateIso ? ` Data da planilha: ${parsedSheetDateIso}.` : ''}`
         });
       } else if (newErrors.length > 0) {
         toast({ title: 'Erros encontrados no CSV', description: `${newErrors.length} erro(s). Corrija e tente novamente.`, variant: 'destructive' });
@@ -226,7 +281,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
   };
 
   const handleImport = () => {
-    if (preview.length === 0) {
+    if (parsedClients.length === 0) {
       toast({
         title: "Nenhum dado para importar",
         description: "Faça upload de um arquivo CSV válido primeiro.",
@@ -244,66 +299,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
       return;
     }
 
-    const parsed = Papa.parse(csvData, {
-      delimiter: ';',
-      header: true,
-      quoteChar: '"',
-      skipEmptyLines: 'greedy',
-      transformHeader: (h) => h.trim(),
-    });
-    const rows = (parsed.data as any[]).filter(Boolean);
-    const allData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>[] = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const spouseVal = getField(row, 'Cônjuge', ['Conjuge']);
-      if (parseSpouse(spouseVal)) continue;
-        const name = (row['Clientes'] || '').toString().trim();
-        const planner = (row['Planejador'] || '').toString().trim();
-        const nameNorm = norm(name);
-        const plannerNorm = norm(planner);
-        if (!name || !planner) continue;
-        if (GENERIC_PLACEHOLDERS.has(nameNorm) || GENERIC_PLACEHOLDERS.has(plannerNorm)) continue; // ignorar placeholders
-
-      const phone = normalizePhone(row['Telefone']);
-      const monthsSinceClosing = parseIntSafe(
-        getField(row, 'Meses do Fechamento', [
-          'Meses de Fechamento', 'Meses Fechamento', 'Meses Relacionamento',
-          'Meses de relacionamento', 'Tempo de Relacionamento', 'Tempo de relacionamento', 'Meses'
-        ])
-      ) ?? null;
-      const npsScoreV3 = parseIntSafe(getField(row, 'NPS'));
-      const hasNpsReferral = parseReferral(getField(row, 'Indicação NPS', ['Indicacao NPS', 'Indicações NPS', 'Indicacoes NPS']));
-      const overdueInstallments = parseIntSafe(row['Inadimplência Parcelas']) ?? 0;
-      const overdueDays = parseIntSafe(row['Inadimplência Dias']) ?? 0;
-      const crossSellCount = parseIntSafe(
-        getField(row, 'Cross Sell', [
-          'Cross-Sell', 'CrossSell', 'Cross sell', 'Cross_sell',
-          'Cross sell (qtd)', 'Cross-sell (qtd)', 'Cross Sell (Qtd)', 'CrossSell Qtd', 'Cross Sell Qtd',
-          'Qtd Cross Sell', 'Qtd Cross-sell', 'Qtd cross sell', 'Qtd de cross sell',
-          'Produtos adicionais', 'Produtos adicionais (qtd)'
-        ])
-      );
-
-      allData.push({
-        name,
-        email: (row['Email'] || '').toString().trim() || undefined,
-        phone,
-        planner,
-        leader: (row['Líder em Formação'] || '').toString().trim() || undefined,
-        mediator: (row['Mediador'] || '').toString().trim() || undefined,
-        manager: (row['Gerente'] || '').toString().trim() || undefined,
-        isSpouse: false,
-        monthsSinceClosing,
-        npsScoreV3: npsScoreV3 ?? null,
-        hasNpsReferral,
-        overdueInstallments,
-        overdueDays,
-        crossSellCount,
-        meetingsEnabled: false,
-      });
-    }
-
+    const allData = parsedClients.map(client => ({ ...client }));
     onImport({
       clients: allData,
       sheetDate: sheetDateIso ?? undefined,
@@ -332,7 +328,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              <strong>Importante:</strong> Se a coluna "Cônjuge" estiver preenchida com o nome do titular pagante, esse registro será filtrado automaticamente e não será importado (somente o titular permanece na base).
+              <strong>Importante:</strong> Se a coluna "Cônjuge" estiver preenchida com o nome do titular pagante, o cliente será importado normalmente e marcado como cônjuge para fins de análise.
             </AlertDescription>
           </Alert>
 
@@ -354,14 +350,14 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">{preview.length}+</div>
+                  <div className="text-2xl font-bold text-green-600">{parsedClients.length}</div>
                   <div className="text-sm text-muted-foreground">Clientes válidos</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{spousesFiltered}</div>
-                  <div className="text-sm text-muted-foreground">Cônjuges filtrados</div>
+                  <div className="text-2xl font-bold text-blue-600">{spousesMarked}</div>
+                  <div className="text-sm text-muted-foreground">Cônjuges identificados</div>
                 </CardContent>
               </Card>
               <Card>

@@ -87,7 +87,6 @@ export default function DataQuality({ isDarkMode = false }: { isDarkMode?: boole
         const spouseRaw = spouseKey ? (r[spouseKey] || '').trim() : ''
         const spouseVal = normalize(spouseRaw)
         const isSpouse = spouseVal && !spousePlaceholders.has(spouseVal)
-        if (isSpouse) continue
         if (normalize(name) === '0' || normalize(planner) === '0') continue
         const key = `${normalize(name)}|${normalize(planner)}`
         const phoneRaw = phoneKey ? String(r[phoneKey] || '') : ''
@@ -134,7 +133,6 @@ export default function DataQuality({ isDarkMode = false }: { isDarkMode?: boole
         const { count, error: cntErr } = await supabase
           .from('clients')
           .select('*', { count: 'exact', head: true })
-          .or('is_spouse.is.null,is_spouse.eq.false')
           .neq('name', '0')
           .neq('planner', '0')
           .eq('last_seen_at', lastTs)
@@ -152,7 +150,6 @@ export default function DataQuality({ isDarkMode = false }: { isDarkMode?: boole
         let q = supabase
           .from('clients')
           .select('name, planner, phone, email')
-          .or('is_spouse.is.null,is_spouse.eq.false')
           .neq('name', '0')
           .neq('planner', '0')
           .order('created_at', { ascending: false })
@@ -212,7 +209,7 @@ export default function DataQuality({ isDarkMode = false }: { isDarkMode?: boole
 
         // Cônjuge
         if (spouseVal && !spousePlaceholders.has(spouseVal)) {
-          reasons.push(spouseRaw ? `cônjuge (vinculado a "${spouseRaw}")` : 'cônjuge (ignorado por regra)')
+          reasons.push(spouseRaw ? `cônjuge (marcado como vinculado a "${spouseRaw}")` : 'cônjuge (marcado na planilha)')
         }
 
         // Telefone / Email
