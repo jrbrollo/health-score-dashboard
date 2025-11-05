@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -11,8 +12,11 @@ import {
   Award, 
   Filter, 
   BarChart3,
-  AlertTriangle
+  AlertTriangle,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Client, Planner, HealthScore, BulkImportPayload } from "@/types/client";
 import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
 import { buildUniqueList, applyHierarchyFilters, uniqueById } from "@/lib/filters";
@@ -40,6 +44,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = 
   const [selectedMediator, setSelectedMediator] = useState<string | "all">("all");
   const [selectedLeader, setSelectedLeader] = useState<string | "all">("all");
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [plannerSearchOpen, setPlannerSearchOpen] = useState(false);
+  const [managerSearchOpen, setManagerSearchOpen] = useState(false);
+  const [mediatorSearchOpen, setMediatorSearchOpen] = useState(false);
+  const [leaderSearchOpen, setLeaderSearchOpen] = useState(false);
 
 
   // Unique planners & hierarchy lists (normalizados)
@@ -47,6 +55,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = 
   const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
   const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
   const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
+  const plannerLabel = selectedPlanner ? `👤 ${selectedPlanner}` : "Todos os Planejadores";
+  const managerLabel = selectedManager !== "all" ? selectedManager : "Todos os Gerentes";
+  const mediatorLabel = selectedMediator !== "all" ? selectedMediator : "Todos os Mediadores";
+  const leaderLabel = selectedLeader !== "all" ? selectedLeader : "Todos os Líderes";
 
   // Filter clients by planner + hierarchy
   const filteredClients = useMemo(() => {
@@ -144,59 +156,197 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = 
           </div>
           
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Seletor de Planejador (sem opção de visão geral) */}
-            <Select value={selectedPlanner ?? 'all'} onValueChange={(value: string) => setSelectedPlanner(value === 'all' ? null : value)}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Planejador" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Planejadores</SelectItem>
-                {planners.map(planner => (
-                  <SelectItem key={planner} value={planner}>
-                    👤 {planner}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Seletor de Planejador com busca */}
+            <Popover open={plannerSearchOpen} onOpenChange={setPlannerSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={plannerSearchOpen}
+                  className={cn("w-56 justify-between")}
+                >
+                  <span className="truncate">{plannerLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar planejador..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum planejador encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedPlanner(null);
+                          setPlannerSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", !selectedPlanner ? "opacity-100" : "opacity-0")} />
+                        <span className="truncate">Todos os Planejadores</span>
+                      </CommandItem>
+                      {planners.map((planner) => (
+                        <CommandItem
+                          key={planner}
+                          value={planner}
+                          onSelect={() => {
+                            setSelectedPlanner(planner);
+                            setPlannerSearchOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedPlanner === planner ? "opacity-100" : "opacity-0")} />
+                          <span className="truncate">{planner}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             {/* Filtro: Gerente */}
-            <Select value={selectedManager} onValueChange={(value: string | "all") => setSelectedManager(value)}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Gerente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Gerentes</SelectItem>
-                {managers.map(m => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={managerSearchOpen} onOpenChange={setManagerSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={managerSearchOpen}
+                  className={cn("w-56 justify-between")}
+                >
+                  <span className="truncate">{managerLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar gerente..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum gerente encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedManager("all");
+                          setManagerSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedManager === "all" ? "opacity-100" : "opacity-0")} />
+                        <span className="truncate">Todos os Gerentes</span>
+                      </CommandItem>
+                      {managers.map(manager => (
+                        <CommandItem
+                          key={manager}
+                          value={manager}
+                          onSelect={() => {
+                            setSelectedManager(manager);
+                            setManagerSearchOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedManager === manager ? "opacity-100" : "opacity-0")} />
+                          <span className="truncate">{manager}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             {/* Filtro: Mediador */}
-            <Select value={selectedMediator} onValueChange={(value: string | "all") => setSelectedMediator(value)}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Mediador" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Mediadores</SelectItem>
-                {mediators.map(m => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={mediatorSearchOpen} onOpenChange={setMediatorSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={mediatorSearchOpen}
+                  className={cn("w-56 justify-between")}
+                >
+                  <span className="truncate">{mediatorLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar mediador..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum mediador encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedMediator("all");
+                          setMediatorSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedMediator === "all" ? "opacity-100" : "opacity-0")} />
+                        <span className="truncate">Todos os Mediadores</span>
+                      </CommandItem>
+                      {mediators.map(mediator => (
+                        <CommandItem
+                          key={mediator}
+                          value={mediator}
+                          onSelect={() => {
+                            setSelectedMediator(mediator);
+                            setMediatorSearchOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedMediator === mediator ? "opacity-100" : "opacity-0")} />
+                          <span className="truncate">{mediator}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             {/* Filtro: Líder em formação */}
-            <Select value={selectedLeader} onValueChange={(value: string | "all") => setSelectedLeader(value)}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Líder em Formação" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Líderes</SelectItem>
-                {leaders.map(l => (
-                  <SelectItem key={l} value={l}>{l}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={leaderSearchOpen} onOpenChange={setLeaderSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={leaderSearchOpen}
+                  className={cn("w-56 justify-between")}
+                >
+                  <span className="truncate">{leaderLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar líder..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum líder encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedLeader("all");
+                          setLeaderSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedLeader === "all" ? "opacity-100" : "opacity-0")} />
+                        <span className="truncate">Todos os Líderes</span>
+                      </CommandItem>
+                      {leaders.map(leader => (
+                        <CommandItem
+                          key={leader}
+                          value={leader}
+                          onSelect={() => {
+                            setSelectedLeader(leader);
+                            setLeaderSearchOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", selectedLeader === leader ? "opacity-100" : "opacity-0")} />
+                          <span className="truncate">{leader}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             
             <div className="flex gap-2">
               {onBulkImport && (
@@ -327,7 +477,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = 
             </div>
 
             {/* Team Overview or Individual Clients */}
-        {selectedPlanner === "all" ? (
+        {!selectedPlanner ? (
           <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
