@@ -99,7 +99,10 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
       return Math.max(max, candidate);
     }, 0);
 
-    const snapshotDate = normalizeDate(latestSnapshotMs ? new Date(latestSnapshotMs) : new Date());
+    // Se não houver data válida, não criar snapshot
+    if (!latestSnapshotMs || !Number.isFinite(latestSnapshotMs)) return null;
+
+    const snapshotDate = normalizeDate(new Date(latestSnapshotMs));
 
     const counts = {
       'Ótimo': 0,

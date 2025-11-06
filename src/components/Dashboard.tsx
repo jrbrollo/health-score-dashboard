@@ -84,12 +84,12 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = 
     const warning = healthScores.filter(score => score.category === "Atenção").length;
     const critical = healthScores.filter(score => score.category === "Crítico").length;
     
-    const averageScore = total > 0 
-      ? Math.round(healthScores.reduce((sum, score) => sum + score.score, 0) / total)
+    const averageScore = healthScores.length > 0 
+      ? Math.round(healthScores.reduce((sum, score) => sum + score.score, 0) / healthScores.length)
       : 0;
 
     return { total, excellent, stable, warning, critical, averageScore };
-  }, [healthScores]);
+  }, [filteredClients, healthScores]);
 
   // Group clients by planner for team view
   const plannerStats = useMemo(() => {
