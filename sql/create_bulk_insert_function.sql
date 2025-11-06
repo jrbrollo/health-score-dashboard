@@ -356,6 +356,11 @@ BEGIN
     last_seen_at = p_seen_at
   RETURNING * INTO result;
 
+  -- Registrar health score no histórico (apenas para não-cônjuges)
+  IF result.is_spouse IS NULL OR result.is_spouse = FALSE THEN
+    PERFORM record_health_score_history_v3(result.id, p_import_date);
+  END IF;
+
   RETURN result;
 END;
 $$ LANGUAGE plpgsql;
