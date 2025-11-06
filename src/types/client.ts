@@ -46,6 +46,7 @@ export interface Client {
   meetingsEnabled?: boolean;
   // Atividade
   isActive?: boolean;
+  lastSeenAt?: Date | null;
   
   // Timestamps
   createdAt: Date;

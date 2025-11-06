@@ -253,13 +253,16 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
 
       // Comparar com snapshot atual no Supabase (debug): quem está na planilha e não está no snapshot
       // Chamada assíncrona em background para não travar parsing
-      (supabase.rpc('diff_snapshot_pairs', { p_pairs: pairs }) as Promise<any>).then(({ data: diff, error: diffErr }) => {
+      const pairStrings = pairs.map(pair => `${pair.name}|${pair.planner}`);
+      (supabase.rpc('diff_snapshot_pairs', { p_pairs: pairStrings }) as Promise<any>).then(({ data: diff, error: diffErr }) => {
         try {
           if (!diffErr && Array.isArray(diff)) {
             console.log('🔎 Ausentes no snapshot (nome|planejador):', diff.length, diff.slice(0, 20));
             if (diff.length > 0) {
               toast({ title: 'Diferenças encontradas', description: `${diff.length} clientes da planilha não estão no snapshot atual.`, variant: 'destructive' });
             }
+          } else if (diffErr) {
+            console.warn('Warn ao comparar com snapshot (diff_snapshot_pairs):', diffErr);
           }
         } catch (e) {
           console.warn('Warn ao processar diff:', e);

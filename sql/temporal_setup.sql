@@ -179,7 +179,7 @@ BEGIN
   ),
   last_snapshots AS (
     SELECT 
-      d.day AS recorded_date,
+      d.day AS snapshot_date,
       s.planner,
       s.manager,
       s.mediator,
@@ -228,24 +228,42 @@ BEGIN
         OR s.leader = ANY(leaders)
         OR (include_null_leader AND s.leader IS NULL)
       )
+  ),
+  aggregated AS (
+    SELECT 
+      ls.snapshot_date,
+      CASE WHEN planner_filter = 'all' THEN 'all' ELSE ls.planner END AS planner_label,
+      COUNT(*) AS total_clients,
+      ROUND(AVG(ls.health_score), 2) AS avg_health_score,
+      COUNT(CASE WHEN ls.health_category = 'Ótimo' THEN 1 END) AS excellent_count,
+      COUNT(CASE WHEN ls.health_category = 'Estável' THEN 1 END) AS stable_count,
+      COUNT(CASE WHEN ls.health_category = 'Atenção' THEN 1 END) AS warning_count,
+      COUNT(CASE WHEN ls.health_category = 'Crítico' THEN 1 END) AS critical_count,
+      ROUND(AVG(ls.meeting_engagement), 2) AS avg_meeting_engagement,
+      ROUND(AVG(ls.app_usage), 2) AS avg_app_usage,
+      ROUND(AVG(ls.payment_status), 2) AS avg_payment_status,
+      ROUND(AVG(ls.ecosystem_engagement), 2) AS avg_ecosystem_engagement,
+      ROUND(AVG(ls.nps_score), 2) AS avg_nps_score
+    FROM last_snapshots ls
+    GROUP BY ls.snapshot_date, CASE WHEN planner_filter = 'all' THEN 'all' ELSE ls.planner END
+    ORDER BY ls.snapshot_date
   )
-  SELECT 
-    recorded_date,
-    CASE WHEN planner_filter = 'all' THEN 'all' ELSE planner END AS planner,
-    COUNT(*) AS total_clients,
-    ROUND(AVG(health_score), 2) AS avg_health_score,
-    COUNT(CASE WHEN health_category = 'Ótimo' THEN 1 END) AS excellent_count,
-    COUNT(CASE WHEN health_category = 'Estável' THEN 1 END) AS stable_count,
-    COUNT(CASE WHEN health_category = 'Atenção' THEN 1 END) AS warning_count,
-    COUNT(CASE WHEN health_category = 'Crítico' THEN 1 END) AS critical_count,
-    ROUND(AVG(meeting_engagement), 2) AS avg_meeting_engagement,
-    ROUND(AVG(app_usage), 2) AS avg_app_usage,
-    ROUND(AVG(payment_status), 2) AS avg_payment_status,
-    ROUND(AVG(ecosystem_engagement), 2) AS avg_ecosystem_engagement,
-    ROUND(AVG(nps_score), 2) AS avg_nps_score
-  FROM last_snapshots
-  GROUP BY recorded_date, CASE WHEN planner_filter = 'all' THEN 'all' ELSE planner END
-  ORDER BY recorded_date;
+  SELECT
+    aggregated.snapshot_date AS recorded_date,
+    aggregated.planner_label AS planner,
+    aggregated.total_clients,
+    aggregated.avg_health_score,
+    aggregated.excellent_count,
+    aggregated.stable_count,
+    aggregated.warning_count,
+    aggregated.critical_count,
+    aggregated.avg_meeting_engagement,
+    aggregated.avg_app_usage,
+    aggregated.avg_payment_status,
+    aggregated.avg_ecosystem_engagement,
+    aggregated.avg_nps_score
+  FROM aggregated
+  ORDER BY aggregated.snapshot_date;
 END;
 $$ LANGUAGE plpgsql;
 

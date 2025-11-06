@@ -48,6 +48,7 @@ function databaseToClient(dbClient: any): Client {
     manager: dbClient.manager,
     isSpouse: dbClient.is_spouse,
     isActive: dbClient.is_active,
+    lastSeenAt: dbClient.last_seen_at ? new Date(dbClient.last_seen_at) : null,
     monthsSinceClosing: dbClient.months_since_closing,
     npsScoreV3: dbClient.nps_score_v3,
     hasNpsReferral: dbClient.has_nps_referral,
@@ -84,16 +85,17 @@ export const clientService = {
       const lastSeenTs: string | null = lastDateRows && lastDateRows[0]?.last_seen_at ? lastDateRows[0].last_seen_at : null
 
       // 2) Consultar somente o snapshot
-      const PAGE_SIZE = 1000
+      const PAGE_SIZE = 500  // Reduzido para garantir múltiplas páginas
       let offset = 0
       const allRows: any[] = []
+      let pageCount = 0
       while (true) {
         let query = supabase
-          .from('clients')
-          .select('*')
+        .from('clients')
+        .select('*')
           .neq('name', '0')
           .neq('planner', '0')
-          .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false })
           .range(offset, offset + PAGE_SIZE - 1)
 
         if (lastSeenTs) {
@@ -101,12 +103,25 @@ export const clientService = {
         }
 
         const { data, error } = await query
-        if (error) {
+      if (error) {
           console.error('Erro ao buscar snapshot de clientes:', error)
-          throw error
+        throw error
+      }
+        
+        pageCount++
+        const fetchedCount = data?.length || 0
+        console.log(`📦 Página ${pageCount}: ${fetchedCount} clientes (offset: ${offset})`)
+        
+        if (data && data.length > 0) {
+          allRows.push(...data)
         }
-        if (data && data.length > 0) allRows.push(...data)
-        if (!data || data.length < PAGE_SIZE) break
+        
+        // Parar se não há mais dados OU se recebemos menos que o PAGE_SIZE
+        if (!data || data.length === 0 || data.length < PAGE_SIZE) {
+          console.log(`✅ Paginação concluída: ${allRows.length} clientes carregados`)
+          break
+        }
+        
         offset += PAGE_SIZE
       }
       return allRows.map(databaseToClient)
@@ -256,10 +271,10 @@ export const clientService = {
           p_seen_at: seenAt
         } as any)
 
-        if (error) {
+      if (error) {
           console.error('❌ Erro ao inserir lote (bulk_insert_clients):', error)
-          throw error
-        }
+        throw error
+      }
 
         if (data && Array.isArray(data)) {
           // Coletar identity_keys diretamente do payload retornado

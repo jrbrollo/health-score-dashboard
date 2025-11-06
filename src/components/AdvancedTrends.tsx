@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { temporalService } from '@/services/temporalService';
 import { TemporalAnalysis } from '@/types/temporal';
+import { calculateHealthScore } from '@/utils/healthScore';
+import { applyHierarchyFilters } from '@/lib/filters';
 
 interface AdvancedTrendsProps {
   clients: Client[];
@@ -72,13 +74,70 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | '90d'>('30d');
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeDate = (date: Date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+
+  const filteredClients = useMemo(() => {
+    return applyHierarchyFilters(clients, {
+      selectedPlanner: selectedPlanner === 'all' ? null : selectedPlanner,
+      managers: manager === 'all' ? [] : [manager],
+      mediators: mediator === 'all' ? [] : [mediator],
+      leaders: leader === 'all' ? [] : [leader]
+    });
+  }, [clients, selectedPlanner, manager, mediator, leader]);
+
+  const buildSnapshotFromClients = (clientList: Client[]): TrendData | null => {
+    if (!clientList || clientList.length === 0) return null;
+
+    const latestSnapshotMs = clientList.reduce((max, current) => {
+      const lastSeen = current.lastSeenAt ? current.lastSeenAt.getTime() : NaN;
+      const updated = current.updatedAt ? current.updatedAt.getTime() : NaN;
+      const candidate = Number.isFinite(lastSeen) ? lastSeen : updated;
+      return Math.max(max, candidate);
+    }, 0);
+
+    const snapshotDate = normalizeDate(latestSnapshotMs ? new Date(latestSnapshotMs) : new Date());
+
+    const counts = {
+      'Ótimo': 0,
+      'Estável': 0,
+      'Atenção': 0,
+      'Crítico': 0
+    } as Record<'Ótimo' | 'Estável' | 'Atenção' | 'Crítico', number>;
+
+    let totalScore = 0;
+
+    clientList.forEach(client => {
+      const result = calculateHealthScore(client);
+      totalScore += result.score;
+      counts[result.category] = (counts[result.category] || 0) + 1;
+    });
+
+    const avgScore = clientList.length > 0 ? totalScore / clientList.length : 0;
+
+    return {
+      date: format(snapshotDate, 'dd/MM', { locale: ptBR }),
+      rawDate: snapshotDate,
+      score: Math.round(avgScore * 100) / 100,
+      clients: clientList.length,
+      excellent: counts['Ótimo'] ?? 0,
+      stable: counts['Estável'] ?? 0,
+      warning: counts['Atenção'] ?? 0,
+      critical: counts['Crítico'] ?? 0,
+    };
+  };
+
   // Buscar série temporal real (as-of) do serviço
   const loadTemporalSeries = async (): Promise<TrendData[]> => {
     const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
     const end = new Date();
     const start = subDays(end, days - 1);
 
-    const series: TemporalAnalysis[] = !selectedPlanner
+    const useAggregated = !selectedPlanner || selectedPlanner === 'all';
+    const series: TemporalAnalysis[] = useAggregated
       ? await temporalService.getAggregatedTemporalAnalysis(start, end, {
           managers: manager === 'all' ? undefined : [manager],
           mediators: mediator === 'all' ? undefined : [mediator],
@@ -90,7 +149,21 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
           leaders: leader === 'all' ? undefined : [leader]
         });
 
-    return series.map(s => ({
+    const dedupedByDay = new Map<string, TemporalAnalysis>();
+    series.forEach(item => {
+      if (!item?.recordedDate) return;
+      const key = item.recordedDate.toISOString().split('T')[0];
+      const existing = dedupedByDay.get(key);
+      if (!existing || existing.recordedDate < item.recordedDate) {
+        dedupedByDay.set(key, item);
+      }
+    });
+
+    const ordered = Array.from(dedupedByDay.values()).sort(
+      (a, b) => a.recordedDate.getTime() - b.recordedDate.getTime()
+    );
+
+    const result = ordered.map(s => ({
       date: format(s.recordedDate, 'dd/MM', { locale: ptBR }),
       rawDate: s.recordedDate,
       score: Number(s.avgHealthScore ?? 0),
@@ -100,6 +173,26 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
       warning: s.warningCount ?? 0,
       critical: s.criticalCount ?? 0,
     }));
+
+    const latestFromClients = buildSnapshotFromClients(filteredClients);
+    if (latestFromClients) {
+      const latestServiceDate = result.length ? normalizeDate(result[result.length - 1].rawDate) : null;
+      const latestClientDate = normalizeDate(latestFromClients.rawDate);
+
+      if (!latestServiceDate || latestClientDate.getTime() > latestServiceDate.getTime()) {
+        result.push(latestFromClients);
+      } else if (latestClientDate.getTime() === latestServiceDate.getTime()) {
+        result[result.length - 1] = latestFromClients;
+      }
+    }
+
+    result.sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
+
+    if (import.meta.env.DEV) {
+      console.debug('[AdvancedTrends] Série temporal carregada:', result.map(r => ({ date: r.rawDate.toISOString().split('T')[0], score: r.score, clients: r.clients })));
+    }
+
+    return result;
   };
 
   // Calcular métricas de tendência (janela atual vs anterior, ponderado por clientes)
@@ -231,7 +324,7 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
       }
     })();
     return () => { cancelled = true; };
-  }, [clients, timeframe, selectedPlanner, manager, mediator, leader]);
+  }, [filteredClients, timeframe, selectedPlanner, manager, mediator, leader]);
 
   const getTrendColor = (trend: string) => {
     switch (trend) {
@@ -570,3 +663,271 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
 };
 
 export default AdvancedTrends;
+
+              />
+
+              <Area 
+
+                type="monotone" 
+
+                dataKey="score" 
+
+                stroke="#8b5cf6" 
+
+                fill="url(#colorGradient)" 
+
+                strokeWidth={2}
+
+              />
+
+              <defs>
+
+                <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+
+                </linearGradient>
+
+              </defs>
+
+            </AreaChart>
+
+          </ResponsiveContainer>
+
+        </CardContent>
+
+      </Card>
+
+
+
+      {/* Padrões Sazonais e Insights Preditivos */}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+
+          <CardHeader>
+
+            <CardTitle className="flex items-center gap-2">
+
+              <Calendar className="h-5 w-5" />
+
+              Padrões Sazonais
+
+            </CardTitle>
+
+          </CardHeader>
+
+          <CardContent>
+
+            <div className="space-y-4">
+
+              {seasonalPatterns.map((pattern, index) => (
+
+                <div key={index} className="flex items-center justify-between p-3 rounded-lg border bg-background/50">
+
+                  <div>
+
+                    <div className="font-medium">{pattern.period}</div>
+
+                    <div className="text-sm text-muted-foreground">
+
+                      Variância: {pattern.variance}
+
+                    </div>
+
+                  </div>
+
+                  <div className="text-right">
+
+                    <div className="text-lg font-semibold">{pattern.averageScore}</div>
+
+                    <div className="flex items-center gap-1">
+
+                      {pattern.trend === 'up' ? (
+
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+
+                      ) : pattern.trend === 'down' ? (
+
+                        <TrendingDown className="h-4 w-4 text-red-500" />
+
+                      ) : (
+
+                        <Activity className="h-4 w-4 text-blue-500" />
+
+                      )}
+
+                      <span className="text-xs text-muted-foreground">
+
+                        {pattern.trend === 'up' ? 'Crescendo' : 
+
+                         pattern.trend === 'down' ? 'Decrescendo' : 'Estável'}
+
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          </CardContent>
+
+        </Card>
+
+
+
+        <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+
+          <CardHeader>
+
+            <CardTitle className="flex items-center gap-2">
+
+              <Target className="h-5 w-5" />
+
+              Insights Preditivos
+
+            </CardTitle>
+
+          </CardHeader>
+
+          <CardContent>
+
+            <div className="space-y-4">
+
+              {predictiveInsights.map((insight, index) => (
+
+                <div key={index} className="flex items-center justify-between p-3 rounded-lg border bg-background/50">
+
+                  <div>
+
+                    <div className="font-medium">{insight.category}</div>
+
+                    <div className="text-sm text-muted-foreground">
+
+                      {insight.timeframe}
+
+                    </div>
+
+                  </div>
+
+                  <div className="text-right">
+
+                    <div className="text-lg font-semibold">
+
+                      {Math.round(insight.probability * 100)}%
+
+                    </div>
+
+                    <Badge className={getConfidenceColor(insight.confidence)}>
+
+                      {insight.confidence === 'high' ? 'Alta' : 
+
+                       insight.confidence === 'medium' ? 'Média' : 'Baixa'}
+
+                    </Badge>
+
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          </CardContent>
+
+        </Card>
+
+      </div>
+
+
+
+      {/* Distribuição de Categorias ao Longo do Tempo */}
+
+      <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+
+        <CardHeader>
+
+          <CardTitle className="flex items-center gap-2">
+
+            <Users className="h-5 w-5" />
+
+            Distribuição de Categorias
+
+          </CardTitle>
+
+        </CardHeader>
+
+        <CardContent>
+
+          <ResponsiveContainer width="100%" height={300}>
+
+            <BarChart data={trendData}>
+
+              <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
+
+              <XAxis 
+
+                dataKey="date" 
+
+                stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+
+                fontSize={12}
+
+              />
+
+              <YAxis 
+
+                stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+
+                fontSize={12}
+
+              />
+
+              <Tooltip 
+
+                contentStyle={{
+
+                  backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+
+                  borderRadius: '8px',
+
+                  color: isDarkMode ? '#f9fafb' : '#111827'
+
+                }}
+
+              />
+
+              <Bar dataKey="excellent" stackId="stack" name="Ótimo" fill="#10b981" />
+              <Bar dataKey="stable" stackId="stack" name="Estável" fill="#3b82f6" />
+              <Bar dataKey="warning" stackId="stack" name="Atenção" fill="#f59e0b" />
+              <Bar dataKey="critical" stackId="stack" name="Crítico" fill="#ef4444" />
+            </BarChart>
+
+          </ResponsiveContainer>
+
+        </CardContent>
+
+      </Card>
+
+    </div>
+
+  );
+
+};
+
+
+
+export default AdvancedTrends;
+
+

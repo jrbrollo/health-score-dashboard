@@ -2,10 +2,39 @@ import { supabase } from '@/lib/supabase';
 import { HealthScoreHistory, TemporalAnalysis, TrendAnalysis, PeriodComparison } from '@/types/temporal';
 import { Planner } from '@/types/client';
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+const averageFromRecords = (records: any[], selector: (record: any) => number | null | undefined) => {
+  if (!records || records.length === 0) return 0;
+  const sum = records.reduce((acc, record) => acc + (selector(record) ?? 0), 0);
+  return sum / records.length;
+};
+
+const parseDateFromDb = (value: string | Date | null | undefined): Date => {
+  if (!value) return new Date();
+  if (value instanceof Date) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const text = value.toString();
+  const isoDate = text.includes('T') ? text.split('T')[0] : text;
+  const [yearStr, monthStr, dayStr] = isoDate.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+
+  if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+    return new Date(year, month - 1, day);
+  }
+
+  // Fallback para casos inesperados
+  const fallback = new Date(text);
+  return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
+};
+
 // Converter dados do banco para o formato da aplicação
 function databaseToTemporalAnalysis(dbData: any): TemporalAnalysis {
   return {
-    recordedDate: new Date(dbData.recorded_date),
+    recordedDate: parseDateFromDb(dbData.recorded_date),
     planner: dbData.planner,
     totalClients: parseInt(dbData.total_clients),
     avgHealthScore: parseFloat(dbData.avg_health_score),
@@ -25,7 +54,7 @@ function databaseToHealthScoreHistory(dbData: any): HealthScoreHistory {
   return {
     id: dbData.id,
     clientId: dbData.client_id,
-    recordedDate: new Date(dbData.recorded_date),
+    recordedDate: parseDateFromDb(dbData.recorded_date),
     clientName: dbData.client_name,
     planner: dbData.planner,
     healthScore: dbData.health_score,
@@ -74,30 +103,13 @@ export const temporalService = {
         });
 
       if (error || !data) {
-        // Fallback
-        let query = supabase
-          .from('temporal_health_analysis')
-          .select('*')
-          .gte('recorded_date', startDate.toISOString().split('T')[0])
-          .lte('recorded_date', endDate.toISOString().split('T')[0])
-          .order('recorded_date', { ascending: true });
-
-        if (planner && planner !== 'all') {
-          query = query.eq('planner', planner);
-        }
-
-        const { data: fallbackData, error: fbErr } = await query;
-        if (fbErr) {
-          console.error('Erro ao buscar análise temporal (fallback):', fbErr);
-          throw fbErr;
-        }
-        return fallbackData ? fallbackData.map(databaseToTemporalAnalysis) : [];
+        return this.calculatePlannerAnalysis(startDate, endDate, planner ?? 'all', hierarchyFilters);
       }
 
       return data.map(databaseToTemporalAnalysis);
     } catch (error) {
       console.error('Erro no getTemporalAnalysis:', error);
-      return [];
+      return this.calculatePlannerAnalysis(startDate, endDate, planner ?? 'all', hierarchyFilters);
     }
   },
 
@@ -130,22 +142,7 @@ export const temporalService = {
         });
 
       if (error || !data) {
-        // Fallback para função antiga agregada
-        const { data: aggData, error: aggErr } = await supabase
-          .rpc('get_aggregated_temporal_analysis', {
-            start_date: startDate.toISOString().split('T')[0],
-            end_date: endDate.toISOString().split('T')[0]
-          });
-
-        if (aggErr) {
-          console.error('Erro ao buscar análise temporal agregada (fallback):', aggErr);
-          throw aggErr;
-        }
-
-        return aggData ? aggData.map((item: any) => ({
-          ...databaseToTemporalAnalysis(item),
-          planner: 'all' as const
-        })) : [];
+        return this.calculateAggregatedAnalysis(startDate, endDate, hierarchyFilters);
       }
 
       return data.map((item: any) => ({
@@ -166,66 +163,146 @@ export const temporalService = {
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('health_score_history')
         .select('*')
         .gte('recorded_date', startDate.toISOString().split('T')[0])
-        .lte('recorded_date', endDate.toISOString().split('T')[0]);
-
-      if (hierarchyFilters) {
-        if (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) {
-          query = query.in('manager', hierarchyFilters.managers);
-        }
-        if (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) {
-          query = query.in('mediator', hierarchyFilters.mediators);
-        }
-        if (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0) {
-          query = query.in('leader', hierarchyFilters.leaders);
-        }
-      }
-
-      // Ignorar placeholders '0'
-      query = query.neq('planner', '0').neq('client_name', '0');
-
-      const { data, error } = await query;
+        .lte('recorded_date', endDate.toISOString().split('T')[0])
+        .neq('planner', '0')
+        .neq('client_name', '0');
 
       if (error) throw error;
 
-      // Agrupar por data
-      const groupedByDate = data?.reduce((acc, record) => {
-        const date = record.recorded_date;
-        if (!acc[date]) {
-          acc[date] = [];
+      let filteredData = data ?? [];
+
+      if (hierarchyFilters) {
+        if (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) {
+          filteredData = filteredData.filter(record => {
+            if (!record.manager) return Boolean(hierarchyFilters.includeNulls?.manager);
+            return hierarchyFilters.managers!.includes(record.manager);
+          });
         }
+        if (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) {
+          filteredData = filteredData.filter(record => {
+            if (!record.mediator) return Boolean(hierarchyFilters.includeNulls?.mediator);
+            return hierarchyFilters.mediators!.includes(record.mediator);
+          });
+        }
+        if (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0) {
+          filteredData = filteredData.filter(record => {
+            if (!record.leader) return Boolean(hierarchyFilters.includeNulls?.leader);
+            return hierarchyFilters.leaders!.includes(record.leader);
+          });
+        }
+      }
+
+      const groupedByDate = filteredData.reduce((acc, record) => {
+        const date = record.recorded_date;
+        if (!acc[date]) acc[date] = [];
         acc[date].push(record);
         return acc;
       }, {} as Record<string, any[]>) || {};
 
-      // Calcular métricas agregadas por data
       const aggregated = Object.entries(groupedByDate).map(([date, records]) => {
         const totalClients = records.length;
-        const avgHealthScore = records.reduce((sum, r) => sum + r.health_score, 0) / totalClients;
-        
+        const avgHealthScore = averageFromRecords(records, r => r.health_score ?? 0);
+
         return {
-          recordedDate: new Date(date),
+          recordedDate: parseDateFromDb(date),
           planner: "all" as const,
           totalClients,
-          avgHealthScore: Math.round(avgHealthScore * 100) / 100,
+          avgHealthScore: round2(avgHealthScore),
           excellentCount: records.filter(r => r.health_category === 'Ótimo').length,
           stableCount: records.filter(r => r.health_category === 'Estável').length,
           warningCount: records.filter(r => r.health_category === 'Atenção').length,
           criticalCount: records.filter(r => r.health_category === 'Crítico').length,
-          avgMeetingEngagement: Math.round((records.reduce((sum, r) => sum + r.meeting_engagement, 0) / totalClients) * 100) / 100,
-          avgAppUsage: Math.round((records.reduce((sum, r) => sum + r.app_usage, 0) / totalClients) * 100) / 100,
-          avgPaymentStatus: Math.round((records.reduce((sum, r) => sum + r.payment_status, 0) / totalClients) * 100) / 100,
-          avgEcosystemEngagement: Math.round((records.reduce((sum, r) => sum + r.ecosystem_engagement, 0) / totalClients) * 100) / 100,
-          avgNpsScore: Math.round((records.reduce((sum, r) => sum + r.nps_score, 0) / totalClients) * 100) / 100,
+          avgMeetingEngagement: round2(averageFromRecords(records, r => r.meeting_engagement ?? 0)),
+          avgAppUsage: round2(averageFromRecords(records, r => r.app_usage ?? 0)),
+          avgPaymentStatus: round2(averageFromRecords(records, r => r.payment_status ?? 0)),
+          avgEcosystemEngagement: round2(averageFromRecords(records, r => r.ecosystem_engagement ?? 0)),
+          avgNpsScore: round2(averageFromRecords(records, r => r.nps_score ?? 0)),
         };
       });
 
       return aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
     } catch (error) {
       console.error('Erro no calculateAggregatedAnalysis:', error);
+      return [];
+    }
+  },
+
+  async calculatePlannerAnalysis(
+    startDate: Date,
+    endDate: Date,
+    planner: Planner | "all",
+    hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
+  ): Promise<TemporalAnalysis[]> {
+    if (!planner || planner === 'all') {
+      return this.calculateAggregatedAnalysis(startDate, endDate, hierarchyFilters);
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('health_score_history')
+        .select('*')
+        .eq('planner', planner)
+        .gte('recorded_date', startDate.toISOString().split('T')[0])
+        .lte('recorded_date', endDate.toISOString().split('T')[0]);
+      if (error) throw error;
+
+      let filteredData = data ?? [];
+
+      if (hierarchyFilters) {
+        if (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) {
+          filteredData = filteredData.filter(record => {
+            if (!record.manager) return Boolean(hierarchyFilters.includeNulls?.manager);
+            return hierarchyFilters.managers!.includes(record.manager);
+          });
+        }
+        if (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) {
+          filteredData = filteredData.filter(record => {
+            if (!record.mediator) return Boolean(hierarchyFilters.includeNulls?.mediator);
+            return hierarchyFilters.mediators!.includes(record.mediator);
+          });
+        }
+        if (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0) {
+          filteredData = filteredData.filter(record => {
+            if (!record.leader) return Boolean(hierarchyFilters.includeNulls?.leader);
+            return hierarchyFilters.leaders!.includes(record.leader);
+          });
+        }
+      }
+
+      const groupedByDate = filteredData.reduce((acc, record) => {
+        const date = record.recorded_date;
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(record);
+        return acc;
+      }, {} as Record<string, any[]>) || {};
+
+      const aggregated = Object.entries(groupedByDate).map(([date, records]) => {
+        const totalClients = records.length;
+
+        return {
+          recordedDate: parseDateFromDb(date),
+          planner,
+          totalClients,
+          avgHealthScore: round2(averageFromRecords(records, r => r.health_score ?? 0)),
+          excellentCount: records.filter(r => r.health_category === 'Ótimo').length,
+          stableCount: records.filter(r => r.health_category === 'Estável').length,
+          warningCount: records.filter(r => r.health_category === 'Atenção').length,
+          criticalCount: records.filter(r => r.health_category === 'Crítico').length,
+          avgMeetingEngagement: round2(averageFromRecords(records, r => r.meeting_engagement ?? 0)),
+          avgAppUsage: round2(averageFromRecords(records, r => r.app_usage ?? 0)),
+          avgPaymentStatus: round2(averageFromRecords(records, r => r.payment_status ?? 0)),
+          avgEcosystemEngagement: round2(averageFromRecords(records, r => r.ecosystem_engagement ?? 0)),
+          avgNpsScore: round2(averageFromRecords(records, r => r.nps_score ?? 0)),
+        };
+      });
+
+      return aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
+    } catch (error) {
+      console.error('Erro no calculatePlannerAnalysis:', error);
       return [];
     }
   },
