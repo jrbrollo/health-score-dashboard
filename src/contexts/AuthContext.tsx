@@ -1,0 +1,396 @@
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { UserProfile, HierarchyCascade } from '@/types/auth';
+import { toast } from '@/hooks/use-toast';
+
+interface AuthContextType {
+  user: User | null;
+  profile: UserProfile | null;
+  session: Session | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, role: string, hierarchyName: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  getHierarchyCascade: () => Promise<HierarchyCascade | null>;
+  getAvailableNames: (role: string) => Promise<string[]>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Carregar perfil do usuário
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(); // Usar maybeSingle() ao invés de single() para não dar erro quando não há perfil
+
+      if (error) {
+        // Se for erro de "nenhuma linha", apenas definir perfil como null
+        if (error.code === 'PGRST116') {
+          console.warn('Perfil não encontrado para o usuário:', userId);
+          setProfile(null);
+          return;
+        }
+        throw error;
+      }
+
+      if (data) {
+        setProfile({
+          id: data.id,
+          email: data.email,
+          role: data.role,
+          hierarchyName: data.hierarchy_name,
+          createdAt: data.created_at ? new Date(data.created_at) : undefined,
+          updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
+        });
+      } else {
+        setProfile(null);
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar perfil:', error);
+      setProfile(null);
+    }
+  };
+
+  // Inicializar auth state
+  useEffect(() => {
+    let mounted = true;
+
+    // Verificar sessão atual
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!mounted) return;
+      
+      if (error) {
+        console.error('Erro ao verificar sessão:', error);
+        setLoading(false);
+        return;
+      }
+
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadUserProfile(session.user.id).finally(() => {
+          if (mounted) setLoading(false);
+        });
+      } else {
+        setLoading(false);
+      }
+    }).catch(error => {
+      console.error('Erro ao verificar sessão:', error);
+      if (mounted) setLoading(false);
+    });
+
+    // Ouvir mudanças de auth
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        // Melhorar mensagens de erro
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Email ou senha incorretos. Verifique suas credenciais.');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Por favor, confirme seu email antes de fazer login. Verifique sua caixa de entrada.');
+        }
+        throw error;
+      }
+
+      if (data.user) {
+        await loadUserProfile(data.user.id);
+        toast({
+          title: 'Login realizado!',
+          description: 'Bem-vindo de volta!',
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao fazer login:', error);
+      toast({
+        title: 'Erro no login',
+        description: error.message || 'Não foi possível fazer login. Verifique suas credenciais.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const signUp = async (email: string, password: string, role: string, hierarchyName: string) => {
+    try {
+      // Validar nome na hierarquia
+      const { data: isValid, error: validateError } = await supabase
+        .rpc('validate_hierarchy_name', {
+          p_role: role,
+          p_hierarchy_name: hierarchyName,
+        });
+
+      if (validateError) throw validateError;
+
+      if (!isValid) {
+        throw new Error('O nome selecionado não existe na hierarquia. Por favor, verifique e tente novamente.');
+      }
+
+      // Criar usuário no Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) {
+        // Se o email já existe, sugerir fazer login
+        if (authError.message?.includes('already registered') || authError.message?.includes('User already registered')) {
+          throw new Error('Este email já está cadastrado. Por favor, faça login ou use a opção "Esqueci minha senha".');
+        }
+        throw authError;
+      }
+
+      if (!authData.user) {
+        throw new Error('Falha ao criar usuário');
+      }
+
+      // Criar perfil usando função SQL (bypass RLS) - não precisa de sessão ativa
+      const { error: profileError } = await supabase.rpc('create_user_profile', {
+        p_user_id: authData.user.id,
+        p_email: email,
+        p_role: role,
+        p_hierarchy_name: hierarchyName,
+      });
+
+      if (profileError) {
+        console.error('Erro ao criar perfil:', profileError);
+        
+        // Se o erro for de email duplicado, verificar se o perfil já existe
+        if (profileError.message?.includes('duplicate key') || profileError.message?.includes('unique constraint')) {
+          // Verificar se o perfil existe para este usuário
+          const { data: existingProfile } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('id', authData.user.id)
+            .maybeSingle();
+          
+          if (existingProfile) {
+            // Perfil já existe, apenas fazer login
+            console.log('Perfil já existe, fazendo login...');
+          } else {
+            // Email existe mas é de outro usuário
+            throw new Error('Este email já está cadastrado. Por favor, faça login ou use outro email.');
+          }
+        } else {
+          // Se der outro erro, tentar novamente após um delay
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const { error: retryError } = await supabase.rpc('create_user_profile', {
+            p_user_id: authData.user.id,
+            p_email: email,
+            p_role: role,
+            p_hierarchy_name: hierarchyName,
+          });
+          if (retryError) {
+            throw retryError;
+          }
+        }
+      }
+
+      // Aguardar um pouco para garantir que o perfil foi criado
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verificar se temos sessão ativa, se não, fazer login
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Se não tiver sessão, tentar fazer login automaticamente
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (loginError) {
+          throw new Error('Conta criada, mas não foi possível fazer login automaticamente. Por favor, faça login manualmente.');
+        }
+      }
+
+      // Carregar perfil
+      await loadUserProfile(authData.user.id);
+
+      toast({
+        title: 'Conta criada!',
+        description: 'Sua conta foi criada com sucesso. Você já pode fazer login!',
+      });
+    } catch (error: any) {
+      console.error('Erro ao criar conta:', error);
+      toast({
+        title: 'Erro ao criar conta',
+        description: error.message || 'Não foi possível criar a conta. Tente novamente.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+
+      // Redirecionar para login após logout
+      window.location.href = '/login';
+
+      toast({
+        title: 'Logout realizado!',
+        description: 'Você saiu da sua conta.',
+      });
+    } catch (error: any) {
+      console.error('Erro ao fazer logout:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível fazer logout.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const getHierarchyCascade = async (): Promise<HierarchyCascade | null> => {
+    if (!profile) return null;
+
+    try {
+      const { data, error } = await supabase.rpc('get_hierarchy_cascade', {
+        p_role: profile.role,
+        p_hierarchy_name: profile.hierarchyName,
+      });
+
+      if (error) {
+        console.error('Erro RPC get_hierarchy_cascade:', error);
+        throw error;
+      }
+
+      // A função retorna uma única linha com arrays
+      if (data && Array.isArray(data) && data.length > 0) {
+        const result = data[0];
+        return {
+          plannerNames: Array.isArray(result.planner_names) ? result.planner_names : [],
+          leaderNames: Array.isArray(result.leader_names) ? result.leader_names : [],
+          mediatorNames: Array.isArray(result.mediator_names) ? result.mediator_names : [],
+        };
+      }
+
+      // Se for manager, retornar objeto vazio (sem restrições)
+      if (profile.role === 'manager') {
+        return {
+          plannerNames: [],
+          leaderNames: [],
+          mediatorNames: [],
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar hierarquia cascata:', error);
+      // Em caso de erro, retornar objeto vazio para manager, null para outros
+      if (profile?.role === 'manager') {
+        return {
+          plannerNames: [],
+          leaderNames: [],
+          mediatorNames: [],
+        };
+      }
+      return null;
+    }
+  };
+
+  const getAvailableNames = async (role: string): Promise<string[]> => {
+    try {
+      const { data, error } = await supabase.rpc('get_available_names_by_role', {
+        p_role: role,
+      });
+
+      if (error) throw error;
+
+      return (data || []).map((row: any) => row.name);
+    } catch (error) {
+      console.error('Erro ao buscar nomes disponíveis:', error);
+      return [];
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Email enviado!',
+        description: 'Verifique sua caixa de entrada para redefinir sua senha.',
+      });
+    } catch (error: any) {
+      console.error('Erro ao enviar email de reset:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível enviar o email de redefinição de senha.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    profile,
+    session,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    resetPassword,
+    getHierarchyCascade,
+    getAvailableNames,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextType {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+}
+

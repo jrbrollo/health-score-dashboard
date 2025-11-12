@@ -107,7 +107,7 @@ export const clientService = {
           console.error('Erro ao buscar snapshot de clientes:', error)
         throw error
       }
-        
+
         pageCount++
         const fetchedCount = data?.length || 0
         console.log(`📦 Página ${pageCount}: ${fetchedCount} clientes (offset: ${offset})`)

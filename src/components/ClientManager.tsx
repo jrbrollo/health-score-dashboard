@@ -22,7 +22,8 @@ import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { ThemeToggle } from "./ui/theme-toggle";
-import { buildUniqueList, applyHierarchyFilters } from "@/lib/filters";
+import { buildUniqueList, applyHierarchyFilters, HierarchyFilters } from "@/lib/filters";
+import { useAuth } from "@/contexts/AuthContext";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { temporalService } from "@/services/temporalService";
 import { HealthScoreHistory } from "@/types/temporal";
@@ -35,11 +36,13 @@ interface ClientManagerProps {
   onBack: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
+  authFilters?: HierarchyFilters | null;
 }
 
 // planners dinâmicos a partir dos clientes
 
-export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
+export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = false, onToggleDarkMode, authFilters }: ClientManagerProps) {
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterPlanner, setFilterPlanner] = useState<Planner | "all">(selectedPlanner);
@@ -81,14 +84,28 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
   const mediatorLabel = filterMediator === "all" ? "Todos os Mediadores" : filterMediator;
   const leaderLabel = filterLeader === "all" ? "Todos os Líderes" : filterLeader;
 
-  // Filtrar clientes
+  // Filtrar clientes (combinando filtros de auth e filtros do usuário)
   const filteredClients = useMemo(() => {
-    let filtered = applyHierarchyFilters(clients, {
-      selectedPlanner: filterPlanner === 'all' ? null : filterPlanner,
-      managers: filterManager === 'all' ? [] : [filterManager],
-      mediators: filterMediator === 'all' ? [] : [filterMediator],
-      leaders: filterLeader === 'all' ? [] : [filterLeader],
-    });
+    // Começar com filtros de autenticação
+    let baseFilters: HierarchyFilters = authFilters || {
+      selectedPlanner: null,
+      managers: [],
+      mediators: [],
+      leaders: [],
+    };
+
+    // Aplicar filtros adicionais do usuário (se permitido pelo role)
+    const userFilters: HierarchyFilters = {
+      selectedPlanner: profile?.role === 'manager' ? (filterPlanner === 'all' ? null : filterPlanner) : baseFilters.selectedPlanner,
+      managers: profile?.role === 'manager' && filterManager !== 'all' ? [filterManager] : baseFilters.managers,
+      mediators: profile?.role === 'manager' && filterMediator !== 'all' ? [filterMediator] : baseFilters.mediators,
+      leaders: profile?.role === 'manager' && filterLeader !== 'all' ? [filterLeader] : baseFilters.leaders,
+    };
+
+    // Se não for gerente, usar apenas filtros de auth
+    const finalFilters = profile?.role === 'manager' ? userFilters : baseFilters;
+
+    let filtered = applyHierarchyFilters(clients, finalFilters);
 
     if (searchTerm) {
       filtered = filtered.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -99,7 +116,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
     }
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, searchTerm, filterCategory]);
+  }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, searchTerm, filterCategory, authFilters, profile]);
 
 
   const getHealthScoreColor = (category: string) => {

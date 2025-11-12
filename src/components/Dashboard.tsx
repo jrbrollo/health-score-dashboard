@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Client, Planner, HealthScore, BulkImportPayload } from "@/types/client";
 import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
-import { buildUniqueList, applyHierarchyFilters, uniqueById } from "@/lib/filters";
+import { buildUniqueList, applyHierarchyFilters, uniqueById, HierarchyFilters } from "@/lib/filters";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AnalyticsView } from "./AnalyticsView";
 import { BulkImportV3 } from "./BulkImportV3";
@@ -27,6 +27,17 @@ import { ThemeToggle } from "./ui/theme-toggle";
 import TemporalAnalysisComponent from "./TemporalAnalysis";
 import AdvancedAnalytics from "./AdvancedAnalytics";
 import DataQuality from "./DataQuality";
+import { useAuth } from "@/contexts/AuthContext";
+import { LogOut, User as UserIcon } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "./ui/avatar";
 
 interface DashboardProps {
   clients: Client[];
@@ -35,11 +46,13 @@ interface DashboardProps {
   onManageClients?: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
+  authFilters?: HierarchyFilters | null;
 }
 
 // Lista de planejadores dinâmica, derivada dos clientes (sem nomes fixos)
 
-export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClients, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
+export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClients, isDarkMode = false, onToggleDarkMode, authFilters }: DashboardProps) {
+  const { profile, signOut } = useAuth();
   const [selectedPlanner, setSelectedPlanner] = useState<string | null>(null);
   const [selectedManager, setSelectedManager] = useState<string | "all">("all");
   const [selectedMediator, setSelectedMediator] = useState<string | "all">("all");
@@ -61,16 +74,51 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   const mediatorLabel = selectedMediator !== "all" ? selectedMediator : "Todos os Mediadores";
   const leaderLabel = selectedLeader !== "all" ? selectedLeader : "Todos os Líderes";
 
-  // Filter clients by planner + hierarchy
+  // Filter clients by planner + hierarchy (combinando filtros de auth e filtros do usuário)
   const filteredClients = useMemo(() => {
-    const filtered = applyHierarchyFilters(clients, {
-      selectedPlanner,
-      managers: selectedManager === 'all' ? [] : [selectedManager],
-      mediators: selectedMediator === 'all' ? [] : [selectedMediator],
-      leaders: selectedLeader === 'all' ? [] : [selectedLeader]
-    });
+    // Começar com filtros de autenticação
+    let baseFilters: HierarchyFilters = authFilters || {
+      selectedPlanner: null,
+      managers: [],
+      mediators: [],
+      leaders: [],
+    };
+
+    // Aplicar filtros adicionais do usuário
+    // Gerente pode filtrar livremente
+    // Líder e Mediador podem filtrar pelos planejadores abaixo deles
+    // Planejador só vê seus próprios clientes (não pode filtrar outros)
+    
+    let finalFilters: HierarchyFilters;
+    
+    if (profile?.role === 'manager') {
+      // Gerente: filtros livres
+      finalFilters = {
+        selectedPlanner: selectedPlanner,
+        managers: selectedManager !== 'all' ? [selectedManager] : [],
+        mediators: selectedMediator !== 'all' ? [selectedMediator] : [],
+        leaders: selectedLeader !== 'all' ? [selectedLeader] : [],
+      };
+    } else if (profile?.role === 'planner') {
+      // Planejador: apenas seus próprios clientes (não pode filtrar outros)
+      finalFilters = baseFilters;
+    } else {
+      // Líder ou Mediador: pode filtrar pelos planejadores abaixo dele
+      // Mas precisa respeitar os filtros de auth (hierarquia)
+      // Se selecionou um planejador, usar ele; senão, usar o filtro de auth
+      const plannerToUse = selectedPlanner || baseFilters.selectedPlanner;
+      
+      finalFilters = {
+        selectedPlanner: plannerToUse,
+        managers: baseFilters.managers,
+        mediators: selectedMediator !== 'all' ? [selectedMediator] : baseFilters.mediators,
+        leaders: selectedLeader !== 'all' ? [selectedLeader] : baseFilters.leaders,
+      };
+    }
+
+    const filtered = applyHierarchyFilters(clients, finalFilters);
     return uniqueById(filtered);
-  }, [clients, selectedPlanner, selectedManager, selectedMediator, selectedLeader]);
+  }, [clients, selectedPlanner, selectedManager, selectedMediator, selectedLeader, authFilters, profile]);
 
   // Calculate health scores for filtered clients
   const healthScores = useMemo(() => {
@@ -157,6 +205,48 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
           </div>
           
           <div className="flex items-center gap-4 flex-wrap">
+            {/* Menu do Usuário */}
+            {profile && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback>
+                        <UserIcon className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="hidden md:inline">{profile.hierarchyName}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{profile.hierarchyName}</p>
+                      <p className="text-xs text-muted-foreground">{profile.email}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {profile.role === 'manager' ? 'Gerente' :
+                         profile.role === 'mediator' ? 'Mediador' :
+                         profile.role === 'leader' ? 'Líder em Formação' :
+                         'Planejador'}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      signOut().catch(err => {
+                        console.error('Erro ao fazer logout:', err);
+                      });
+                    }} 
+                    className="text-red-600 cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            
             {/* Seletor de Planejador com busca */}
             <Popover open={plannerSearchOpen} onOpenChange={setPlannerSearchOpen}>
               <PopoverTrigger asChild>

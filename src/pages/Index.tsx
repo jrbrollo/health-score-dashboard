@@ -1,22 +1,65 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Client, Planner, BulkImportPayload } from "@/types/client";
 import { Dashboard } from "@/components/Dashboard";
 import { ClientManager } from "@/components/ClientManager";
 import { clientService } from "@/services/clientService";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { getAuthFilters } from "@/lib/authFilters";
+import { HierarchyFilters } from "@/lib/filters";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, profile, loading: authLoading, getHierarchyCascade } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showClientManager, setShowClientManager] = useState(false);
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [authFilters, setAuthFilters] = useState<HierarchyFilters | null>(null);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Carregar filtros de autenticação
+  useEffect(() => {
+    if (profile) {
+      getAuthFilters(profile, getHierarchyCascade).then(filters => {
+        setAuthFilters(filters);
+      }).catch(error => {
+        console.error('Erro ao carregar filtros de autenticação:', error);
+        // Em caso de erro, definir filtros vazios para não travar a aplicação
+        setAuthFilters({
+          selectedPlanner: null,
+          managers: [],
+          mediators: [],
+          leaders: [],
+        });
+      });
+    } else if (!authLoading && user) {
+      // Se não tem perfil mas tem usuário, definir filtros vazios
+      setAuthFilters({
+        selectedPlanner: null,
+        managers: [],
+        mediators: [],
+        leaders: [],
+      });
+    }
+  }, [profile, getHierarchyCascade, authLoading, user]);
 
   // Carregar clientes do Supabase ao inicializar
   useEffect(() => {
-    loadClients();
-  }, []);
+    if (user && authFilters !== null && profile) {
+      loadClients();
+    }
+  }, [user, authFilters, profile]);
 
   // Aplicar modo escuro ao documento
   useEffect(() => {
@@ -30,7 +73,13 @@ const Index = () => {
   const loadClients = async () => {
     try {
       setLoading(true);
-      const clientsData = await clientService.getAllClients();
+      let clientsData = await clientService.getAllClients();
+      
+      // Aplicar filtros de autenticação
+      if (authFilters) {
+        const { applyHierarchyFilters } = await import('@/lib/filters');
+        clientsData = applyHierarchyFilters(clientsData, authFilters);
+      }
       // Debug: distribuição de Cross Sell para diagnóstico
       try {
         const dist = clientsData.reduce((acc: any, c) => {
@@ -171,8 +220,67 @@ const Index = () => {
     setShowClientManager(false);
   };
 
-  // Tela de loading
-  if (loading) {
+  // Se usuário está autenticado mas não tem perfil, redirecionar para login
+  useEffect(() => {
+    if (!authLoading && user && !profile && authFilters === null) {
+      // Aguardar um pouco para ver se o perfil carrega
+      const timer = setTimeout(() => {
+        if (!profile) {
+          toast({
+            title: 'Perfil não encontrado',
+            description: 'Sua conta não possui perfil. Por favor, entre em contato com o administrador.',
+            variant: 'destructive',
+          });
+          signOut();
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, profile, authLoading, authFilters]);
+
+  // Tela de loading (auth ou dados)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold">Verificando autenticação...</h2>
+          <p className="text-muted-foreground">Aguarde enquanto verificamos sua sessão</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem perfil após loading de auth, aguardar um pouco antes de mostrar erro
+  if (user && !profile && authFilters === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold">Carregando perfil...</h2>
+          <p className="text-muted-foreground">Carregando informações do usuário</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem perfil após loading, mostrar erro
+  if (!authLoading && user && !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-semibold mb-4">Perfil não encontrado</h2>
+          <p className="text-muted-foreground mb-4">
+            Sua conta não possui um perfil configurado. Por favor, entre em contato com o administrador ou tente criar uma nova conta.
+          </p>
+          <Button onClick={() => signOut()}>Fazer Logout</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar loading apenas se realmente estiver carregando E tiver usuário e perfil
+  if (loading && user && profile && authFilters !== null && clients.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -201,6 +309,7 @@ const Index = () => {
         onBack={handleBackToDashboard}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        authFilters={authFilters}
       />
     );
   }
@@ -212,6 +321,7 @@ const Index = () => {
       onManageClients={() => handleManageClients()}
       isDarkMode={isDarkMode}
       onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+      authFilters={authFilters}
     />
   );
 };
