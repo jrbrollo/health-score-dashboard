@@ -167,8 +167,25 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     }
   };
 
-  // Preparar dados para gráficos - APENAS dados históricos do banco
-  const prepareChartData = () => {
+  // Calcular score atual em tempo real dos clientes filtrados
+  const currentScore = useMemo(() => {
+    if (!filteredClients || filteredClients.length === 0) {
+      return 0;
+    }
+    
+    // Calcular média em tempo real dos clientes filtrados
+    const scores = filteredClients
+      .filter(client => client.isActive !== false)
+      .map(client => calculateHealthScore(client));
+    
+    if (scores.length === 0) return 0;
+    
+    const sum = scores.reduce((acc, score) => acc + score.score, 0);
+    return sum / scores.length;
+  }, [filteredClients]);
+
+  // Preparar dados para gráficos - dados históricos com último ponto atualizado
+  const prepareChartData = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -207,28 +224,46 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       }
     });
 
-    return Array.from(uniqueByDate.values()).sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
-  };
-
-  const chartData = prepareChartData();
-
-  // Calcular score atual em tempo real dos clientes filtrados
-  const currentScore = useMemo(() => {
-    if (!filteredClients || filteredClients.length === 0) {
-      // Fallback: usar último valor do histórico se não houver clientes
-      return chartData.length > 0 ? chartData[chartData.length - 1]?.avgScore || 0 : 0;
+    const sortedData = Array.from(uniqueByDate.values()).sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
+    
+    // Se houver dados e o último ponto for do dia mais recente, atualizar com score atual
+    if (sortedData.length > 0 && filteredClients && filteredClients.length > 0 && currentScore > 0) {
+      const lastPoint = sortedData[sortedData.length - 1];
+      const lastPointDate = new Date(lastPoint.fullDate);
+      lastPointDate.setHours(0, 0, 0, 0);
+      
+      // Se o último ponto for de hoje ou do último dia disponível, atualizar com score atual
+      const daysDiff = Math.floor((today.getTime() - lastPointDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Atualizar se for hoje (0 dias) ou ontem (1 dia) - para garantir que sempre mostre o valor mais atual
+      if (daysDiff <= 1) {
+        // Calcular contagens atualizadas
+        const scores = filteredClients
+          .filter(client => client.isActive !== false)
+          .map(client => calculateHealthScore(client));
+        
+        const excellent = scores.filter(s => s.category === "Ótimo").length;
+        const stable = scores.filter(s => s.category === "Estável").length;
+        const warning = scores.filter(s => s.category === "Atenção").length;
+        const critical = scores.filter(s => s.category === "Crítico").length;
+        
+        // Substituir o último ponto com dados atualizados
+        sortedData[sortedData.length - 1] = {
+          ...lastPoint,
+          avgScore: currentScore,
+          totalClients: filteredClients.filter(c => c.isActive !== false).length,
+          excellent,
+          stable,
+          warning,
+          critical,
+        };
+      }
     }
-    
-    // Calcular média em tempo real dos clientes filtrados
-    const scores = filteredClients
-      .filter(client => client.isActive !== false)
-      .map(client => calculateHealthScore(client));
-    
-    if (scores.length === 0) return 0;
-    
-    const sum = scores.reduce((acc, score) => acc + score.score, 0);
-    return sum / scores.length;
-  }, [filteredClients, chartData]);
+
+    return sortedData;
+  }, [analysisData, filteredClients, currentScore]);
+
+  const chartData = prepareChartData;
 
   // Renderizar gráfico baseado no tipo e modo
   const renderChart = () => {
