@@ -18,7 +18,7 @@ const Index = () => {
   const [showClientManager, setShowClientManager] = useState(false);
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [loading, setLoading] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true); // Tema escuro como padrão
   const [authFilters, setAuthFilters] = useState<HierarchyFilters | null>(null);
   const [showProfileError, setShowProfileError] = useState(false);
 
@@ -62,7 +62,13 @@ const Index = () => {
     }
   }, [user, authFilters, profile]);
 
-  // Aplicar modo escuro ao documento
+  // Aplicar modo escuro ao documento (aplicar imediatamente ao carregar)
+  useEffect(() => {
+    // Aplicar tema escuro por padrão ao carregar
+    document.documentElement.classList.add('dark');
+  }, []);
+
+  // Aplicar modo escuro ao documento quando mudar
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');

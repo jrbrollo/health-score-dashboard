@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Logo } from '@/components/Logo';
 
 export default function Login() {
   const navigate = useNavigate();
   const { signIn, signUp, getAvailableNames, resetPassword, loading: authLoading } = useAuth();
+  
+  // Aplicar tema escuro por padrão na página de login
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    return () => {
+      // Não remover o dark ao sair, pois é o padrão agora
+    };
+  }, []);
   
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -157,14 +166,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Health Score Dashboard
-          </CardTitle>
-          <CardDescription className="text-lg mt-2">
-            Sistema de Gestão de Clientes
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black to-gray-950 p-4">
+      <Card className="w-full max-w-md shadow-xl bg-[#1a1a1a] border-gray-800">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center">
+            <Logo isDarkMode={true} />
+          </div>
+          <CardDescription className="text-base">
+            Sistema de Gestão de Clientes - Braúna
           </CardDescription>
         </CardHeader>
         <CardContent>

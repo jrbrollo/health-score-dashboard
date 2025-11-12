@@ -39,6 +39,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { AnalysisInfoTooltip } from "./AnalysisInfoTooltip";
+import { Logo } from "./Logo";
 
 interface DashboardProps {
   clients: Client[];
@@ -190,15 +191,8 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                Health Score Dashboard
-              </h1>
-              <p className="text-muted-foreground text-lg mt-2">
-                Análise da carteira de clientes - Braúna
-              </p>
-            </div>
+          <div className="flex items-center gap-10">
+            <Logo isDarkMode={isDarkMode} className="scale-125" />
             <ThemeToggle 
               isDark={isDarkMode} 
               onToggle={onToggleDarkMode || (() => {})} 

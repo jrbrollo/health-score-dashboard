@@ -144,12 +144,11 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                Gerenciar Clientes
-              </h1>
-              <p className="text-muted-foreground text-lg mt-2">
+          <div className="flex items-center gap-10">
+            <Logo isDarkMode={isDarkMode} />
+            <div className="hidden md:block border-l pl-4 ml-2">
+              <h2 className="text-lg font-semibold">Gerenciar Clientes</h2>
+              <p className="text-muted-foreground text-sm">
                 {filterPlanner === "all" 
                   ? `Visualizando clientes de todos os planejadores (${filteredClients.length} clientes)`
                   : `Visualizando clientes de ${filterPlanner} (${filteredClients.length} clientes)`
