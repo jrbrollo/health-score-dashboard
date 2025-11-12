@@ -180,15 +180,35 @@ export const temporalService = {
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
-      const { data, error } = await supabase
-        .from('health_score_history')
-        .select('*')
-        .gte('recorded_date', startDate.toISOString().split('T')[0])
-        .lte('recorded_date', endDate.toISOString().split('T')[0])
-        .neq('planner', '0')
-        .neq('client_name', '0');
+      // Buscar dados com paginação para evitar timeout
+      let allData: any[] = [];
+      let offset = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('health_score_history')
+          .select('*')
+          .gte('recorded_date', startDate.toISOString().split('T')[0])
+          .lte('recorded_date', endDate.toISOString().split('T')[0])
+          .neq('planner', '0')
+          .neq('client_name', '0')
+          .range(offset, offset + pageSize - 1)
+          .order('recorded_date', { ascending: true });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = allData.concat(data);
+          offset += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const data = allData;
 
       let filteredData = data ?? [];
 
@@ -259,13 +279,34 @@ export const temporalService = {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('health_score_history')
-        .select('*')
-        .eq('planner', planner)
-        .gte('recorded_date', startDate.toISOString().split('T')[0])
-        .lte('recorded_date', endDate.toISOString().split('T')[0]);
-      if (error) throw error;
+      // Buscar dados com paginação para evitar timeout
+      let allData: any[] = [];
+      let offset = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('health_score_history')
+          .select('*')
+          .eq('planner', planner)
+          .gte('recorded_date', startDate.toISOString().split('T')[0])
+          .lte('recorded_date', endDate.toISOString().split('T')[0])
+          .range(offset, offset + pageSize - 1)
+          .order('recorded_date', { ascending: true });
+        
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = allData.concat(data);
+          offset += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const data = allData;
 
       let filteredData = data ?? [];
 

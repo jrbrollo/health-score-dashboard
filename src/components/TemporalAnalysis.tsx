@@ -105,13 +105,22 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
           }
         : undefined;
 
-      const data = !selectedPlanner
-        ? await temporalService.getAggregatedTemporalAnalysis(dateRange.from, dateRange.to, hierarchyFilters)
-        : await temporalService.getTemporalAnalysis(dateRange.from, dateRange.to, selectedPlanner as Planner, hierarchyFilters);
+      // Timeout de segurança: 30 segundos
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao carregar análise temporal')), 30000);
+      });
+
+      const dataPromise = !selectedPlanner
+        ? temporalService.getAggregatedTemporalAnalysis(dateRange.from, dateRange.to, hierarchyFilters)
+        : temporalService.getTemporalAnalysis(dateRange.from, dateRange.to, selectedPlanner as Planner, hierarchyFilters);
+
+      const data = await Promise.race([dataPromise, timeoutPromise]);
       
       setAnalysisData(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar dados temporais:', error);
+      // Em caso de erro ou timeout, definir dados vazios para não travar a aplicação
+      setAnalysisData([]);
     } finally {
       setLoading(false);
     }
