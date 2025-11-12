@@ -15,6 +15,7 @@ import { Client, Planner } from '@/types/client';
 import PortfolioMetrics from './PortfolioMetrics';
 import MovementSankey from './MovementSankey';
 import AdvancedTrends from './AdvancedTrends';
+import { AnalysisInfoTooltip } from './AnalysisInfoTooltip';
 
 interface AdvancedAnalyticsProps {
   clients: Client[];
@@ -63,15 +64,26 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-2">
           <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Análises Avançadas
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Funcionalidades analíticas avançadas para insights profundos
-            {selectedPlanner && selectedPlanner !== "all" && ` - ${selectedPlanner}`}
-          </p>
+          <AnalysisInfoTooltip
+            title="Análises Avançadas"
+            description="Esta seção oferece análises avançadas e especializadas, incluindo métricas de portfólio, visualização de movimentação entre categorias e análise de tendências temporais."
+            tips={[
+              "Use as Métricas de Portfólio para uma visão agregada da saúde da carteira",
+              "O Movement Sankey mostra como clientes migram entre categorias ao longo do tempo",
+              "A Análise de Tendências identifica padrões sazonais e previsões",
+              "Compare diferentes períodos para entender mudanças de longo prazo",
+              "Use os filtros para analisar subconjuntos específicos da carteira"
+            ]}
+          />
         </div>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Funcionalidades analíticas avançadas para insights profundos
+          {selectedPlanner && selectedPlanner !== "all" && ` - ${selectedPlanner}`}
+        </p>
       </div>
 
       {/* Tabs de Módulos */}

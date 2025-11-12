@@ -11,6 +11,7 @@ import { format, subDays, startOfDay, endOfDay, differenceInCalendarDays } from 
 import { ptBR } from 'date-fns/locale';
 import { Client } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
+import { AnalysisInfoTooltip } from './AnalysisInfoTooltip';
 
 interface TemporalAnalysisProps {
   isDarkMode?: boolean;
@@ -426,6 +427,20 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     <div className={`space-y-6 ${isDarkMode ? 'gradient-bg-dark' : 'gradient-bg-light'}`}>
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-bold">Análise Temporal</h2>
+          <AnalysisInfoTooltip
+            title="Análise Temporal"
+            description="Esta seção permite acompanhar a evolução do Health Score ao longo do tempo, identificando tendências, padrões sazonais e mudanças na saúde da carteira."
+            tips={[
+              "Use o gráfico de evolução para identificar tendências de melhoria ou declínio",
+              "Compare períodos diferentes usando os filtros de data (30, 60, 90 dias)",
+              "Preste atenção a quedas bruscas no score que podem indicar problemas",
+              "O Score Atual mostra o valor mais recente calculado em tempo real",
+              "Use a análise de tendência para entender se a carteira está melhorando ou piorando"
+            ]}
+          />
+        </div>
         <div>
           <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Análise Temporal

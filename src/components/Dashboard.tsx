@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { AnalysisInfoTooltip } from "./AnalysisInfoTooltip";
 
 interface DashboardProps {
   clients: Client[];
@@ -490,6 +491,19 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-2xl font-bold">Visão Geral</h2>
+              <AnalysisInfoTooltip
+                title="Visão Geral"
+                description="Esta seção apresenta um resumo executivo da saúde geral da carteira de clientes, incluindo métricas principais e distribuição por categorias."
+                tips={[
+                  "Monitore o Score Médio para acompanhar a saúde geral da carteira",
+                  "A distribuição por categorias ajuda a identificar quantos clientes precisam de atenção",
+                  "Use os filtros para analisar performance por planejador, gerente, mediador ou líder",
+                  "Compare o desempenho entre diferentes profissionais da equipe"
+                ]}
+              />
+            </div>
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
               <Card className={`animate-fade-in-up animate-delay-100 ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>

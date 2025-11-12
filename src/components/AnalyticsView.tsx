@@ -9,6 +9,7 @@ import { Client, HealthCategory } from "@/types/client";
 import { uniqueById } from "@/lib/filters";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
+import { AnalysisInfoTooltip } from "./AnalysisInfoTooltip";
 
 interface AnalyticsViewProps {
   clients: Client[];
@@ -81,9 +82,21 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-          Análise Avançada - {selectedPlanner ? selectedPlanner : "Equipe Filtrada"}
-        </h2>
+        <div className="flex items-center justify-center gap-2">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            Análise de Indicadores - {selectedPlanner ? selectedPlanner : "Equipe Filtrada"}
+          </h2>
+          <AnalysisInfoTooltip
+            title="Análise de Indicadores"
+            description="Esta seção oferece uma análise detalhada dos indicadores de saúde dos clientes, incluindo rankings de planejadores, distribuição por categorias e análise dos pilares do Health Score."
+            tips={[
+              "Use o ranking de planejadores para identificar os profissionais com melhor desempenho",
+              "Analise a distribuição por categorias para entender a composição da carteira",
+              "Monitore os pilares (NPS, Indicação, Pagamentos, Cross Sell, Tenure) para identificar pontos fortes e fracos",
+              "Preste atenção aos insights gerados automaticamente para ações recomendadas"
+            ]}
+          />
+        </div>
         <p className="text-muted-foreground mt-2">
           Insights detalhados e recomendações estratégicas
         </p>

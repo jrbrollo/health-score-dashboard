@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, FileUp, ListChecks } from 'lucide-react'
+import { AnalysisInfoTooltip } from './AnalysisInfoTooltip'
 
 type CsvRow = Record<string, string>
 
@@ -261,10 +262,23 @@ export default function DataQuality({ isDarkMode = false }: { isDarkMode?: boole
     <div className="space-y-6">
       <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}`}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ListChecks className="h-5 w-5" />
-            Qualidade de Dados (Planilha vs Snapshot)
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <ListChecks className="h-5 w-5" />
+              Qualidade de Dados (Planilha vs Snapshot)
+            </CardTitle>
+            <AnalysisInfoTooltip
+              title="Qualidade de Dados"
+              description="Esta seção permite validar a qualidade dos dados importados, comparando a planilha enviada com o snapshot atual no banco de dados e identificando clientes que não foram importados."
+              tips={[
+                "Use esta ferramenta antes de importar a planilha para identificar problemas potenciais",
+                "Verifique os motivos pelos quais clientes não foram importados",
+                "Preste atenção a erros de formato (telefone, email, planner inválido)",
+                "Clientes duplicados na planilha serão identificados e apenas um será importado",
+                "Divergências de planner entre planilha e banco são sinalizadas para revisão"
+              ]}
+            />
+          </div>
           <CardDescription>
             Envie a planilha mestre para comparar com o snapshot atual e ver clientes com erro.
           </CardDescription>
