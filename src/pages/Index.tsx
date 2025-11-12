@@ -251,7 +251,20 @@ const Index = () => {
     }
   }, [user, profile, authLoading, authFilters, signOut]);
 
-  // Tela de loading (auth ou dados)
+  // Tela de loading (auth ou dados) - com timeout de segurança
+  const [showRecovery, setShowRecovery] = useState(false);
+  
+  useEffect(() => {
+    if (authLoading) {
+      const timer = setTimeout(() => {
+        setShowRecovery(true);
+      }, 6000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowRecovery(false);
+    }
+  }, [authLoading]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -259,21 +272,23 @@ const Index = () => {
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
           <h2 className="text-xl font-semibold">Verificando autenticação...</h2>
           <p className="text-muted-foreground mb-4">Aguarde enquanto verificamos sua sessão</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              // Limpar localStorage e recarregar
-              try {
-                localStorage.clear();
-                window.location.href = '/login';
-              } catch (e) {
-                window.location.reload();
-              }
-            }}
-            className="mt-4"
-          >
-            Limpar dados e voltar ao login
-          </Button>
+          {showRecovery && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Limpar localStorage e recarregar
+                try {
+                  localStorage.clear();
+                  window.location.href = '/login';
+                } catch (e) {
+                  window.location.reload();
+                }
+              }}
+              className="mt-4"
+            >
+              Limpar dados e voltar ao login
+            </Button>
+          )}
         </div>
       </div>
     );
