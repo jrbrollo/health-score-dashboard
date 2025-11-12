@@ -674,6 +674,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
               selectedMediator={selectedMediator}
               selectedLeader={selectedLeader}
               currentClientCount={filteredClients.length}
+              filteredClients={filteredClients}
             />
           </TabsContent>
 

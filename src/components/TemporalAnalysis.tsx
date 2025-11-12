@@ -9,6 +9,8 @@ import { temporalService } from '@/services/temporalService';
 import { TemporalAnalysis, TrendAnalysis, Planner } from '@/types/temporal';
 import { format, subDays, startOfDay, endOfDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Client } from '@/types/client';
+import { calculateHealthScore } from '@/utils/healthScore';
 
 interface TemporalAnalysisProps {
   isDarkMode?: boolean;
@@ -17,6 +19,7 @@ interface TemporalAnalysisProps {
   selectedMediator?: string | "all";
   selectedLeader?: string | "all";
   currentClientCount?: number;
+  filteredClients?: Client[];
 }
 
 const DEFAULT_DAYS = 30;
@@ -33,6 +36,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   selectedMediator = 'all',
   selectedLeader = 'all',
   currentClientCount = 0,
+  filteredClients = [],
 }) => {
   const [analysisData, setAnalysisData] = useState<TemporalAnalysis[]>([]);
   const [trendData, setTrendData] = useState<TrendAnalysis | null>(null);
@@ -155,7 +159,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
 
   // Preparar dados para gráficos
   const prepareChartData = () => {
-    return analysisData.map(item => ({
+    const historicalData = analysisData.map(item => ({
       date: format(item.recordedDate, 'dd/MM', { locale: ptBR }),
       fullDate: item.recordedDate,
       avgScore: item.avgHealthScore,
@@ -168,9 +172,72 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       ecosystem: item.avgEcosystemEngagement,
       nps: item.avgNpsScore
     }));
+
+    // Se houver clientes filtrados e não houver dados históricos para hoje, adicionar ponto atual
+    if (filteredClients && filteredClients.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const hasTodayData = historicalData.some(item => {
+        const itemDate = new Date(item.fullDate);
+        itemDate.setHours(0, 0, 0, 0);
+        return itemDate.getTime() === today.getTime();
+      });
+
+      if (!hasTodayData) {
+        // Calcular score atual em tempo real
+        const scores = filteredClients
+          .filter(client => client.isActive !== false)
+          .map(client => calculateHealthScore(client));
+        
+        if (scores.length > 0) {
+          const sum = scores.reduce((acc, score) => acc + score.score, 0);
+          const avgScore = sum / scores.length;
+          
+          const excellent = scores.filter(s => s.category === "Ótimo").length;
+          const stable = scores.filter(s => s.category === "Estável").length;
+          const warning = scores.filter(s => s.category === "Atenção").length;
+          const critical = scores.filter(s => s.category === "Crítico").length;
+
+          historicalData.push({
+            date: format(today, 'dd/MM', { locale: ptBR }),
+            fullDate: today,
+            avgScore: avgScore,
+            totalClients: filteredClients.filter(c => c.isActive !== false).length,
+            excellent,
+            stable,
+            warning,
+            critical,
+            payment: 0, // Não disponível em tempo real
+            ecosystem: 0, // Não disponível em tempo real
+            nps: 0 // Não disponível em tempo real
+          });
+        }
+      }
+    }
+
+    return historicalData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
   };
 
   const chartData = prepareChartData();
+
+  // Calcular score atual em tempo real dos clientes filtrados
+  const currentScore = useMemo(() => {
+    if (!filteredClients || filteredClients.length === 0) {
+      // Fallback: usar último valor do histórico se não houver clientes
+      return chartData.length > 0 ? chartData[chartData.length - 1]?.avgScore || 0 : 0;
+    }
+    
+    // Calcular média em tempo real dos clientes filtrados
+    const scores = filteredClients
+      .filter(client => client.isActive !== false)
+      .map(client => calculateHealthScore(client));
+    
+    if (scores.length === 0) return 0;
+    
+    const sum = scores.reduce((acc, score) => acc + score.score, 0);
+    return sum / scores.length;
+  }, [filteredClients, chartData]);
 
   // Renderizar gráfico baseado no tipo e modo
   const renderChart = () => {
@@ -523,7 +590,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
           <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
             <CardContent className="p-4 text-center">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {chartData[chartData.length - 1]?.avgScore.toFixed(1) || '0'}
+                {currentScore.toFixed(1)}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Score Atual
