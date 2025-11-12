@@ -26,33 +26,53 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Calcular NPS Pillar (20 pontos)
-  v_nps_pillar := 0;
+  -- Calcular NPS Pillar (-10 a 20 pontos)
+  -- NOVA LÓGICA: Detrator = -10, Neutro = 10, Promotor = 20, Null = 10
+  v_nps_pillar := 10; -- Default para null (neutro)
   IF v_client.nps_score_v3 IS NOT NULL THEN
     IF v_client.nps_score_v3 >= 9 THEN
-      v_nps_pillar := 20;
+      v_nps_pillar := 20; -- Promotor
     ELSIF v_client.nps_score_v3 >= 7 THEN
-      v_nps_pillar := 10;
+      v_nps_pillar := 10; -- Neutro
     ELSE
-      v_nps_pillar := 0;
+      v_nps_pillar := -10; -- Detrator (MUDANÇA: era 0, agora -10)
     END IF;
   END IF;
 
   -- Calcular Referral Pillar (10 pontos)
   v_referral_pillar := CASE WHEN v_client.has_nps_referral = TRUE THEN 10 ELSE 0 END;
 
-  -- Calcular Payment Pillar (40 pontos)
-  v_payment_pillar := 40;
-  IF COALESCE(v_client.overdue_installments, 0) > 0 THEN
-    IF COALESCE(v_client.overdue_days, 0) > 90 THEN
-      v_payment_pillar := 0;
-    ELSIF COALESCE(v_client.overdue_days, 0) > 60 THEN
-      v_payment_pillar := 10;
-    ELSIF COALESCE(v_client.overdue_days, 0) > 30 THEN
-      v_payment_pillar := 20;
+  -- Calcular Payment Pillar (-20 a 40 pontos)
+  -- NOVA LÓGICA:
+  -- 0 parcelas = 40
+  -- 1 parcela: 0-7d(25), 8-15d(15), 16-30d(5), 31-60d(0), 61+d(-10)
+  -- 2 parcelas: <30d(-10), ≥30d(-20)
+  -- 3+ parcelas = override para score 0 total
+  v_payment_pillar := 40; -- Adimplente
+  
+  IF COALESCE(v_client.overdue_installments, 0) = 1 THEN
+    -- 1 parcela atrasada
+    IF COALESCE(v_client.overdue_days, 0) <= 7 THEN
+      v_payment_pillar := 25;
+    ELSIF COALESCE(v_client.overdue_days, 0) <= 15 THEN
+      v_payment_pillar := 15;
+    ELSIF COALESCE(v_client.overdue_days, 0) <= 30 THEN
+      v_payment_pillar := 5;
+    ELSIF COALESCE(v_client.overdue_days, 0) <= 60 THEN
+      v_payment_pillar := 0; -- MUDANÇA: era -5, agora 0
     ELSE
-      v_payment_pillar := 30;
+      v_payment_pillar := -10; -- 61+ dias - MUDANÇA: era -15, agora -10
     END IF;
+  ELSIF COALESCE(v_client.overdue_installments, 0) = 2 THEN
+    -- 2 parcelas atrasadas
+    IF COALESCE(v_client.overdue_days, 0) >= 30 THEN
+      v_payment_pillar := -20; -- NOVO: 2 parcelas + 30+ dias
+    ELSE
+      v_payment_pillar := -10; -- 2 parcelas com menos de 30 dias
+    END IF;
+  ELSIF COALESCE(v_client.overdue_installments, 0) >= 3 THEN
+    -- 3+ parcelas: zerar tudo (tratado abaixo)
+    v_payment_pillar := 0;
   END IF;
 
   -- Calcular Cross Sell Pillar (15 pontos)
@@ -66,29 +86,46 @@ BEGIN
   END IF;
 
   -- Calcular Tenure Pillar (15 pontos)
+  -- NOVA LÓGICA:
+  -- 0-4 meses = 5, 5-8 meses = 10, 9-12 meses = 15, 13-24 meses = 15, 25+ meses = 15
   v_tenure_pillar := 0;
-  IF v_client.months_since_closing IS NOT NULL THEN
-    IF v_client.months_since_closing >= 12 THEN
-      v_tenure_pillar := 15;
-    ELSIF v_client.months_since_closing >= 6 THEN
-      v_tenure_pillar := 10;
-    ELSIF v_client.months_since_closing >= 3 THEN
-      v_tenure_pillar := 5;
+  IF v_client.months_since_closing IS NOT NULL AND v_client.months_since_closing >= 0 THEN
+    IF v_client.months_since_closing >= 25 THEN
+      v_tenure_pillar := 15; -- Fidelizado (25+ meses)
+    ELSIF v_client.months_since_closing >= 13 THEN
+      v_tenure_pillar := 15; -- Maduro (13-24) - MUDANÇA: era 12, agora 15
+    ELSIF v_client.months_since_closing >= 9 THEN
+      v_tenure_pillar := 15; -- Consolidado (9-12) - MUDANÇA: era 7-12, agora 9-12
+    ELSIF v_client.months_since_closing >= 5 THEN
+      v_tenure_pillar := 10; -- Consolidação inicial (5-8) - MUDANÇA: era 4-6, agora 5-8
+    ELSIF v_client.months_since_closing >= 0 THEN
+      v_tenure_pillar := 5; -- Onboarding (0-4) - MUDANÇA: era 0-3, agora 0-4
     END IF;
   END IF;
 
   -- Calcular Health Score Total
   v_health_score := v_nps_pillar + v_referral_pillar + v_payment_pillar + v_cross_sell_pillar + v_tenure_pillar;
 
-  -- Determinar categoria
-  IF v_health_score >= 100 THEN
-    v_health_category := 'Ótimo';
-  ELSIF v_health_score >= 60 THEN
-    v_health_category := 'Estável';
-  ELSIF v_health_score >= 35 THEN
-    v_health_category := 'Atenção';
-  ELSE
+  -- Override: 3+ parcelas em atraso = Score 0
+  IF COALESCE(v_client.overdue_installments, 0) >= 3 THEN
+    v_health_score := 0;
     v_health_category := 'Crítico';
+  ELSE
+    -- Garantir score mínimo de 0 (sem valores negativos)
+    IF v_health_score < 0 THEN
+      v_health_score := 0;
+    END IF;
+
+    -- Determinar categoria (escala 0-100)
+    IF v_health_score >= 75 THEN
+      v_health_category := 'Ótimo';
+    ELSIF v_health_score >= 50 THEN
+      v_health_category := 'Estável';
+    ELSIF v_health_score >= 30 THEN
+      v_health_category := 'Atenção';
+    ELSE
+      v_health_category := 'Crítico';
+    END IF;
   END IF;
 
   -- Inserir ou atualizar no histórico
