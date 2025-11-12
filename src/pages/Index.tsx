@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Client, Planner, BulkImportPayload } from "@/types/client";
 import { Dashboard } from "@/components/Dashboard";
+import { ClientManager } from "@/components/ClientManager";
 import { clientService } from "@/services/clientService";
 import { toast } from "@/hooks/use-toast";
 
@@ -197,8 +198,6 @@ const Index = () => {
       <ClientManager
         clients={clients}
         selectedPlanner={selectedPlanner}
-        onUpdateClient={handleUpdateClient}
-        onDeleteClient={handleDeleteClient}
         onBack={handleBackToDashboard}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
@@ -210,6 +209,7 @@ const Index = () => {
     <Dashboard
       clients={clients}
       onBulkImport={handleBulkImport}
+      onManageClients={() => handleManageClients()}
       isDarkMode={isDarkMode}
       onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
     />

@@ -32,13 +32,14 @@ interface DashboardProps {
   clients: Client[];
   onBulkImport?: (payload: BulkImportPayload) => void;
   onDeleteClient?: (clientId: string) => void;
+  onManageClients?: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
 }
 
 // Lista de planejadores dinâmica, derivada dos clientes (sem nomes fixos)
 
-export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
+export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClients, isDarkMode = false, onToggleDarkMode }: DashboardProps) {
   const [selectedPlanner, setSelectedPlanner] = useState<string | null>(null);
   const [selectedManager, setSelectedManager] = useState<string | "all">("all");
   const [selectedMediator, setSelectedMediator] = useState<string | "all">("all");
@@ -349,6 +350,16 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, isDarkMode = 
             </Popover>
             
             <div className="flex gap-2">
+              {onManageClients && (
+                <Button 
+                  onClick={onManageClients}
+                  variant="default"
+                  className="shadow-lg"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Gerenciar Clientes
+                </Button>
+              )}
               {onBulkImport && (
                 <Button 
                   onClick={() => setShowBulkImport(true)}

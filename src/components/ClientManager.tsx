@@ -4,34 +4,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { 
-  Edit, 
   Search, 
   Users, 
-  Save, 
   X,
   Filter,
-  Calendar,
-  CreditCard,
-  Smartphone,
-  UserCheck,
-  Star,
-  Building,
-  Trash2
+  Eye,
+  TrendingUp,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
-import { Client, Planner, LastMeeting, AppUsage, PaymentStatus, NPSScore, EcosystemUsage } from "@/types/client";
+import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { ThemeToggle } from "./ui/theme-toggle";
-import { toast } from "@/hooks/use-toast";
 import { buildUniqueList, applyHierarchyFilters } from "@/lib/filters";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
+import { temporalService } from "@/services/temporalService";
+import { HealthScoreHistory } from "@/types/temporal";
+import { useEffect } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface ClientManagerProps {
   clients: Client[];
   selectedPlanner: Planner | "all";
-  onUpdateClient: (clientId: string, updatedData: Partial<Client>) => void;
-  onDeleteClient: (clientId: string) => void;
   onBack: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
@@ -39,21 +39,47 @@ interface ClientManagerProps {
 
 // planners dinâmicos a partir dos clientes
 
-export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDeleteClient, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
+export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = false, onToggleDarkMode }: ClientManagerProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingClient, setEditingClient] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Client>>({});
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterPlanner, setFilterPlanner] = useState<Planner | "all">(selectedPlanner);
   const [filterManager, setFilterManager] = useState<string | "all">("all");
   const [filterMediator, setFilterMediator] = useState<string | "all">("all");
   const [filterLeader, setFilterLeader] = useState<string | "all">("all");
-  const [deletingClient, setDeletingClient] = useState<string | null>(null);
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
+  const [clientHistory, setClientHistory] = useState<HealthScoreHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [plannerSearchOpen, setPlannerSearchOpen] = useState(false);
+  const [managerSearchOpen, setManagerSearchOpen] = useState(false);
+  const [mediatorSearchOpen, setMediatorSearchOpen] = useState(false);
+  const [leaderSearchOpen, setLeaderSearchOpen] = useState(false);
+
+  // Carregar histórico quando visualizar cliente
+  useEffect(() => {
+    if (viewingClient) {
+      setLoadingHistory(true);
+      temporalService.getClientHistory(viewingClient.id)
+        .then(history => {
+          setClientHistory(history);
+          setLoadingHistory(false);
+        })
+        .catch(err => {
+          console.error('Erro ao carregar histórico:', err);
+          setLoadingHistory(false);
+        });
+    }
+  }, [viewingClient]);
 
   const planners = useMemo(() => buildUniqueList(clients, 'planner') as Planner[], [clients]);
   const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
   const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
   const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
+  
+  // Labels para os filtros
+  const plannerLabel = filterPlanner === "all" ? "Todos os Planejadores" : filterPlanner;
+  const managerLabel = filterManager === "all" ? "Todos os Gerentes" : filterManager;
+  const mediatorLabel = filterMediator === "all" ? "Todos os Mediadores" : filterMediator;
+  const leaderLabel = filterLeader === "all" ? "Todos os Líderes" : filterLeader;
 
   // Filtrar clientes
   const filteredClients = useMemo(() => {
@@ -75,59 +101,6 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, searchTerm, filterCategory]);
 
-  const handleEdit = (client: Client) => {
-    setEditingClient(client.id);
-    setEditForm({
-      lastMeeting: client.lastMeeting,
-      hasScheduledMeeting: client.hasScheduledMeeting,
-      appUsage: client.appUsage,
-      paymentStatus: client.paymentStatus,
-      hasReferrals: client.hasReferrals,
-      npsScore: client.npsScore,
-      ecosystemUsage: client.ecosystemUsage,
-    });
-  };
-
-  const handleSave = () => {
-    if (editingClient && editForm) {
-      onUpdateClient(editingClient, {
-        ...editForm,
-        updatedAt: new Date(),
-      });
-      
-      setEditingClient(null);
-      setEditForm({});
-      
-      toast({
-        title: "Cliente atualizado!",
-        description: "As informações do cliente foram atualizadas com sucesso.",
-      });
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingClient(null);
-    setEditForm({});
-  };
-
-  const handleDelete = (clientId: string) => {
-    setDeletingClient(clientId);
-  };
-
-  const confirmDelete = () => {
-    if (deletingClient) {
-      onDeleteClient(deletingClient);
-      setDeletingClient(null);
-      toast({
-        title: "Cliente excluído!",
-        description: "O cliente foi removido da carteira.",
-      });
-    }
-  };
-
-  const cancelDelete = () => {
-    setDeletingClient(null);
-  };
 
   const getHealthScoreColor = (category: string) => {
     if (isDarkMode) {
@@ -147,173 +120,6 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
         default: return "text-gray-600 bg-gray-100";
       }
     }
-  };
-
-  const renderEditForm = (client: Client) => {
-    if (editingClient !== client.id) return null;
-
-    return (
-      <div className={`mt-4 p-4 rounded-lg space-y-4 ${isDarkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Última Reunião */}
-          <div>
-            <Label className="flex items-center gap-2 mb-2">
-              <Calendar className="h-4 w-4" />
-              Última reunião
-            </Label>
-            <Select 
-              value={editForm.lastMeeting || client.lastMeeting} 
-              onValueChange={(value: LastMeeting) => setEditForm(prev => ({ ...prev, lastMeeting: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="< 30 dias">Menos de 30 dias</SelectItem>
-                <SelectItem value="31-60 dias">Entre 31 e 60 dias</SelectItem>
-                <SelectItem value="> 60 dias">Mais de 60 dias</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Próxima Reunião */}
-          <div>
-            <Label className="flex items-center gap-2 mb-2">
-              <Calendar className="h-4 w-4" />
-              Próxima reunião agendada
-            </Label>
-            <Select 
-              value={editForm.hasScheduledMeeting !== undefined ? (editForm.hasScheduledMeeting ? "sim" : "nao") : (client.hasScheduledMeeting ? "sim" : "nao")}
-              onValueChange={(value) => setEditForm(prev => ({ ...prev, hasScheduledMeeting: value === "sim" }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sim">Sim, agendada</SelectItem>
-                <SelectItem value="nao">Não agendada</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Uso do App */}
-          <div>
-            <Label className="flex items-center gap-2 mb-2">
-              <Smartphone className="h-4 w-4" />
-              Uso do app/planilha
-            </Label>
-            <Select 
-              value={editForm.appUsage || client.appUsage} 
-              onValueChange={(value: AppUsage) => setEditForm(prev => ({ ...prev, appUsage: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Acessou e categorizou (15 dias)">Acessou e categorizou (15 dias)</SelectItem>
-                <SelectItem value="Acessou, sem categorização">Acessou, sem categorização</SelectItem>
-                <SelectItem value="Sem acesso/categorização (30+ dias)">Sem acesso (30+ dias)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Status Pagamento */}
-          <div>
-            <Label className="flex items-center gap-2 mb-2">
-              <CreditCard className="h-4 w-4" />
-              Status de pagamento
-            </Label>
-            <Select 
-              value={editForm.paymentStatus || client.paymentStatus} 
-              onValueChange={(value: PaymentStatus) => setEditForm(prev => ({ ...prev, paymentStatus: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pagamento em dia">Pagamento em dia</SelectItem>
-                <SelectItem value="1 parcela em atraso">1 parcela em atraso</SelectItem>
-                <SelectItem value="2 parcelas em atraso">2 parcelas em atraso</SelectItem>
-                <SelectItem value="3+ parcelas em atraso">3+ parcelas em atraso</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Indicações */}
-          <div>
-            <Label className="flex items-center gap-2 mb-2">
-              <UserCheck className="h-4 w-4" />
-              Gerou indicações
-            </Label>
-            <Select 
-              value={editForm.hasReferrals !== undefined ? (editForm.hasReferrals ? "sim" : "nao") : (client.hasReferrals ? "sim" : "nao")}
-              onValueChange={(value) => setEditForm(prev => ({ ...prev, hasReferrals: value === "sim" }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sim">Sim</SelectItem>
-                <SelectItem value="nao">Não</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* NPS */}
-          <div>
-            <Label className="flex items-center gap-2 mb-2">
-              <Star className="h-4 w-4" />
-              Nota NPS
-            </Label>
-            <Select 
-              value={editForm.npsScore || client.npsScore} 
-              onValueChange={(value: NPSScore) => setEditForm(prev => ({ ...prev, npsScore: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Promotor (9-10)">Promotor (9-10)</SelectItem>
-                <SelectItem value="Neutro (7-8)">Neutro (7-8)</SelectItem>
-                <SelectItem value="Detrator (0-6)">Detrator (0-6)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Uso Outras Áreas */}
-          <div className="md:col-span-2">
-            <Label className="flex items-center gap-2 mb-2">
-              <Building className="h-4 w-4" />
-              Uso de outras áreas da Braúna
-            </Label>
-            <Select 
-              value={editForm.ecosystemUsage || client.ecosystemUsage} 
-              onValueChange={(value: EcosystemUsage) => setEditForm(prev => ({ ...prev, ecosystemUsage: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Usou 2+ áreas">Usou 2 ou mais áreas</SelectItem>
-                <SelectItem value="Usou 1 área">Usou 1 área</SelectItem>
-                <SelectItem value="Não usou">Não usou outras áreas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={handleCancel}>
-            <X className="h-4 w-4 mr-2" />
-            Cancelar
-          </Button>
-          <Button onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
-            Salvar Alterações
-          </Button>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -367,66 +173,208 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
                 </div>
               </div>
               
+              {/* Filtro: Planejador com busca */}
               <div>
-                <Label htmlFor="planner">Filtrar por planejador</Label>
-                <Select value={filterPlanner} onValueChange={(value: Planner | "all") => setFilterPlanner(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os planejadores</SelectItem>
-                    {planners.map(planner => (
-                      <SelectItem key={planner} value={planner}>
-                        {planner}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Filtrar por planejador</Label>
+                <Popover open={plannerSearchOpen} onOpenChange={setPlannerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={plannerSearchOpen}
+                      className={cn("w-full justify-between")}
+                    >
+                      <span className="truncate">{plannerLabel}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar planejador..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum planejador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setFilterPlanner("all");
+                              setPlannerSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", filterPlanner === "all" ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">Todos os Planejadores</span>
+                          </CommandItem>
+                          {planners.map((planner) => (
+                            <CommandItem
+                              key={planner}
+                              value={planner}
+                              onSelect={() => {
+                                setFilterPlanner(planner);
+                                setPlannerSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", filterPlanner === planner ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{planner}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
+              {/* Filtro: Gerente com busca */}
               <div>
                 <Label>Gerente</Label>
-                <Select value={filterManager} onValueChange={(v) => setFilterManager(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {managers.map(m => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={managerSearchOpen} onOpenChange={setManagerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={managerSearchOpen}
+                      className={cn("w-full justify-between")}
+                    >
+                      <span className="truncate">{managerLabel}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar gerente..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum gerente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setFilterManager("all");
+                              setManagerSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", filterManager === "all" ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">Todos os Gerentes</span>
+                          </CommandItem>
+                          {managers.map(manager => (
+                            <CommandItem
+                              key={manager}
+                              value={manager}
+                              onSelect={() => {
+                                setFilterManager(manager);
+                                setManagerSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", filterManager === manager ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{manager}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
+              {/* Filtro: Mediador com busca */}
               <div>
                 <Label>Mediador</Label>
-                <Select value={filterMediator} onValueChange={(v) => setFilterMediator(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {mediators.map(m => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={mediatorSearchOpen} onOpenChange={setMediatorSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={mediatorSearchOpen}
+                      className={cn("w-full justify-between")}
+                    >
+                      <span className="truncate">{mediatorLabel}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar mediador..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum mediador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setFilterMediator("all");
+                              setMediatorSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", filterMediator === "all" ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">Todos os Mediadores</span>
+                          </CommandItem>
+                          {mediators.map(mediator => (
+                            <CommandItem
+                              key={mediator}
+                              value={mediator}
+                              onSelect={() => {
+                                setFilterMediator(mediator);
+                                setMediatorSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", filterMediator === mediator ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{mediator}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
+              {/* Filtro: Líder com busca */}
               <div>
                 <Label>Líder em formação</Label>
-                <Select value={filterLeader} onValueChange={(v) => setFilterLeader(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {leaders.map(l => (
-                      <SelectItem key={l} value={l}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={leaderSearchOpen} onOpenChange={setLeaderSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={leaderSearchOpen}
+                      className={cn("w-full justify-between")}
+                    >
+                      <span className="truncate">{leaderLabel}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar líder..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum líder encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setFilterLeader("all");
+                              setLeaderSearchOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", filterLeader === "all" ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">Todos os Líderes</span>
+                          </CommandItem>
+                          {leaders.map(leader => (
+                            <CommandItem
+                              key={leader}
+                              value={leader}
+                              onSelect={() => {
+                                setFilterLeader(leader);
+                                setLeaderSearchOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", filterLeader === leader ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{leader}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               
               <div>
@@ -487,45 +435,49 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEdit(client)}
-                          disabled={editingClient === client.id}
+                          onClick={() => setViewingClient(client)}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
-                          {editingClient === client.id ? "Editando..." : "Editar"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(client.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Excluir
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Detalhes
                         </Button>
                       </div>
                     </div>
 
-                    {/* Informações rápidas */}
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    {/* Informações rápidas - Métricas v3 */}
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                       <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Última reunião:</span>
-                        <p className="font-medium">{client.lastMeeting}</p>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NPS Score:</span>
+                        <p className="font-medium">
+                          {client.npsScoreV3 !== null && client.npsScoreV3 !== undefined 
+                            ? client.npsScoreV3 
+                            : "Não avaliado"}
+                        </p>
                       </div>
                       <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Próxima reunião:</span>
-                        <p className="font-medium">{client.hasScheduledMeeting ? "Agendada" : "Não agendada"}</p>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Tem Indicação:</span>
+                        <p className="font-medium">{client.hasNpsReferral ? "Sim" : "Não"}</p>
                       </div>
                       <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status pagamento:</span>
-                        <p className="font-medium">{client.paymentStatus}</p>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Inadimplência:</span>
+                        <p className="font-medium">
+                          {client.overdueInstallments === 0 || !client.overdueInstallments
+                            ? "Em dia"
+                            : `${client.overdueInstallments} parcela${client.overdueInstallments > 1 ? 's' : ''} (${client.overdueDays || 0} dias)`}
+                        </p>
                       </div>
                       <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NPS:</span>
-                        <p className="font-medium">{client.npsScore}</p>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Cross Sell:</span>
+                        <p className="font-medium">{client.crossSellCount || 0} produto{(client.crossSellCount || 0) !== 1 ? 's' : ''}</p>
+                      </div>
+                      <div>
+                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Meses Relacionamento:</span>
+                        <p className="font-medium">
+                          {client.monthsSinceClosing !== null && client.monthsSinceClosing !== undefined
+                            ? `${client.monthsSinceClosing} mês${client.monthsSinceClosing !== 1 ? 'es' : ''}`
+                            : "Não informado"}
+                        </p>
                       </div>
                     </div>
-
-                    {renderEditForm(client)}
                   </CardContent>
                 </Card>
               );
@@ -534,33 +486,163 @@ export function ClientManager({ clients, selectedPlanner, onUpdateClient, onDele
         </div>
       </div>
 
-      {/* Modal de confirmação de exclusão */}
-      {deletingClient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-lg shadow-xl max-w-md w-full mx-4`}>
-            <h3 className="text-lg font-semibold mb-4 text-red-600">
-              Confirmar Exclusão
-            </h3>
-            <p className="mb-6 text-gray-600">
-              Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="outline"
-                onClick={cancelDelete}
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={confirmDelete}
-              >
-                Excluir Cliente
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Drawer de Detalhes do Cliente */}
+      <Drawer open={!!viewingClient} onOpenChange={(open) => !open && setViewingClient(null)}>
+        <DrawerContent className={`max-h-[90vh] ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          {viewingClient && (
+            <>
+              <DrawerHeader className="border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DrawerTitle className="text-2xl">{viewingClient.name}</DrawerTitle>
+                    <DrawerDescription className="mt-2">
+                      Planejador: {viewingClient.planner} • 
+                      {viewingClient.manager && ` Gerente: ${viewingClient.manager} •`}
+                      {viewingClient.mediator && ` Mediador: ${viewingClient.mediator}`}
+                    </DrawerDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setViewingClient(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DrawerHeader>
+              
+              <div className="overflow-y-auto p-6 space-y-6">
+                {/* Score Atual */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Health Score Atual
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const healthScore = calculateHealthScore(viewingClient);
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <HealthScoreBadge score={healthScore.score} category={healthScore.category} />
+                            <Badge className={getHealthScoreColor(healthScore.category)}>
+                              {healthScore.category}
+                            </Badge>
+                          </div>
+                          
+                          {/* Breakdown Visual */}
+                          <div className="space-y-3 mt-4">
+                            <h4 className="font-semibold text-sm">Breakdown Detalhado:</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                <span className="text-sm">NPS</span>
+                                <span className="font-semibold">{healthScore.breakdown.nps} pts</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                <span className="text-sm">Indicação</span>
+                                <span className="font-semibold">{healthScore.breakdown.referral} pts</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                <span className="text-sm">Inadimplência</span>
+                                <span className="font-semibold">{healthScore.breakdown.payment} pts</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                <span className="text-sm">Cross Sell</span>
+                                <span className="font-semibold">{healthScore.breakdown.crossSell} pts</span>
+                              </div>
+                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800 md:col-span-2">
+                                <span className="text-sm">Meses Relacionamento</span>
+                                <span className="font-semibold">{healthScore.breakdown.tenure} pts</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico de Evolução Temporal */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle>Evolução do Health Score</CardTitle>
+                    <CardDescription>
+                      Histórico de pontuação ao longo do tempo
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingHistory ? (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-muted-foreground">Carregando histórico...</p>
+                      </div>
+                    ) : clientHistory.length === 0 ? (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-muted-foreground">Nenhum histórico disponível ainda</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={clientHistory.map(h => ({
+                          date: h.recordedDate.toLocaleDateString('pt-BR'),
+                          score: h.healthScore,
+                          category: h.healthCategory
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis domain={[0, 100]} />
+                          <Tooltip />
+                          <Legend />
+                          <Line 
+                            type="monotone" 
+                            dataKey="score" 
+                            stroke="#8884d8" 
+                            strokeWidth={2}
+                            name="Health Score"
+                            dot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Informações Detalhadas */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle>Informações Detalhadas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">NPS Score v3:</span>
+                        <p className="font-medium">{viewingClient.npsScoreV3 ?? 'Não informado'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tem Indicação:</span>
+                        <p className="font-medium">{viewingClient.hasNpsReferral ? 'Sim' : 'Não'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Parcelas em Atraso:</span>
+                        <p className="font-medium">{viewingClient.overdueInstallments ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Dias em Atraso:</span>
+                        <p className="font-medium">{viewingClient.overdueDays ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Produtos Cross Sell:</span>
+                        <p className="font-medium">{viewingClient.crossSellCount ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Meses desde Fechamento:</span>
+                        <p className="font-medium">{viewingClient.monthsSinceClosing ?? 'Não informado'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
+
     </div>
   );
 }

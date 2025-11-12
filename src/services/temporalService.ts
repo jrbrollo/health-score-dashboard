@@ -51,6 +51,9 @@ function databaseToTemporalAnalysis(dbData: any): TemporalAnalysis {
 }
 
 function databaseToHealthScoreHistory(dbData: any): HealthScoreHistory {
+  // Usar campos v3 se disponíveis, senão usar v2 (compatibilidade)
+  const hasV3Pillars = dbData.nps_score_v3_pillar !== null && dbData.nps_score_v3_pillar !== undefined;
+  
   return {
     id: dbData.id,
     clientId: dbData.client_id,
@@ -59,12 +62,26 @@ function databaseToHealthScoreHistory(dbData: any): HealthScoreHistory {
     planner: dbData.planner,
     healthScore: dbData.health_score,
     healthCategory: dbData.health_category,
-    breakdown: {
-      meetingEngagement: dbData.meeting_engagement,
-      appUsage: dbData.app_usage,
-      paymentStatus: dbData.payment_status,
-      ecosystemEngagement: dbData.ecosystem_engagement,
-      npsScore: dbData.nps_score,
+    breakdown: hasV3Pillars ? {
+      // V3: Pilares corretos
+      nps: dbData.nps_score_v3_pillar ?? 0,
+      referral: dbData.referral_pillar ?? 0,
+      payment: dbData.payment_pillar ?? 0,
+      crossSell: dbData.cross_sell_pillar ?? 0,
+      tenure: dbData.tenure_pillar ?? 0,
+      // Campos v2 para compatibilidade (deprecated)
+      meetingEngagement: dbData.meeting_engagement ?? 0,
+      appUsage: dbData.app_usage ?? 0,
+      paymentStatus: dbData.payment_status ?? 0,
+      ecosystemEngagement: dbData.ecosystem_engagement ?? 0,
+      npsScore: dbData.nps_score ?? 0,
+    } : {
+      // V2: Fallback para dados antigos
+      meetingEngagement: dbData.meeting_engagement ?? 0,
+      appUsage: dbData.app_usage ?? 0,
+      paymentStatus: dbData.payment_status ?? 0,
+      ecosystemEngagement: dbData.ecosystem_engagement ?? 0,
+      npsScore: dbData.nps_score ?? 0,
     },
     originalData: {
       lastMeeting: dbData.last_meeting,
@@ -206,7 +223,7 @@ export const temporalService = {
       const aggregated = Object.entries(groupedByDate).map(([date, records]) => {
         const totalClients = records.length;
         const avgHealthScore = averageFromRecords(records, r => r.health_score ?? 0);
-
+        
         return {
           recordedDate: parseDateFromDb(date),
           planner: "all" as const,
@@ -440,6 +457,24 @@ export const temporalService = {
     } catch (error) {
       console.error('Erro no getLatestScoresByPlanner:', error);
       return {};
+    }
+  },
+
+  // Obter histórico de um cliente específico
+  async getClientHistory(clientId: string): Promise<HealthScoreHistory[]> {
+    try {
+      const { data, error } = await supabase
+        .from('health_score_history')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('recorded_date', { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map(databaseToHealthScoreHistory);
+    } catch (error) {
+      console.error('Erro ao buscar histórico do cliente:', error);
+      return [];
     }
   }
 };

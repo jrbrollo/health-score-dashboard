@@ -14,13 +14,20 @@ export interface HealthScoreHistory {
   healthScore: number;
   healthCategory: HealthCategory;
   
-  // Breakdown detalhado
+  // Breakdown detalhado (v3 com fallback v2)
   breakdown: {
-    meetingEngagement: number;
-    appUsage: number;
-    paymentStatus: number;
-    ecosystemEngagement: number;
-    npsScore: number;
+    // V3 Pilares (quando disponível)
+    nps?: number;
+    referral?: number;
+    payment?: number;
+    crossSell?: number;
+    tenure?: number;
+    // V2 Campos (deprecated, para compatibilidade)
+    meetingEngagement?: number;
+    appUsage?: number;
+    paymentStatus?: number;
+    ecosystemEngagement?: number;
+    npsScore?: number;
   };
   
   // Dados originais para referência
