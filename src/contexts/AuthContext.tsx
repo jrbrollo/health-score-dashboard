@@ -308,22 +308,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Aguardar um pouco para garantir que o perfil foi criado
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Verificar se temos sessão ativa, se não, fazer login
+      // Verificar se temos sessão ativa
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // Se não tiver sessão, tentar fazer login automaticamente
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+        // Se não tiver sessão, é porque precisa confirmar o email primeiro
+        // Mostrar mensagem de sucesso informando sobre a confirmação
+        toast({
+          title: 'Conta criada com sucesso!',
+          description: 'Enviamos um e-mail de confirmação. Por favor, verifique sua caixa de entrada e clique no link para confirmar sua conta antes de fazer login.',
         });
-        
-        if (loginError) {
-          throw new Error('Conta criada, mas não foi possível fazer login automaticamente. Por favor, faça login manualmente.');
-        }
+        return; // Retornar sem erro, pois isso é esperado
       }
 
-      // Carregar perfil
+      // Se tiver sessão, carregar perfil e fazer login automático
       await loadUserProfile(authData.user.id);
 
       toast({
