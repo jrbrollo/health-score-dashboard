@@ -22,6 +22,7 @@ import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { ThemeToggle } from "./ui/theme-toggle";
+import { Logo } from "./Logo";
 import { buildUniqueList, applyHierarchyFilters, HierarchyFilters } from "@/lib/filters";
 import { useAuth } from "@/contexts/AuthContext";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
