@@ -103,42 +103,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
-    let profileTimeoutId: NodeJS.Timeout | null = null;
 
-    // Timeout de segurança: se demorar mais de 10 segundos, forçar loading = false
+    // Timeout de segurança: se demorar mais de 5 segundos, forçar loading = false
     timeoutId = setTimeout(() => {
       if (mounted) {
-        console.warn('Timeout ao verificar sessão, forçando loading = false');
+        console.warn('Timeout ao verificar sessão (5s), forçando loading = false');
         setLoading(false);
-        // Limpar localStorage corrompido se necessário
-        try {
-          const authData = localStorage.getItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
-          if (authData) {
-            console.warn('Limpando dados de autenticação corrompidos');
-            localStorage.removeItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
-          }
-        } catch (e) {
-          console.error('Erro ao limpar localStorage:', e);
-        }
       }
-    }, 10000);
+    }, 5000);
 
     // Verificar sessão atual
     const checkSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Timeout de 3 segundos para getSession
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout ao obter sessão')), 3000);
+        });
+
+        const { data: { session }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
         
         if (!mounted) return;
         clearTimeout(timeoutId);
         
         if (error) {
           console.error('Erro ao verificar sessão:', error);
-          // Tentar limpar localStorage corrompido
-          try {
-            localStorage.removeItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
-          } catch (e) {
-            // Ignorar erros ao limpar
-          }
           setLoading(false);
           return;
         }
@@ -147,30 +139,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Timeout aumentado para 20 segundos para loadUserProfile
-          profileTimeoutId = setTimeout(() => {
-            if (mounted) {
-              console.warn('Timeout ao carregar perfil após 20s, continuando sem perfil');
-              setLoading(false);
-            }
-          }, 20000);
+          // Carregar perfil com timeout de 5 segundos
+          const profileTimeoutPromise = new Promise<void>((resolve) => {
+            setTimeout(() => {
+              console.warn('Timeout ao carregar perfil (5s), continuando sem perfil');
+              resolve();
+            }, 5000);
+          });
 
-          try {
-            await loadUserProfile(session.user.id);
-          } catch (profileError) {
-            console.error('Erro ao carregar perfil:', profileError);
-            // Continuar mesmo sem perfil (não é erro fatal)
-          } finally {
-            if (profileTimeoutId) clearTimeout(profileTimeoutId);
+          Promise.race([
+            loadUserProfile(session.user.id).catch(err => {
+              console.error('Erro ao carregar perfil:', err);
+            }),
+            profileTimeoutPromise
+          ]).finally(() => {
             if (mounted) setLoading(false);
-          }
+          });
         } else {
           setLoading(false);
         }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error);
         clearTimeout(timeoutId);
-        if (profileTimeoutId) clearTimeout(profileTimeoutId);
         if (mounted) setLoading(false);
       }
     };
@@ -188,12 +178,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        try {
-          await loadUserProfile(session.user.id);
-        } catch (error) {
-          console.error('Erro ao carregar perfil no auth state change:', error);
-          // Continuar mesmo sem perfil
-        }
+        // Carregar perfil sem bloquear a UI
+        loadUserProfile(session.user.id).catch(err => {
+          console.error('Erro ao carregar perfil no auth state change:', err);
+        });
       } else {
         setProfile(null);
       }
@@ -203,7 +191,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
-      if (profileTimeoutId) clearTimeout(profileTimeoutId);
       subscription.unsubscribe();
     };
   }, []);
