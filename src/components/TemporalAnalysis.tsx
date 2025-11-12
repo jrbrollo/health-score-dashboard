@@ -41,9 +41,13 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   const [analysisData, setAnalysisData] = useState<TemporalAnalysis[]>([]);
   const [trendData, setTrendData] = useState<TrendAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({
-    from: startOfDay(subDays(new Date(), DEFAULT_DAYS)),
-    to: endOfDay(new Date())
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return {
+      from: startOfDay(subDays(today, DEFAULT_DAYS)),
+      to: today // Usar apenas a data de hoje, sem hora
+    };
   });
   const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
   const [viewMode, setViewMode] = useState<'score' | 'distribution' | 'pillars'>('score');
@@ -58,17 +62,23 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   }, [periodLength]);
 
   const handleQuickRange = (days: number) => {
-    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     setDateRange({
-      from: startOfDay(subDays(now, days)),
-      to: endOfDay(now)
+      from: startOfDay(subDays(today, days)),
+      to: today // Não usar endOfDay para evitar incluir horas futuras
     });
   };
 
   const handleDateChange = (range: { from?: Date; to?: Date }) => {
     if (!range?.from) return;
     const from = startOfDay(range.from);
-    const to = range?.to ? endOfDay(range.to) : endOfDay(range.from);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Garantir que a data final não seja futura
+    const to = range?.to 
+      ? startOfDay(range.to.getTime() > today.getTime() ? today : range.to)
+      : startOfDay(range.from.getTime() > today.getTime() ? today : range.from);
     setDateRange({ from, to });
   };
 
@@ -157,66 +167,47 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     }
   };
 
-  // Preparar dados para gráficos
+  // Preparar dados para gráficos - APENAS dados históricos do banco
   const prepareChartData = () => {
-    const historicalData = analysisData.map(item => ({
-      date: format(item.recordedDate, 'dd/MM', { locale: ptBR }),
-      fullDate: item.recordedDate,
-      avgScore: item.avgHealthScore,
-      totalClients: item.totalClients,
-      excellent: item.excellentCount,
-      stable: item.stableCount,
-      warning: item.warningCount,
-      critical: item.criticalCount,
-      payment: item.avgPaymentStatus,
-      ecosystem: item.avgEcosystemEngagement,
-      nps: item.avgNpsScore
-    }));
-
-    // Se houver clientes filtrados e não houver dados históricos para hoje, adicionar ponto atual
-    if (filteredClients && filteredClients.length > 0) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const hasTodayData = historicalData.some(item => {
-        const itemDate = new Date(item.fullDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Filtrar apenas dados históricos válidos (não futuros)
+    const historicalData = analysisData
+      .filter(item => {
+        const itemDate = new Date(item.recordedDate);
         itemDate.setHours(0, 0, 0, 0);
-        return itemDate.getTime() === today.getTime();
-      });
+        // Não incluir datas futuras
+        return itemDate.getTime() <= today.getTime();
+      })
+      .map(item => ({
+        date: format(item.recordedDate, 'dd/MM', { locale: ptBR }),
+        fullDate: item.recordedDate,
+        avgScore: item.avgHealthScore,
+        totalClients: item.totalClients,
+        excellent: item.excellentCount,
+        stable: item.stableCount,
+        warning: item.warningCount,
+        critical: item.criticalCount,
+        payment: item.avgPaymentStatus,
+        ecosystem: item.avgEcosystemEngagement,
+        nps: item.avgNpsScore
+      }));
 
-      if (!hasTodayData) {
-        // Calcular score atual em tempo real
-        const scores = filteredClients
-          .filter(client => client.isActive !== false)
-          .map(client => calculateHealthScore(client));
-        
-        if (scores.length > 0) {
-          const sum = scores.reduce((acc, score) => acc + score.score, 0);
-          const avgScore = sum / scores.length;
-          
-          const excellent = scores.filter(s => s.category === "Ótimo").length;
-          const stable = scores.filter(s => s.category === "Estável").length;
-          const warning = scores.filter(s => s.category === "Atenção").length;
-          const critical = scores.filter(s => s.category === "Crítico").length;
-
-          historicalData.push({
-            date: format(today, 'dd/MM', { locale: ptBR }),
-            fullDate: today,
-            avgScore: avgScore,
-            totalClients: filteredClients.filter(c => c.isActive !== false).length,
-            excellent,
-            stable,
-            warning,
-            critical,
-            payment: 0, // Não disponível em tempo real
-            ecosystem: 0, // Não disponível em tempo real
-            nps: 0 // Não disponível em tempo real
-          });
-        }
+    // Ordenar por data e remover duplicatas (manter apenas o mais recente de cada data)
+    const uniqueByDate = new Map<string, typeof historicalData[0]>();
+    
+    historicalData.forEach(item => {
+      const dateKey = format(item.fullDate, 'yyyy-MM-dd');
+      const existing = uniqueByDate.get(dateKey);
+      
+      // Se não existe ou se este é mais recente, substituir
+      if (!existing || item.fullDate.getTime() > existing.fullDate.getTime()) {
+        uniqueByDate.set(dateKey, item);
       }
-    }
+    });
 
-    return historicalData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
+    return Array.from(uniqueByDate.values()).sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
   };
 
   const chartData = prepareChartData();
