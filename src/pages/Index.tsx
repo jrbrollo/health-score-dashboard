@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading, getHierarchyCascade } = useAuth();
+  const { user, profile, loading: authLoading, getHierarchyCascade, signOut } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showClientManager, setShowClientManager] = useState(false);
@@ -279,16 +279,45 @@ const Index = () => {
     );
   }
 
-  // Se não tem perfil após loading, mostrar erro
+  // Aguardar um pouco antes de mostrar erro de perfil (pode ser apenas lentidão)
+  useEffect(() => {
+    if (!authLoading && user && !profile) {
+      const timer = setTimeout(() => {
+        setShowProfileError(true);
+      }, 5000); // Aguardar 5 segundos antes de mostrar erro
+      return () => clearTimeout(timer);
+    } else {
+      setShowProfileError(false);
+    }
+  }, [authLoading, user, profile]);
+
+  // Se não tem perfil após loading, mostrar erro (mas aguardar um pouco para evitar falsos positivos)
   if (!authLoading && user && !profile) {
+    if (!showProfileError) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold">Carregando perfil...</h2>
+            <p className="text-muted-foreground">Aguarde enquanto carregamos suas informações</p>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center max-w-md">
           <h2 className="text-2xl font-semibold mb-4">Perfil não encontrado</h2>
           <p className="text-muted-foreground mb-4">
-            Sua conta não possui um perfil configurado. Por favor, entre em contato com o administrador ou tente criar uma nova conta.
+            Sua conta não possui um perfil configurado ou houve um problema ao carregá-lo. Por favor, entre em contato com o administrador ou tente fazer logout e login novamente.
           </p>
-          <Button onClick={() => signOut()}>Fazer Logout</Button>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Tentar Novamente
+            </Button>
+            <Button onClick={() => signOut()}>Fazer Logout</Button>
+          </div>
         </div>
       </div>
     );

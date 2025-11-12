@@ -28,9 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Carregar perfil do usuário
   const loadUserProfile = async (userId: string): Promise<void> => {
     try {
-      // Timeout de 5 segundos para evitar travamento
+      // Timeout aumentado para 15 segundos (pode demorar em conexões lentas)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout ao carregar perfil')), 5000);
+        setTimeout(() => reject(new Error('Timeout ao carregar perfil')), 15000);
       });
 
       const profilePromise = supabase
@@ -66,12 +66,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error: any) {
       console.error('Erro ao carregar perfil:', error);
-      // Em caso de erro ou timeout, definir perfil como null mas não travar a aplicação
-      setProfile(null);
-      // Re-throw apenas se não for timeout para que o caller possa tratar
-      if (!error.message?.includes('Timeout')) {
-        throw error;
+      
+      // Se for timeout, tentar novamente uma vez antes de desistir
+      if (error.message?.includes('Timeout')) {
+        console.warn('Timeout ao carregar perfil, tentando novamente...');
+        try {
+          // Tentar novamente sem timeout
+          const { data, error: retryError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+          
+          if (!retryError && data) {
+            setProfile({
+              id: data.id,
+              email: data.email,
+              role: data.role,
+              hierarchyName: data.hierarchy_name,
+              createdAt: data.created_at ? new Date(data.created_at) : undefined,
+              updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
+            });
+            return;
+          }
+        } catch (retryErr) {
+          console.error('Erro ao tentar novamente:', retryErr);
+        }
       }
+      
+      // Em caso de erro, definir perfil como null mas não travar a aplicação
+      setProfile(null);
     }
   };
 
@@ -123,19 +147,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Timeout para loadUserProfile também
+          // Timeout aumentado para 20 segundos para loadUserProfile
           profileTimeoutId = setTimeout(() => {
             if (mounted) {
-              console.warn('Timeout ao carregar perfil, continuando sem perfil');
+              console.warn('Timeout ao carregar perfil após 20s, continuando sem perfil');
               setLoading(false);
             }
-          }, 5000);
+          }, 20000);
 
           try {
             await loadUserProfile(session.user.id);
           } catch (profileError) {
             console.error('Erro ao carregar perfil:', profileError);
-            // Continuar mesmo sem perfil
+            // Continuar mesmo sem perfil (não é erro fatal)
           } finally {
             if (profileTimeoutId) clearTimeout(profileTimeoutId);
             if (mounted) setLoading(false);
