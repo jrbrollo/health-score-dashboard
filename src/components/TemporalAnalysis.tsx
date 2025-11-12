@@ -441,14 +441,6 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
             ]}
           />
         </div>
-        <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Análise Temporal
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Acompanhe a evolução do Health Score ao longo do tempo
-          </p>
-        </div>
       </div>
 
       {/* Filtros */}
