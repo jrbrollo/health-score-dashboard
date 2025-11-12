@@ -16,12 +16,17 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_role ON user_profiles(role);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_hierarchy_name ON user_profiles(hierarchy_name);
 
--- 2. Função para buscar nomes disponíveis por role
+-- 2. Função para buscar nomes disponíveis por role (apenas nomes exclusivos de cada nível)
 CREATE OR REPLACE FUNCTION get_available_names_by_role(p_role TEXT)
-RETURNS TABLE(name TEXT) AS $$
+RETURNS TABLE(name TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   CASE p_role
     WHEN 'manager' THEN
+      -- Gerente: buscar apenas nomes que estão na coluna manager
       RETURN QUERY
       SELECT DISTINCT c.manager::TEXT
       FROM clients c
@@ -31,37 +36,85 @@ BEGIN
       ORDER BY c.manager;
     
     WHEN 'mediator' THEN
+      -- Mediador: buscar apenas nomes que estão na coluna mediator MAS NÃO estão na coluna manager
       RETURN QUERY
       SELECT DISTINCT c.mediator::TEXT
       FROM clients c
       WHERE c.mediator IS NOT NULL 
         AND c.mediator != '0'
         AND trim(c.mediator) != ''
+        -- Excluir nomes que também aparecem como manager
+        AND c.mediator NOT IN (
+          SELECT DISTINCT manager
+          FROM clients
+          WHERE manager IS NOT NULL 
+            AND manager != '0'
+            AND trim(manager) != ''
+        )
       ORDER BY c.mediator;
     
     WHEN 'leader' THEN
+      -- Líder: buscar apenas nomes que estão na coluna leader MAS NÃO estão em manager ou mediator
       RETURN QUERY
       SELECT DISTINCT c.leader::TEXT
       FROM clients c
       WHERE c.leader IS NOT NULL 
         AND c.leader != '0'
         AND trim(c.leader) != ''
+        -- Excluir nomes que também aparecem como manager ou mediator
+        AND c.leader NOT IN (
+          SELECT DISTINCT manager
+          FROM clients
+          WHERE manager IS NOT NULL 
+            AND manager != '0'
+            AND trim(manager) != ''
+        )
+        AND c.leader NOT IN (
+          SELECT DISTINCT mediator
+          FROM clients
+          WHERE mediator IS NOT NULL 
+            AND mediator != '0'
+            AND trim(mediator) != ''
+        )
       ORDER BY c.leader;
     
     WHEN 'planner' THEN
+      -- Planejador: buscar apenas nomes que estão na coluna planner MAS NÃO estão em manager, mediator ou leader
       RETURN QUERY
       SELECT DISTINCT c.planner::TEXT
       FROM clients c
       WHERE c.planner IS NOT NULL 
         AND c.planner != '0'
         AND trim(c.planner) != ''
+        -- Excluir nomes que também aparecem em níveis superiores
+        AND c.planner NOT IN (
+          SELECT DISTINCT manager
+          FROM clients
+          WHERE manager IS NOT NULL 
+            AND manager != '0'
+            AND trim(manager) != ''
+        )
+        AND c.planner NOT IN (
+          SELECT DISTINCT mediator
+          FROM clients
+          WHERE mediator IS NOT NULL 
+            AND mediator != '0'
+            AND trim(mediator) != ''
+        )
+        AND c.planner NOT IN (
+          SELECT DISTINCT leader
+          FROM clients
+          WHERE leader IS NOT NULL 
+            AND leader != '0'
+            AND trim(leader) != ''
+        )
       ORDER BY c.planner;
     
     ELSE
       RETURN;
   END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 3. Função para buscar hierarquia cascata (todos os nomes abaixo de um nível)
 CREATE OR REPLACE FUNCTION get_hierarchy_cascade(
