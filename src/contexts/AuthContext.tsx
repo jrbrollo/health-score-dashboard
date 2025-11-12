@@ -343,27 +343,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Tentar fazer signOut no Supabase, mas não bloquear se não houver sessão
+      try {
+        const { error } = await supabase.auth.signOut();
+        // Se o erro for de sessão ausente, ignorar e continuar com limpeza local
+        if (error && !error.message?.includes('session') && !error.message?.includes('Auth session missing')) {
+          throw error;
+        }
+      } catch (signOutError: any) {
+        // Se for erro de sessão ausente, apenas logar e continuar
+        if (signOutError.message?.includes('session') || signOutError.message?.includes('Auth session missing')) {
+          console.warn('Sessão já expirada ou ausente, limpando estado local');
+        } else {
+          throw signOutError;
+        }
+      }
 
+      // Sempre limpar estado local, mesmo se signOut falhar
       setUser(null);
       setProfile(null);
       setSession(null);
 
+      // Limpar localStorage do Supabase
+      try {
+        localStorage.removeItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
+        // Limpar outros possíveis itens de auth
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('auth')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (e) {
+        console.warn('Erro ao limpar localStorage:', e);
+      }
+
       // Redirecionar para login após logout
       window.location.href = '/login';
-
-      toast({
-        title: 'Logout realizado!',
-        description: 'Você saiu da sua conta.',
-      });
     } catch (error: any) {
       console.error('Erro ao fazer logout:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível fazer logout.',
-        variant: 'destructive',
-      });
+      
+      // Mesmo em caso de erro, limpar estado local e redirecionar
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      
+      try {
+        localStorage.clear();
+      } catch (e) {
+        // Ignorar erros ao limpar localStorage
+      }
+      
+      window.location.href = '/login';
     }
   };
 
