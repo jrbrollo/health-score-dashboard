@@ -20,6 +20,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [authFilters, setAuthFilters] = useState<HierarchyFilters | null>(null);
+  const [showProfileError, setShowProfileError] = useState(false);
 
   // Verificar autenticação
   useEffect(() => {
