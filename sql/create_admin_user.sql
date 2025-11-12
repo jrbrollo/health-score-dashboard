@@ -1,0 +1,44 @@
+-- ============================================================
+-- COMO CRIAR UMA CONTA DE ADMINISTRADOR NO SUPABASE
+-- ============================================================
+--
+-- MÉTODO RECOMENDADO: Via Supabase Dashboard
+-- ------------------------------------------------
+-- 1. Acesse o Supabase Dashboard
+-- 2. Vá em Authentication > Users
+-- 3. Clique em "Add User" > "Create new user"
+-- 4. Preencha:
+--    - Email: seu-email@exemplo.com
+--    - Password: sua-senha-segura
+--    - Auto Confirm User: ✅ (marcar para não precisar confirmar email)
+-- 5. Clique em "Create User"
+-- 6. Copie o UUID do usuário criado (aparece na lista)
+-- 7. Vá em SQL Editor e execute:
+--
+--    SELECT create_admin_profile(
+--      'UUID_DO_USUARIO_COPIADO'::UUID,
+--      'seu-email@exemplo.com',
+--      'Administrador'  -- ou qualquer nome de gerente que existe na base
+--    );
+--
+-- ALTERNATIVA: Usando create_user_profile diretamente
+-- ---------------------------------------------------------
+-- Se você já tem o UUID do usuário criado no Auth:
+--
+--    SELECT create_user_profile(
+--      'UUID_DO_USUARIO'::UUID,
+--      'seu-email@exemplo.com',
+--      'manager',
+--      'Administrador'  -- ou qualquer nome de gerente que existe na base
+--    );
+--
+-- ============================================================
+-- NOTAS IMPORTANTES:
+-- ============================================================
+-- - O role 'manager' permite ver TODOS os dados sem restrições
+-- - O hierarchy_name pode ser qualquer nome (não precisa existir na base)
+-- - Para administradores, recomendo usar 'Administrador' como hierarchy_name
+-- - Após criar o perfil, o usuário pode fazer login normalmente
+-- - O usuário terá acesso completo a todos os clientes e profissionais
+--
+-- ============================================================

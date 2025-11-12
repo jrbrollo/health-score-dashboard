@@ -242,10 +242,25 @@ const Index = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
           <h2 className="text-xl font-semibold">Verificando autenticação...</h2>
-          <p className="text-muted-foreground">Aguarde enquanto verificamos sua sessão</p>
+          <p className="text-muted-foreground mb-4">Aguarde enquanto verificamos sua sessão</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              // Limpar localStorage e recarregar
+              try {
+                localStorage.clear();
+                window.location.href = '/login';
+              } catch (e) {
+                window.location.reload();
+              }
+            }}
+            className="mt-4"
+          >
+            Limpar dados e voltar ao login
+          </Button>
         </div>
       </div>
     );

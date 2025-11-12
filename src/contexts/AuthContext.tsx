@@ -26,13 +26,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // Carregar perfil do usuário
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = async (userId: string): Promise<void> => {
     try {
-      const { data, error } = await supabase
+      // Timeout de 5 segundos para evitar travamento
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao carregar perfil')), 5000);
+      });
+
+      const profilePromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle(); // Usar maybeSingle() ao invés de single() para não dar erro quando não há perfil
+        .maybeSingle();
+
+      const result = await Promise.race([profilePromise, timeoutPromise]);
+      const { data, error } = result as any;
 
       if (error) {
         // Se for erro de "nenhuma linha", apenas definir perfil como null
@@ -58,48 +66,110 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error: any) {
       console.error('Erro ao carregar perfil:', error);
+      // Em caso de erro ou timeout, definir perfil como null mas não travar a aplicação
       setProfile(null);
+      // Re-throw apenas se não for timeout para que o caller possa tratar
+      if (!error.message?.includes('Timeout')) {
+        throw error;
+      }
     }
   };
 
   // Inicializar auth state
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    let profileTimeoutId: NodeJS.Timeout | null = null;
+
+    // Timeout de segurança: se demorar mais de 10 segundos, forçar loading = false
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn('Timeout ao verificar sessão, forçando loading = false');
+        setLoading(false);
+        // Limpar localStorage corrompido se necessário
+        try {
+          const authData = localStorage.getItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
+          if (authData) {
+            console.warn('Limpando dados de autenticação corrompidos');
+            localStorage.removeItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
+          }
+        } catch (e) {
+          console.error('Erro ao limpar localStorage:', e);
+        }
+      }
+    }, 10000);
 
     // Verificar sessão atual
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (!mounted) return;
-      
-      if (error) {
-        console.error('Erro ao verificar sessão:', error);
-        setLoading(false);
-        return;
-      }
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        clearTimeout(timeoutId);
+        
+        if (error) {
+          console.error('Erro ao verificar sessão:', error);
+          // Tentar limpar localStorage corrompido
+          try {
+            localStorage.removeItem('sb-pdlyaqxrkoqbqniercpi-auth-token');
+          } catch (e) {
+            // Ignorar erros ao limpar
+          }
+          setLoading(false);
+          return;
+        }
 
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserProfile(session.user.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
-      } else {
-        setLoading(false);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Timeout para loadUserProfile também
+          profileTimeoutId = setTimeout(() => {
+            if (mounted) {
+              console.warn('Timeout ao carregar perfil, continuando sem perfil');
+              setLoading(false);
+            }
+          }, 5000);
+
+          try {
+            await loadUserProfile(session.user.id);
+          } catch (profileError) {
+            console.error('Erro ao carregar perfil:', profileError);
+            // Continuar mesmo sem perfil
+          } finally {
+            if (profileTimeoutId) clearTimeout(profileTimeoutId);
+            if (mounted) setLoading(false);
+          }
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error);
+        clearTimeout(timeoutId);
+        if (profileTimeoutId) clearTimeout(profileTimeoutId);
+        if (mounted) setLoading(false);
       }
-    }).catch(error => {
-      console.error('Erro ao verificar sessão:', error);
-      if (mounted) setLoading(false);
-    });
+    };
+
+    checkSession();
 
     // Ouvir mudanças de auth
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
+      clearTimeout(timeoutId);
       
       setSession(session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
-        await loadUserProfile(session.user.id);
+        try {
+          await loadUserProfile(session.user.id);
+        } catch (error) {
+          console.error('Erro ao carregar perfil no auth state change:', error);
+          // Continuar mesmo sem perfil
+        }
       } else {
         setProfile(null);
       }
@@ -108,6 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
+      if (profileTimeoutId) clearTimeout(profileTimeoutId);
       subscription.unsubscribe();
     };
   }, []);
