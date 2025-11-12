@@ -220,6 +220,18 @@ const Index = () => {
     setShowClientManager(false);
   };
 
+  // Aguardar um pouco antes de mostrar erro de perfil (pode ser apenas lentidão)
+  useEffect(() => {
+    if (!authLoading && user && !profile) {
+      const timer = setTimeout(() => {
+        setShowProfileError(true);
+      }, 5000); // Aguardar 5 segundos antes de mostrar erro
+      return () => clearTimeout(timer);
+    } else {
+      setShowProfileError(false);
+    }
+  }, [authLoading, user, profile]);
+
   // Se usuário está autenticado mas não tem perfil, redirecionar para login
   useEffect(() => {
     if (!authLoading && user && !profile && authFilters === null) {
@@ -236,7 +248,7 @@ const Index = () => {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [user, profile, authLoading, authFilters]);
+  }, [user, profile, authLoading, authFilters, signOut]);
 
   // Tela de loading (auth ou dados)
   if (authLoading) {
@@ -278,18 +290,6 @@ const Index = () => {
       </div>
     );
   }
-
-  // Aguardar um pouco antes de mostrar erro de perfil (pode ser apenas lentidão)
-  useEffect(() => {
-    if (!authLoading && user && !profile) {
-      const timer = setTimeout(() => {
-        setShowProfileError(true);
-      }, 5000); // Aguardar 5 segundos antes de mostrar erro
-      return () => clearTimeout(timer);
-    } else {
-      setShowProfileError(false);
-    }
-  }, [authLoading, user, profile]);
 
   // Se não tem perfil após loading, mostrar erro (mas aguardar um pouco para evitar falsos positivos)
   if (!authLoading && user && !profile) {
