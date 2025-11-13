@@ -314,15 +314,37 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     
     const clientIds = filteredClients.map(c => String(c.id));
     
-    // Buscar histórico na data inicial
-    const startHistory = await loadClientHistoryForDate(dateRange.from, clientIds);
+    // Verificar se a data inicial é o primeiro dia do histórico (13/11/2025)
+    // Se for, todos os clientes devem ser considerados "Novos"
+    const startDate = new Date(dateRange.from);
+    startDate.setHours(0, 0, 0, 0);
+    const minHistoryDate = new Date(MIN_HISTORY_DATE);
+    minHistoryDate.setHours(0, 0, 0, 0);
+    const isFirstDayOfHistory = startDate.getTime() === minHistoryDate.getTime();
+    
+    // Verificar se estamos comparando a mesma data
+    const endDate = new Date(dateRange.to);
+    endDate.setHours(0, 0, 0, 0);
+    const isSameDate = startDate.getTime() === endDate.getTime();
+    
+    // Se é o primeiro dia do histórico OU estamos comparando a mesma data,
+    // todos os clientes devem ser "Novos" (primeira aparição no histórico)
+    const forceAllAsNew = isFirstDayOfHistory || isSameDate;
+    
+    let startHistory: Map<string, HealthScoreHistory>;
+    if (forceAllAsNew) {
+      // Não buscar histórico inicial - forçar todos como "Novos"
+      startHistory = new Map();
+      console.log('📅 Primeiro dia do histórico ou mesma data - todos os clientes serão considerados "Novos"');
+    } else {
+      // Buscar histórico na data inicial normalmente
+      startHistory = await loadClientHistoryForDate(dateRange.from, clientIds);
+    }
     setStartDateHistory(startHistory);
     
     // Para a data final, usar estado atual se for hoje, senão buscar histórico
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const endDate = dateRange.to;
-    endDate.setHours(0, 0, 0, 0);
     
     let endHistory: Map<string, HealthScoreHistory>;
     
@@ -366,6 +388,18 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       const clientIdStr = String(client.id);
       const startState = startHistory.get(clientIdStr);
       const endState = endHistory.get(clientIdStr);
+      
+      // Se forçamos todos como "Novos" (primeiro dia ou mesma data), tratar como novo
+      if (forceAllAsNew) {
+        if (endState) {
+          const key = `Novo → ${endState.healthCategory}`;
+          if (!movementMap.has(key)) {
+            movementMap.set(key, { from: 'Novo', to: endState.healthCategory, clients: [] });
+          }
+          movementMap.get(key)!.clients.push(client);
+        }
+        return;
+      }
       
       // Se não tem estado inicial, considerar como novo cliente
       if (!startState) {
