@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -40,6 +40,11 @@ import {
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { AnalysisInfoTooltip } from "./AnalysisInfoTooltip";
 import { Logo } from "./Logo";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
+import { Eye, X } from "lucide-react";
+import { temporalService } from "@/services/temporalService";
+import { HealthScoreHistory } from "@/types/temporal";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
 
 interface DashboardProps {
   clients: Client[];
@@ -49,11 +54,12 @@ interface DashboardProps {
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
   authFilters?: HierarchyFilters | null;
+  importProgress?: { current: number; total: number } | null;
 }
 
 // Lista de planejadores dinâmica, derivada dos clientes (sem nomes fixos)
 
-export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClients, isDarkMode = false, onToggleDarkMode, authFilters }: DashboardProps) {
+export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClients, isDarkMode = false, onToggleDarkMode, authFilters, importProgress }: DashboardProps) {
   const { profile, signOut } = useAuth();
   const [selectedPlanner, setSelectedPlanner] = useState<string | null>(null);
   const [selectedManager, setSelectedManager] = useState<string | "all">("all");
@@ -64,6 +70,12 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   const [managerSearchOpen, setManagerSearchOpen] = useState(false);
   const [mediatorSearchOpen, setMediatorSearchOpen] = useState(false);
   const [leaderSearchOpen, setLeaderSearchOpen] = useState(false);
+  const [openCategoryDrawer, setOpenCategoryDrawer] = useState<string | null>(null);
+  const [categoryDrawerClients, setCategoryDrawerClients] = useState<Client[]>([]);
+  const [categoryDrawerTitle, setCategoryDrawerTitle] = useState<string>('');
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
+  const [clientHistory, setClientHistory] = useState<HealthScoreHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
 
   // Unique planners & hierarchy lists (normalizados)
@@ -142,6 +154,122 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
     return { total, excellent, stable, warning, critical, averageScore };
   }, [filteredClients, healthScores]);
 
+  // Função para abrir drawer de categoria
+  const handleCategoryCardClick = (category: 'Ótimo' | 'Estável' | 'Atenção' | 'Crítico') => {
+    const categoryClients = filteredClients.filter(client => {
+      const score = calculateHealthScore(client);
+      return score.category === category;
+    });
+
+    const titles = {
+      'Ótimo': 'Clientes Ótimos',
+      'Estável': 'Clientes Estáveis',
+      'Atenção': 'Clientes em Atenção',
+      'Crítico': 'Clientes Críticos'
+    };
+
+    setCategoryDrawerClients(categoryClients);
+    setCategoryDrawerTitle(titles[category]);
+    setOpenCategoryDrawer(category);
+  };
+
+  const getCategoryHeaderStyles = (category: string) => {
+    if (isDarkMode) {
+      switch (category) {
+        case 'Ótimo':
+          return 'border-emerald-800/50';
+        case 'Estável':
+          return 'border-blue-800/50';
+        case 'Atenção':
+          return 'border-amber-800/50';
+        case 'Crítico':
+          return 'border-red-800/50';
+        default:
+          return 'border-border';
+      }
+    } else {
+      switch (category) {
+        case 'Ótimo':
+          return 'border-emerald-200/50';
+        case 'Estável':
+          return 'border-blue-200/50';
+        case 'Atenção':
+          return 'border-amber-200/50';
+        case 'Crítico':
+          return 'border-red-200/50';
+        default:
+          return 'border-border';
+      }
+    }
+  };
+
+  // Função para obter estilos de card baseados na categoria (cores sutis)
+  const getCategoryCardStyles = (category: string) => {
+    if (isDarkMode) {
+      switch (category) {
+        case 'Ótimo':
+          return 'border-l-4 border-emerald-500/50';
+        case 'Estável':
+          return 'border-l-4 border-blue-500/50';
+        case 'Atenção':
+          return 'border-l-4 border-amber-500/50';
+        case 'Crítico':
+          return 'border-l-4 border-red-500/50';
+        default:
+          return '';
+      }
+    } else {
+      switch (category) {
+        case 'Ótimo':
+          return 'border-l-4 border-emerald-500';
+        case 'Estável':
+          return 'border-l-4 border-blue-500';
+        case 'Atenção':
+          return 'border-l-4 border-amber-500';
+        case 'Crítico':
+          return 'border-l-4 border-red-500';
+        default:
+          return '';
+      }
+    }
+  };
+
+  const getHealthScoreColor = (category: string) => {
+    if (isDarkMode) {
+      switch (category) {
+        case "Ótimo": return "text-green-300 bg-green-900/30 border border-green-700";
+        case "Estável": return "text-blue-300 bg-blue-900/30 border border-blue-700";
+        case "Atenção": return "text-yellow-300 bg-yellow-900/30 border border-yellow-700";
+        case "Crítico": return "text-red-300 bg-red-900/30 border border-red-700";
+        default: return "text-gray-300 bg-gray-800/30 border border-gray-600";
+      }
+    } else {
+      switch (category) {
+        case "Ótimo": return "text-green-600 bg-green-100";
+        case "Estável": return "text-blue-600 bg-blue-100";
+        case "Atenção": return "text-yellow-600 bg-yellow-100";
+        case "Crítico": return "text-red-600 bg-red-100";
+        default: return "text-gray-600 bg-gray-100";
+      }
+    }
+  };
+
+  // Carregar histórico quando visualizar cliente
+  useEffect(() => {
+    if (viewingClient) {
+      setLoadingHistory(true);
+      temporalService.getClientHistory(viewingClient.id)
+        .then(history => {
+          setClientHistory(history);
+          setLoadingHistory(false);
+        })
+        .catch(err => {
+          console.error('Erro ao carregar histórico:', err);
+          setLoadingHistory(false);
+        });
+    }
+  }, [viewingClient]);
+
   // Group clients by planner for team view
   const plannerStats = useMemo(() => {
     if (selectedPlanner) return [];
@@ -182,6 +310,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
         onImport={handleBulkImport}
         onClose={() => setShowBulkImport(false)}
         isDarkMode={isDarkMode}
+        importProgress={importProgress}
       />
     );
   }
@@ -528,7 +657,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardContent>
               </Card>
 
-              <Card className={`animate-fade-in-up animate-delay-300 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl ${isDarkMode ? 'bg-gradient-to-br from-emerald-900/80 to-green-900/80 border-emerald-700/50' : 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200/50'}`}>
+              <Card 
+                onClick={() => handleCategoryCardClick('Ótimo')}
+                className={`animate-fade-in-up animate-delay-300 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl cursor-pointer ${isDarkMode ? 'bg-gradient-to-br from-emerald-900/80 to-green-900/80 border-emerald-700/50' : 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200/50'}`}
+              >
                 <div className={`absolute inset-0 bg-gradient-to-r opacity-20 transition-opacity duration-300 group-hover:opacity-30 ${isDarkMode ? 'from-emerald-500 to-green-600' : 'from-emerald-400 to-green-500'}`}></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
                   <CardTitle className={`text-sm font-bold ${isDarkMode ? 'text-emerald-200' : 'text-emerald-800'}`}>Ótimos</CardTitle>
@@ -542,7 +674,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardContent>
               </Card>
 
-              <Card className={`animate-fade-in-up animate-delay-400 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl ${isDarkMode ? 'bg-gradient-to-br from-blue-900/80 to-cyan-900/80 border-blue-700/50' : 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200/50'}`}>
+              <Card 
+                onClick={() => handleCategoryCardClick('Estável')}
+                className={`animate-fade-in-up animate-delay-400 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl cursor-pointer ${isDarkMode ? 'bg-gradient-to-br from-blue-900/80 to-cyan-900/80 border-blue-700/50' : 'bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200/50'}`}
+              >
                 <div className={`absolute inset-0 bg-gradient-to-r opacity-20 transition-opacity duration-300 group-hover:opacity-30 ${isDarkMode ? 'from-blue-500 to-cyan-600' : 'from-blue-400 to-cyan-500'}`}></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
                   <CardTitle className={`text-sm font-bold ${isDarkMode ? 'text-blue-200' : 'text-blue-800'}`}>Estáveis</CardTitle>
@@ -556,7 +691,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardContent>
               </Card>
 
-              <Card className={`animate-fade-in-up animate-delay-500 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl ${isDarkMode ? 'bg-gradient-to-br from-amber-900/80 to-yellow-900/80 border-amber-700/50' : 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200/50'}`}>
+              <Card 
+                onClick={() => handleCategoryCardClick('Atenção')}
+                className={`animate-fade-in-up animate-delay-500 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl cursor-pointer ${isDarkMode ? 'bg-gradient-to-br from-amber-900/80 to-yellow-900/80 border-amber-700/50' : 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200/50'}`}
+              >
                 <div className={`absolute inset-0 bg-gradient-to-r opacity-20 transition-opacity duration-300 group-hover:opacity-30 ${isDarkMode ? 'from-amber-500 to-yellow-600' : 'from-amber-400 to-yellow-500'}`}></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
                   <CardTitle className={`text-sm font-bold ${isDarkMode ? 'text-amber-200' : 'text-amber-800'}`}>Atenção</CardTitle>
@@ -570,7 +708,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardContent>
               </Card>
 
-              <Card className={`animate-fade-in-up animate-delay-600 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl ${isDarkMode ? 'bg-gradient-to-br from-red-900/80 to-rose-900/80 border-red-700/50' : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200/50'}`}>
+              <Card 
+                onClick={() => handleCategoryCardClick('Crítico')}
+                className={`animate-fade-in-up animate-delay-600 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl cursor-pointer ${isDarkMode ? 'bg-gradient-to-br from-red-900/80 to-rose-900/80 border-red-700/50' : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200/50'}`}
+              >
                 <div className={`absolute inset-0 bg-gradient-to-r opacity-20 transition-opacity duration-300 group-hover:opacity-30 ${isDarkMode ? 'from-red-500 to-rose-600' : 'from-red-400 to-rose-500'}`}></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
                   <CardTitle className={`text-sm font-bold ${isDarkMode ? 'text-red-200' : 'text-red-800'}`}>Críticos</CardTitle>
@@ -705,6 +846,222 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Drawer de Categoria de Clientes */}
+      <Drawer open={!!openCategoryDrawer} onOpenChange={(open) => !open && setOpenCategoryDrawer(null)}>
+        <DrawerContent className={`max-h-[90vh] ${isDarkMode ? 'gradient-bg-dark' : 'bg-white'}`}>
+          <div className="max-w-4xl mx-auto w-full p-6 overflow-y-auto">
+            <DrawerHeader className={`border-b pb-4 ${openCategoryDrawer ? getCategoryHeaderStyles(openCategoryDrawer) : ''}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <DrawerTitle className={`text-2xl ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {categoryDrawerTitle}
+                  </DrawerTitle>
+                  <DrawerDescription className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {categoryDrawerClients.length} {categoryDrawerClients.length === 1 ? 'cliente encontrado' : 'clientes encontrados'}
+                  </DrawerDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setOpenCategoryDrawer(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DrawerHeader>
+
+            <div className="mt-6 space-y-3">
+              {categoryDrawerClients.length === 0 ? (
+                <div className={`text-center py-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <p>Nenhum cliente encontrado nesta categoria.</p>
+                </div>
+              ) : (
+                categoryDrawerClients.map((client) => {
+                  const healthScore = calculateHealthScore(client);
+                  return (
+                    <Card 
+                      key={client.id} 
+                      className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'} ${getCategoryCardStyles(healthScore.category)}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 flex-1">
+                            <div>
+                              <h3 className={`font-semibold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                {client.name}
+                              </h3>
+                              <div className="flex items-center gap-3 mt-2">
+                                <HealthScoreBadge 
+                                  score={healthScore.score} 
+                                  category={healthScore.category}
+                                />
+                                {client.planner && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {client.planner}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Score: <span className="font-semibold">{healthScore.score}</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setViewingClient(client)}
+                              className="flex items-center gap-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Ver Detalhes
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Drawer de Detalhes do Cliente */}
+      <Drawer open={!!viewingClient} onOpenChange={(open) => !open && setViewingClient(null)}>
+        <DrawerContent className={`max-h-[90vh] ${isDarkMode ? 'gradient-bg-dark' : 'bg-white'}`}>
+          {viewingClient && (
+            <>
+              <DrawerHeader className="border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DrawerTitle className={`text-2xl ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {viewingClient.name}
+                    </DrawerTitle>
+                    <DrawerDescription className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Planejador: {viewingClient.planner} • 
+                      {viewingClient.manager && ` Gerente: ${viewingClient.manager} •`}
+                      {viewingClient.mediator && ` Mediador: ${viewingClient.mediator}`}
+                    </DrawerDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setViewingClient(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DrawerHeader>
+              
+              <div className={`overflow-y-auto p-6 space-y-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                {/* Score Atual */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Health Score Atual
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const healthScore = calculateHealthScore(viewingClient);
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <HealthScoreBadge score={healthScore.score} category={healthScore.category} />
+                            <Badge className={getHealthScoreColor(healthScore.category)}>
+                              {healthScore.category}
+                            </Badge>
+                          </div>
+                          
+                          {/* Breakdown Visual */}
+                          <div className="space-y-3 mt-4">
+                            <h4 className="font-semibold text-sm">Breakdown Detalhado:</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">NPS</span>
+                                <span className="font-semibold">{healthScore.breakdown.nps} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Indicação</span>
+                                <span className="font-semibold">{healthScore.breakdown.referral} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Inadimplência</span>
+                                <span className="font-semibold">{healthScore.breakdown.payment} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Cross Sell</span>
+                                <span className="font-semibold">{healthScore.breakdown.crossSell} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg md:col-span-2 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Meses Relacionamento</span>
+                                <span className="font-semibold">{healthScore.breakdown.tenure} pts</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico de Evolução Temporal */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle>Evolução do Health Score</CardTitle>
+                    <CardDescription>
+                      Histórico de pontuação ao longo do tempo
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingHistory ? (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-muted-foreground">Carregando histórico...</p>
+                      </div>
+                    ) : clientHistory.length === 0 ? (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-muted-foreground">Nenhum histórico disponível ainda</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={clientHistory.map(h => ({
+                          date: h.recordedDate.toLocaleDateString('pt-BR'),
+                          score: h.healthScore,
+                          category: h.healthCategory
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                          />
+                          <YAxis 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                          />
+                          <RechartsTooltip 
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+                              border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              color: isDarkMode ? '#f9fafb' : '#111827'
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="score" 
+                            stroke={isDarkMode ? '#3b82f6' : '#2563eb'} 
+                            strokeWidth={2}
+                            dot={{ fill: isDarkMode ? '#3b82f6' : '#2563eb', r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

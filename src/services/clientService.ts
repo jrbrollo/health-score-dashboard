@@ -1,5 +1,7 @@
 import { supabase, DatabaseClient } from '@/lib/supabase'
 import { Client } from '@/types/client'
+import { executeQueryWithTimeout } from '@/lib/queryUtils'
+import { validateClientUpdates } from '@/lib/validations'
 
 // Converter do formato da aplicação para o banco (v3)
 function clientToDatabase(client: Client): any {
@@ -75,12 +77,15 @@ export const clientService = {
     try {
       // Snapshot: buscar apenas clientes com last_seen_at na data mais recente (fonte: planilha do dia)
       // 1) Obter a data do último snapshot
-      const { data: lastDateRows, error: lastDateError } = await supabase
-        .from('clients')
-        .select('last_seen_at')
-        .not('last_seen_at', 'is', null)
-        .order('last_seen_at', { ascending: false })
-        .limit(1)
+      const { data: lastDateRows, error: lastDateError } = await executeQueryWithTimeout(
+        () => supabase
+          .from('clients')
+          .select('last_seen_at')
+          .not('last_seen_at', 'is', null)
+          .order('last_seen_at', { ascending: false })
+          .limit(1),
+        30000 // 30 segundos para query simples
+      );
       if (lastDateError) throw lastDateError
       const lastSeenTs: string | null = lastDateRows && lastDateRows[0]?.last_seen_at ? lastDateRows[0].last_seen_at : null
 
@@ -102,11 +107,14 @@ export const clientService = {
           query = query.eq('last_seen_at', lastSeenTs)
         }
 
-        const { data, error } = await query
-      if (error) {
+        const { data, error } = await executeQueryWithTimeout(
+          () => query,
+          60000 // 60 segundos para queries de paginação
+        );
+        if (error) {
           console.error('Erro ao buscar snapshot de clientes:', error)
-        throw error
-      }
+          throw error
+        }
 
         pageCount++
         const fetchedCount = data?.length || 0
@@ -146,11 +154,14 @@ export const clientService = {
         updatedAt: new Date(),
       })
 
-      const { data, error } = await supabase
-        .from('clients')
-        .insert([dbClient])
-        .select()
-        .single()
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase
+          .from('clients')
+          .insert([dbClient])
+          .select()
+          .single(),
+        30000 // 30 segundos para insert simples
+      );
 
       if (error) {
         console.error('Erro ao criar cliente:', error)
@@ -167,6 +178,20 @@ export const clientService = {
   // Atualizar um cliente
   async updateClient(clientId: string, updates: Partial<Client>): Promise<Client | null> {
     try {
+      // Validar dados antes de atualizar
+      const validationErrors = validateClientUpdates({
+        npsScoreV3: updates.npsScoreV3,
+        overdueInstallments: updates.overdueInstallments,
+        overdueDays: updates.overdueDays,
+        crossSellCount: updates.crossSellCount,
+        monthsSinceClosing: updates.monthsSinceClosing,
+        email: updates.email,
+      }, 'Dados do cliente');
+
+      if (validationErrors.length > 0) {
+        throw new Error(`Validação falhou: ${validationErrors.join(', ')}`);
+      }
+
       const updateData: any = {}
       
       if (updates.name) updateData.name = updates.name
@@ -179,14 +204,27 @@ export const clientService = {
       if (updates.npsScore) updateData.nps_score = updates.npsScore
       if (updates.ecosystemUsage) updateData.ecosystem_usage = updates.ecosystemUsage
       
+      // Campos v3
+      if (updates.npsScoreV3 !== undefined) updateData.nps_score_v3 = updates.npsScoreV3
+      if (updates.hasNpsReferral !== undefined) updateData.has_nps_referral = updates.hasNpsReferral
+      if (updates.overdueInstallments !== undefined) updateData.overdue_installments = updates.overdueInstallments
+      if (updates.overdueDays !== undefined) updateData.overdue_days = updates.overdueDays
+      if (updates.crossSellCount !== undefined) updateData.cross_sell_count = updates.crossSellCount
+      if (updates.monthsSinceClosing !== undefined) updateData.months_since_closing = updates.monthsSinceClosing
+      if (updates.email !== undefined) updateData.email = updates.email
+      if (updates.phone !== undefined) updateData.phone = updates.phone
+      
       updateData.updated_at = new Date().toISOString()
 
-      const { data, error } = await supabase
-        .from('clients')
-        .update(updateData)
-        .eq('id', clientId)
-        .select()
-        .single()
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase
+          .from('clients')
+          .update(updateData)
+          .eq('id', clientId)
+          .select()
+          .single(),
+        30000 // 30 segundos para update simples
+      );
 
       if (error) {
         console.error('Erro ao atualizar cliente:', error)
@@ -203,10 +241,13 @@ export const clientService = {
   // Deletar um cliente
   async deleteClient(clientId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientId)
+      const { error } = await executeQueryWithTimeout(
+        () => supabase
+          .from('clients')
+          .delete()
+          .eq('id', clientId),
+        30000 // 30 segundos para delete simples
+      );
 
       if (error) {
         console.error('Erro ao deletar cliente:', error)
@@ -223,7 +264,7 @@ export const clientService = {
   // Criar múltiplos clientes (bulk import)
   async createMultipleClients(
     clientsData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>[],
-    options?: { sheetDate?: string }
+    options?: { sheetDate?: string; onProgress?: (current: number, total: number) => void }
   ): Promise<Client[]> {
     try {
       console.log('🔍 Tentando inserir', clientsData.length, 'clientes', options?.sheetDate ? `para a data ${options.sheetDate}` : '')
@@ -273,11 +314,19 @@ export const clientService = {
 
         console.log(`📦 Inserindo lote ${Math.floor(i / BATCH_SIZE) + 1}: clientes ${i + 1} a ${i + dbBatch.length}`)
 
-        const { data, error } = await supabase.rpc('bulk_insert_clients_v3', {
-          clients_json: dbBatch,
-          p_import_date: importDate,
-          p_seen_at: seenAt
-        } as any)
+        // Notificar progresso antes de inserir o lote
+        if (options?.onProgress) {
+          options.onProgress(i + batch.length, clientsData.length);
+        }
+
+        const { data, error } = await executeQueryWithTimeout(
+          () => supabase.rpc('bulk_insert_clients_v3', {
+            clients_json: dbBatch,
+            p_import_date: importDate,
+            p_seen_at: seenAt
+          } as any),
+          120000 // 120 segundos para bulk insert (pode demorar mais)
+        );
 
       if (error) {
           console.error('❌ Erro ao inserir lote (bulk_insert_clients):', error)
@@ -295,6 +344,11 @@ export const clientService = {
           }
           allInserted.push(...data.map(databaseToClient))
         }
+      }
+
+      // Notificar progresso final
+      if (options?.onProgress) {
+        options.onProgress(clientsData.length, clientsData.length);
       }
 
       console.log('✅ Todos os clientes criados/atualizados com sucesso:', allInserted.length)

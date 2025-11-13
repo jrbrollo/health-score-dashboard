@@ -21,6 +21,7 @@ import { calculateHealthScore } from '@/utils/healthScore';
 import { temporalService } from '@/services/temporalService';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { subDays } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 interface PortfolioMetricsProps {
   clients: Client[];
@@ -362,9 +363,37 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
             }
           });
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao calcular métricas do portfólio:', error);
         setLoading(false);
+        
+        // Mostrar erro ao usuário apenas se for crítico
+        if (error?.code === 'TIMEOUT' || error?.message?.includes('tempo limite')) {
+          toast({
+            title: 'Timeout ao carregar métricas',
+            description: 'A operação demorou muito. Tente novamente ou reduza o escopo da consulta.',
+            variant: 'destructive',
+          });
+        } else if (error?.message && !error.message.includes('tendência temporal')) {
+          // Não mostrar erro para problemas de tendência (já tem fallback)
+          toast({
+            title: 'Erro ao carregar métricas',
+            description: 'Não foi possível carregar algumas métricas. Alguns dados podem estar incompletos.',
+            variant: 'destructive',
+          });
+        }
+        
+        // Garantir que pelo menos dados básicos sejam exibidos
+        if (!portfolioData) {
+          setPortfolioData({
+            portfolioHealthIndex: 0,
+            riskConcentration: { critical: 0, warning: 0, stable: 0, excellent: 0 },
+            trendDirection: { scoreChangePercent: 0, isImproving: false },
+            volatilityIndex: 0,
+            totalClients: filteredClients.length,
+            averageScore: 0
+          });
+        }
       }
     })();
   }, [filteredClients, selectedPlanner, manager, mediator, leader]);

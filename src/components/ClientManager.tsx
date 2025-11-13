@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { temporalService } from "@/services/temporalService";
 import { HealthScoreHistory } from "@/types/temporal";
-import { useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface ClientManagerProps {
@@ -45,6 +45,7 @@ interface ClientManagerProps {
 export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = false, onToggleDarkMode, authFilters }: ClientManagerProps) {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterPlanner, setFilterPlanner] = useState<Planner | "all">(selectedPlanner);
   const [filterManager, setFilterManager] = useState<string | "all">("all");
@@ -108,8 +109,8 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
 
     let filtered = applyHierarchyFilters(clients, finalFilters);
 
-    if (searchTerm) {
-      filtered = filtered.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (debouncedSearchTerm) {
+      filtered = filtered.filter(c => c.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
     }
 
     if (filterCategory !== "all") {
@@ -117,7 +118,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
     }
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
-  }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, searchTerm, filterCategory, authFilters, profile]);
+  }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, debouncedSearchTerm, filterCategory, authFilters, profile]);
 
 
   const getHealthScoreColor = (category: string) => {

@@ -164,7 +164,7 @@ function calculateTenure(client: Client): number {
 /**
  * Categorização v3 (escala 0-100)
  */
-function getHealthCategory(score: number): HealthCategory {
+export function getHealthCategory(score: number): HealthCategory {
   if (score >= 75) return "Ótimo";
   if (score >= 50) return "Estável";
   if (score >= 30) return "Atenção";

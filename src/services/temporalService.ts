@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { HealthScoreHistory, TemporalAnalysis, TrendAnalysis, PeriodComparison } from '@/types/temporal';
 import { Planner } from '@/types/client';
 import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
+import { executeQueryWithTimeout } from '@/lib/queryUtils';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const averageFromRecords = (records: any[], selector: (record: any) => number | null | undefined) => {
@@ -111,8 +112,8 @@ export const temporalService = {
       const safeEndDate = clampToMinHistoryDate(endDate);
       
       // Tenta RPC as-of; se não existir (404), volta para view antiga
-      const { data, error } = await supabase
-        .rpc('get_temporal_analysis_asof', {
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase.rpc('get_temporal_analysis_asof', {
           start_date: safeStartDate.toISOString().split('T')[0],
           end_date: safeEndDate.toISOString().split('T')[0],
           planner_filter: planner ?? 'all',
@@ -122,7 +123,9 @@ export const temporalService = {
           include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
           include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
           include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
-        });
+        }),
+        60000 // 60 segundos para análise temporal
+      );
 
       if (error || !data) {
         return this.calculatePlannerAnalysis(safeStartDate, safeEndDate, planner ?? 'all', hierarchyFilters);
@@ -156,8 +159,8 @@ export const temporalService = {
       )) {
         return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
       }
-      const { data, error } = await supabase
-        .rpc('get_temporal_analysis_asof', {
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase.rpc('get_temporal_analysis_asof', {
           start_date: safeStartDate.toISOString().split('T')[0],
           end_date: safeEndDate.toISOString().split('T')[0],
           planner_filter: 'all',
@@ -167,7 +170,9 @@ export const temporalService = {
           include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
           include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
           include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
-        });
+        }),
+        60000 // 60 segundos para análise temporal agregada
+      );
 
       if (error || !data) {
         return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
@@ -204,15 +209,18 @@ export const temporalService = {
       let hasMore = true;
 
       while (hasMore) {
-        const { data, error } = await supabase
-          .from('health_score_history')
-          .select('*')
-          .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
-          .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
-          .neq('planner', '0')
-          .neq('client_name', '0')
-          .range(offset, offset + pageSize - 1)
-          .order('recorded_date', { ascending: true });
+        const { data, error } = await executeQueryWithTimeout(
+          () => supabase
+            .from('health_score_history')
+            .select('*')
+            .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
+            .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
+            .neq('planner', '0')
+            .neq('client_name', '0')
+            .range(offset, offset + pageSize - 1)
+            .order('recorded_date', { ascending: true }),
+          60000 // 60 segundos para queries paginadas
+        );
 
         if (error) throw error;
 
@@ -307,14 +315,17 @@ export const temporalService = {
       let hasMore = true;
 
       while (hasMore) {
-        const { data, error } = await supabase
-          .from('health_score_history')
-          .select('*')
-          .eq('planner', planner)
-          .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
-          .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
-          .range(offset, offset + pageSize - 1)
-          .order('recorded_date', { ascending: true });
+        const { data, error } = await executeQueryWithTimeout(
+          () => supabase
+            .from('health_score_history')
+            .select('*')
+            .eq('planner', planner)
+            .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
+            .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
+            .range(offset, offset + pageSize - 1)
+            .order('recorded_date', { ascending: true }),
+          60000 // 60 segundos para queries paginadas
+        );
         
         if (error) throw error;
 
@@ -481,8 +492,10 @@ export const temporalService = {
   // Forçar registro de histórico para clientes existentes (útil para populacao inicial)
   async backfillHistoryForExistingClients(): Promise<boolean> {
     try {
-      const { data, error } = await supabase
-        .rpc('backfill_health_score_history');
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase.rpc('backfill_health_score_history'),
+        120000 // 120 segundos para backfill (pode demorar muito)
+      );
 
       if (error) {
         console.error('Erro ao popular histórico:', error);
@@ -499,11 +512,14 @@ export const temporalService = {
   // Obter últimos registros por planejador
   async getLatestScoresByPlanner(): Promise<Record<string, number>> {
     try {
-      const { data, error } = await supabase
-        .from('temporal_health_analysis')
-        .select('planner, avg_health_score')
-        .order('recorded_date', { ascending: false })
-        .limit(20); // Últimos registros
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase
+          .from('temporal_health_analysis')
+          .select('planner, avg_health_score')
+          .order('recorded_date', { ascending: false })
+          .limit(20), // Últimos registros
+        30000 // 30 segundos para query simples
+      );
 
       if (error) throw error;
 
@@ -525,11 +541,14 @@ export const temporalService = {
   // Obter histórico de um cliente específico
   async getClientHistory(clientId: string): Promise<HealthScoreHistory[]> {
     try {
-      const { data, error } = await supabase
-        .from('health_score_history')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('recorded_date', { ascending: true });
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase
+          .from('health_score_history')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('recorded_date', { ascending: true }),
+        30000 // 30 segundos para histórico de um cliente
+      );
 
       if (error) throw error;
 

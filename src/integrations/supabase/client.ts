@@ -2,8 +2,25 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://pdlyaqxrkoqbqniercpi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkbHlhcXhya29xYnFuaWVyY3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTIwMTQsImV4cCI6MjA3MzA4ODAxNH0.iOhMYwCMlRnYvNfg6EJqE0imk4Gn7kvK2PwdqlXu70E";
+// Usar variáveis de ambiente (obrigatórias)
+// Configure as variáveis no arquivo .env na raiz do projeto
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Validação: garantir que variáveis de ambiente estão configuradas
+if (!SUPABASE_URL) {
+  throw new Error(
+    '❌ VITE_SUPABASE_URL não configurada. ' +
+    'Crie um arquivo .env na raiz do projeto com: VITE_SUPABASE_URL=https://seu-projeto.supabase.co'
+  );
+}
+
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error(
+    '❌ VITE_SUPABASE_ANON_KEY não configurada. ' +
+    'Crie um arquivo .env na raiz do projeto com: VITE_SUPABASE_ANON_KEY=sua-chave-anon'
+  );
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

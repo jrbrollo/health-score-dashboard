@@ -21,6 +21,7 @@ const Index = () => {
   const [isDarkMode, setIsDarkMode] = useState(true); // Tema escuro como padrão
   const [authFilters, setAuthFilters] = useState<HierarchyFilters | null>(null);
   const [showProfileError, setShowProfileError] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Verificar autenticação
   useEffect(() => {
@@ -147,7 +148,17 @@ const Index = () => {
   const handleBulkImport = async ({ clients: importedClients, sheetDate }: BulkImportPayload) => {
     try {
       console.log('📤 Iniciando importação de', importedClients.length, 'clientes', sheetDate ? `para a data ${sheetDate}` : '');
-      const newClients = await clientService.createMultipleClients(importedClients, { sheetDate });
+      setImportProgress({ current: 0, total: importedClients.length });
+      
+      const newClients = await clientService.createMultipleClients(importedClients, { 
+        sheetDate,
+        onProgress: (current, total) => {
+          setImportProgress({ current, total });
+        }
+      });
+      
+      setImportProgress(null); // Limpar progresso
+      
       if (newClients.length > 0) {
         // Após import/upsert, recarregar do banco para garantir dados atualizados (evita manter versões antigas no estado)
         await loadClients();
@@ -160,6 +171,7 @@ const Index = () => {
       }
     } catch (error: any) {
       console.error('❌ Erro ao importar clientes:', error);
+      setImportProgress(null); // Limpar progresso em caso de erro
       const errorMessage = error?.message || 'Erro desconhecido';
       const errorDetails = error?.details || error?.hint || '';
       toast({

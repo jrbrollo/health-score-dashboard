@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 import { supabase } from '@/lib/supabase';
 import { MIN_HISTORY_DATE } from '@/lib/constants';
+import { executeQueryWithTimeout } from '@/lib/queryUtils';
 import { useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import { Client, BulkImportPayload } from "@/types/client";
 import { toast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 interface BulkImportV3Props {
   onImport: (payload: BulkImportPayload) => void;
   onClose: () => void;
   isDarkMode?: boolean;
+  importProgress?: { current: number; total: number } | null;
 }
 
 type ParsedClientRow = {
@@ -26,7 +29,7 @@ type ParsedClientRow = {
   spousePartnerNorm?: string | null;
 };
 
-export function BulkImportV3({ onImport, onClose, isDarkMode = false }: BulkImportV3Props) {
+export function BulkImportV3({ onImport, onClose, isDarkMode = false, importProgress }: BulkImportV3Props) {
   const [csvData, setCsvData] = useState<string>("");
   const [preview, setPreview] = useState<any[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -41,11 +44,33 @@ export function BulkImportV3({ onImport, onClose, isDarkMode = false }: BulkImpo
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validação de tamanho de arquivo (máximo 10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB em bytes
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "Arquivo muito grande",
+        description: `O arquivo excede o tamanho máximo permitido de 10MB. Tamanho atual: ${(file.size / (1024 * 1024)).toFixed(2)}MB`,
+        variant: "destructive",
+      });
+      // Limpar input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
       setCsvData(text);
       parseCsvV3(text);
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Erro ao ler arquivo",
+        description: "Não foi possível ler o arquivo. Tente novamente.",
+        variant: "destructive",
+      });
     };
     reader.readAsText(file, 'UTF-8'); // Garantir UTF-8
   };
@@ -121,17 +146,50 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
         transformHeader: (h) => h.trim(),
       });
 
-      const { raw: parsedSheetDateRaw, iso: parsedSheetDateIso } = parseSheetDate(parsed.meta?.fields);
-      setSheetDateRaw(parsedSheetDateRaw);
-      setSheetDateIso(parsedSheetDateIso);
-
+      // Validação prévia da estrutura do CSV
       const expected = [
         'Clientes', 'Email', 'Telefone', 'Cônjuge', 'Meses do Fechamento',
         'Planejador', 'Líder em Formação', 'Mediador', 'Gerente',
         'NPS', 'Indicação NPS', 'Inadimplência Parcelas', 'Inadimplência Dias', 'Cross Sell'
       ];
 
+      // Verificar se o CSV tem headers válidos
+      const csvHeaders = parsed.meta?.fields || [];
+      const missingHeaders = expected.filter((expectedHeader) => {
+        // Verificar se o header existe (case-insensitive e com normalização)
+        return !csvHeaders.some((csvHeader) => {
+          const normalizedExpected = expectedHeader.toLowerCase().trim();
+          const normalizedCsv = csvHeader.toLowerCase().trim();
+          return normalizedExpected === normalizedCsv || 
+                 normalizedCsv.includes(normalizedExpected) ||
+                 normalizedExpected.includes(normalizedCsv);
+        });
+      });
+
+      if (missingHeaders.length > 0) {
+        setErrors([
+          `Estrutura do CSV inválida. Colunas obrigatórias ausentes: ${missingHeaders.join(', ')}`,
+          `Colunas encontradas: ${csvHeaders.length > 0 ? csvHeaders.slice(0, 10).join(', ') : 'Nenhuma'}${csvHeaders.length > 10 ? '...' : ''}`,
+          `Colunas esperadas: ${expected.join(', ')}`
+        ]);
+        setWarnings([]);
+        setPreview([]);
+        return;
+      }
+
+      // Verificar se há dados no CSV
       const rows = (parsed.data as any[]).filter(Boolean);
+      if (rows.length === 0) {
+        setErrors(['CSV não contém dados válidos. Verifique se o arquivo não está vazio.']);
+        setWarnings([]);
+        setPreview([]);
+        return;
+      }
+
+      const { raw: parsedSheetDateRaw, iso: parsedSheetDateIso } = parseSheetDate(parsed.meta?.fields);
+      setSheetDateRaw(parsedSheetDateRaw);
+      setSheetDateIso(parsedSheetDateIso);
+
       const newErrors: string[] = [];
       const newWarnings: string[] = [];
       const parsedRows: ParsedClientRow[] = [];
@@ -140,9 +198,24 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const missing = expected.filter((h) => !(h in row));
-        if (missing.length) {
-          newErrors.push(`Linha ${i + 2}: headers ausentes: ${missing.join(', ')}`);
+        // Verificação linha por linha (mais flexível para variações de nome)
+        const missing = expected.filter((h) => {
+          // Verificar se existe exatamente ou com variações
+          const exactMatch = h in row;
+          if (exactMatch) return false;
+          
+          // Tentar encontrar variações do nome
+          const normalizedExpected = h.toLowerCase().trim();
+          return !Object.keys(row).some((key) => {
+            const normalizedKey = key.toLowerCase().trim();
+            return normalizedExpected === normalizedKey || 
+                   normalizedKey.includes(normalizedExpected) ||
+                   normalizedExpected.includes(normalizedKey);
+          });
+        });
+        
+        if (missing.length > 0) {
+          newErrors.push(`Linha ${i + 2}: colunas ausentes ou com nome diferente: ${missing.join(', ')}`);
           continue;
         }
 
@@ -249,17 +322,34 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
       // Validação de data da planilha
       if (parsedSheetDateIso) {
         const sheetDate = new Date(parsedSheetDateIso);
+        sheetDate.setHours(0, 0, 0, 0); // Normalizar para início do dia
+        
         const today = new Date();
         today.setHours(23, 59, 59, 999); // Fim do dia de hoje
         
-        // Verificar se data não é futura
-        if (sheetDate > today) {
-          newErrors.push(`Data da planilha (${parsedSheetDateRaw}) é futura. Verifique a coluna R.`);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        
+        // Data mínima permitida: 30 dias antes de MIN_HISTORY_DATE (para permitir correções)
+        const minAllowedDate = new Date(MIN_HISTORY_DATE);
+        minAllowedDate.setDate(minAllowedDate.getDate() - 30);
+        minAllowedDate.setHours(0, 0, 0, 0);
+        
+        // Verificar se data é futura (mais de 1 dia à frente)
+        if (sheetDate > tomorrow) {
+          newErrors.push(`Data da planilha (${parsedSheetDateRaw}) é muito futura (mais de 1 dia à frente). Verifique a coluna R.`);
         }
         
-        // Verificar se data não é muito antiga (antes da data mínima)
-        if (sheetDate < MIN_HISTORY_DATE) {
-          newErrors.push(`Data da planilha (${parsedSheetDateRaw}) é anterior à data mínima confiável (13/11/2025). Verifique a coluna R.`);
+        // Verificar se data é muito antiga (antes da data mínima permitida)
+        if (sheetDate < minAllowedDate) {
+          const minDateStr = minAllowedDate.toLocaleDateString('pt-BR');
+          newErrors.push(`Data da planilha (${parsedSheetDateRaw}) é muito antiga (anterior a ${minDateStr}). Verifique a coluna R.`);
+        }
+        
+        // Verificar se data é anterior à data mínima confiável (mas dentro da janela de 30 dias)
+        if (sheetDate < MIN_HISTORY_DATE && sheetDate >= minAllowedDate) {
+          warningsWithDate.push(`⚠️ Data da planilha (${parsedSheetDateRaw}) é anterior à data mínima confiável (13/11/2025). Os dados podem não ser totalmente precisos.`);
         }
         
         // Verificar se já existe histórico para esta data (proteção contra reimportação)
@@ -330,11 +420,14 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
     // Verificar se já existe histórico para esta data (proteção contra reimportação)
     if (sheetDateIso) {
       try {
-        const { data: existingHistory, error: historyError } = await supabase
-          .from('health_score_history')
-          .select('recorded_date')
-          .eq('recorded_date', sheetDateIso)
-          .limit(1);
+        const { data: existingHistory, error: historyError } = await executeQueryWithTimeout(
+          () => supabase
+            .from('health_score_history')
+            .select('recorded_date')
+            .eq('recorded_date', sheetDateIso)
+            .limit(1),
+          30000 // 30 segundos para verificação simples
+        );
         
         if (historyError) {
           console.warn('Erro ao verificar histórico existente:', historyError);
@@ -451,6 +544,24 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
                 </ul>
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Progress Bar */}
+          {importProgress && importProgress.total > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                  Importando clientes...
+                </span>
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                  {importProgress.current} / {importProgress.total} ({Math.round((importProgress.current / importProgress.total) * 100)}%)
+                </span>
+              </div>
+              <Progress 
+                value={(importProgress.current / importProgress.total) * 100} 
+                className="h-2"
+              />
+            </div>
           )}
 
           {/* Warnings */}

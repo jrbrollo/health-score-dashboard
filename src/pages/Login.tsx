@@ -67,6 +67,12 @@ export default function Login() {
     }
   };
 
+  // Validação de formato de email
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -74,6 +80,16 @@ export default function Login() {
       toast({
         title: 'Campos obrigatórios',
         description: 'Por favor, preencha email e senha.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validação de formato de email
+    if (!isValidEmail(loginEmail)) {
+      toast({
+        title: 'Email inválido',
+        description: 'Por favor, insira um email válido.',
         variant: 'destructive',
       });
       return;
@@ -97,6 +113,16 @@ export default function Login() {
       toast({
         title: 'Campos obrigatórios',
         description: 'Por favor, preencha todos os campos.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validação de formato de email
+    if (!isValidEmail(signupEmail)) {
+      toast({
+        title: 'Email inválido',
+        description: 'Por favor, insira um email válido.',
         variant: 'destructive',
       });
       return;
@@ -148,6 +174,16 @@ export default function Login() {
       toast({
         title: 'Email obrigatório',
         description: 'Por favor, informe seu email.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validação de formato de email
+    if (!isValidEmail(resetEmail)) {
+      toast({
+        title: 'Email inválido',
+        description: 'Por favor, insira um email válido.',
         variant: 'destructive',
       });
       return;
