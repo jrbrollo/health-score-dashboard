@@ -364,6 +364,8 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                   cy="50%"
                   outerRadius={80}
                   dataKey="value"
+                  labelLine={true}
+                  label={({ value, name }) => `${name}: ${value}`}
                 >
                   {pieChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
