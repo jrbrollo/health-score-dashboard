@@ -112,6 +112,24 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   // Cache de Health Scores calculados
   const healthScoreCache = useRef<Map<string, ReturnType<typeof calculateHealthScore>>>(new Map());
 
+  // Cache para dados calculados (movements, flows, trends)
+  const dataCacheRef = useRef<{
+    clientsHash: string;
+    dateRangeHash: string;
+    movementData: MovementData[];
+    categoryFlows: CategoryFlow[];
+    trendAnalysis: TrendAnalysis | null;
+  }>({
+    clientsHash: '',
+    dateRangeHash: '',
+    movementData: [],
+    categoryFlows: [],
+    trendAnalysis: null
+  });
+
+  // Ref para preservar scroll position
+  const scrollPositionRef = useRef<number>(0);
+
   // Filtrar clientes por planejador
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
@@ -639,6 +657,17 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     }
   };
 
+  // Função para gerar hash dos IDs dos clientes e dateRange (comparação profunda)
+  const generateDataHash = (clientsList: Client[], range: { from: Date; to: Date }): { clientsHash: string; dateRangeHash: string } => {
+    const sortedIds = clientsList
+      .map(c => String(c.id))
+      .sort()
+      .join(',');
+    const clientsHash = `${sortedIds.length}-${selectedPlanner}-${manager}-${mediator}-${leader}-${sortedIds.slice(0, 100)}`;
+    const dateRangeHash = `${range.from.toISOString().split('T')[0]}-${range.to.toISOString().split('T')[0]}`;
+    return { clientsHash, dateRangeHash };
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (filteredClients.length === 0) {
@@ -648,22 +677,60 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         setTrendAnalysis(null);
         return;
       }
+
+      // Gerar hash para comparação
+      const { clientsHash, dateRangeHash } = generateDataHash(filteredClients, dateRange);
       
-      setLoading(true);
-      setLoadingProgress('Iniciando análise...');
+      // Se os dados são os mesmos (mesmo hash), não recarregar
+      if (
+        dataCacheRef.current.clientsHash === clientsHash &&
+        dataCacheRef.current.dateRangeHash === dateRangeHash &&
+        dataCacheRef.current.movementData.length > 0
+      ) {
+        // Dados já estão em cache, apenas restaurar do cache
+        setMovementData(dataCacheRef.current.movementData);
+        setCategoryFlows(dataCacheRef.current.categoryFlows);
+        setTrendAnalysis(dataCacheRef.current.trendAnalysis);
+        setLoading(false);
+        setLoadingProgress('');
+        return;
+      }
+
+      // Preservar scroll position antes de mostrar loading
+      scrollPositionRef.current = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+
+      // Só mostrar loading se realmente não temos dados ainda
+      const hasData = dataCacheRef.current.movementData.length > 0;
+      if (!hasData) {
+        setLoading(true);
+        setLoadingProgress('Iniciando análise...');
+      }
       console.log('🔄 Iniciando carregamento de dados de movimento...');
       
       try {
         // Limpar cache de Health Scores quando mudar o conjunto de clientes
         healthScoreCache.current.clear();
         
-        setLoadingProgress('Calculando movimentos...');
+        if (!hasData) {
+          setLoadingProgress('Calculando movimentos...');
+        }
         const movements = await generateMovementData();
         console.log(`✅ Movimentos calculados: ${movements.length}`);
         
-        setLoadingProgress('Processando fluxos e tendências...');
+        if (!hasData) {
+          setLoadingProgress('Processando fluxos e tendências...');
+        }
         const flows = calculateCategoryFlows(movements, filteredClients);
         const trends = calculateTrendAnalysis(movements, filteredClients);
+        
+        // Atualizar cache
+        dataCacheRef.current = {
+          clientsHash,
+          dateRangeHash,
+          movementData: movements,
+          categoryFlows: flows,
+          trendAnalysis: trends
+        };
         
         setMovementData(movements);
         setCategoryFlows(flows);
@@ -677,11 +744,23 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       } finally {
         setLoading(false);
         setLoadingProgress('');
+
+        // Restaurar scroll position após um pequeno delay para garantir que o DOM foi atualizado
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (scrollPositionRef.current > 0) {
+              window.scrollTo({
+                top: scrollPositionRef.current,
+                behavior: 'instant' as ScrollBehavior
+              });
+            }
+          });
+        });
       }
     };
     
     loadData();
-  }, [filteredClients, dateRange, loadClientHistoryForDate, calculateCategoryFlows, calculateTrendAnalysis]);
+  }, [filteredClients, dateRange, loadClientHistoryForDate, calculateCategoryFlows, calculateTrendAnalysis, selectedPlanner, manager, mediator, leader]);
 
   const getCategoryColor = (category: string) => {
     switch (category) {

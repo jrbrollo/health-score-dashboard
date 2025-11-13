@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -63,6 +63,30 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
   const [loading, setLoading] = useState(true);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+
+  // Cache para evitar recálculos desnecessários
+  const cacheRef = useRef<{
+    clientsHash: string;
+    portfolioData: PortfolioData | null;
+    plannerRiskData: PlannerRiskData[];
+  }>({
+    clientsHash: '',
+    portfolioData: null,
+    plannerRiskData: []
+  });
+
+  // Ref para preservar scroll position
+  const scrollPositionRef = useRef<number>(0);
+
+  // Função para gerar hash dos IDs dos clientes (comparação profunda)
+  const generateClientsHash = (clientsList: Client[]): string => {
+    const sortedIds = clientsList
+      .map(c => String(c.id))
+      .sort()
+      .join(',');
+    const filters = `${selectedPlanner}-${manager}-${mediator}-${leader}`;
+    return `${sortedIds.length}-${filters}-${sortedIds.slice(0, 100)}`; // Limitar tamanho do hash
+  };
 
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
@@ -226,18 +250,54 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
   };
 
   useEffect(() => {
-    setLoading(true);
+    // Gerar hash dos clientes filtrados para comparação
+    const currentHash = generateClientsHash(filteredClients);
     
-    // Simular delay para mostrar loading
-    setTimeout(() => {
-      const metrics = calculatePortfolioMetrics(filteredClients);
-      const riskData = calculatePlannerRiskData(filteredClients);
-      
-      setPortfolioData(metrics);
-      setPlannerRiskData(riskData);
+    // Se os dados são os mesmos (mesmo hash), não recarregar
+    if (cacheRef.current.clientsHash === currentHash && cacheRef.current.portfolioData !== null) {
+      // Dados já estão em cache, apenas restaurar do cache
+      setPortfolioData(cacheRef.current.portfolioData);
+      setPlannerRiskData(cacheRef.current.plannerRiskData);
       setLoading(false);
-    }, 500);
-  }, [filteredClients]);
+      return;
+    }
+
+    // Preservar scroll position antes de mostrar loading
+    scrollPositionRef.current = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+
+    // Só mostrar loading se realmente não temos dados ainda
+    const hasData = cacheRef.current.portfolioData !== null || cacheRef.current.plannerRiskData.length > 0;
+    if (!hasData) {
+      setLoading(true);
+    }
+    
+    // Calcular métricas (sem delay artificial)
+    const metrics = calculatePortfolioMetrics(filteredClients);
+    const riskData = calculatePlannerRiskData(filteredClients);
+    
+    // Atualizar cache
+    cacheRef.current = {
+      clientsHash: currentHash,
+      portfolioData: metrics,
+      plannerRiskData: riskData
+    };
+    
+    setPortfolioData(metrics);
+    setPlannerRiskData(riskData);
+    setLoading(false);
+
+    // Restaurar scroll position após um pequeno delay para garantir que o DOM foi atualizado
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (scrollPositionRef.current > 0) {
+          window.scrollTo({
+            top: scrollPositionRef.current,
+            behavior: 'instant' as ScrollBehavior
+          });
+        }
+      });
+    });
+  }, [filteredClients, selectedPlanner, manager, mediator, leader]);
 
   // Dados para gráficos
   const pieChartData = portfolioData ? [
