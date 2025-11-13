@@ -461,8 +461,13 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                       <Info className="h-3 w-3" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-sm p-4" side="right" align="start">
-                    <div className="space-y-2">
+                  <TooltipContent 
+                    className="max-w-sm p-4 z-[9999] bg-popover border border-border shadow-lg" 
+                    side="right" 
+                    align="start"
+                    style={{ zIndex: 9999 }}
+                  >
+                    <div className="space-y-2 relative z-[9999]">
                       <h4 className="font-semibold text-sm">Tendência (Últimos 7 dias)</h4>
                       <p className="text-xs text-muted-foreground">
                         Mostra a variação percentual do Health Score médio comparado a 7 dias atrás.
@@ -523,8 +528,13 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                       <Info className="h-3 w-3" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-sm p-4" side="right" align="start">
-                    <div className="space-y-2">
+                  <TooltipContent 
+                    className="max-w-sm p-4 z-[9999] bg-popover border border-border shadow-lg" 
+                    side="right" 
+                    align="start"
+                    style={{ zIndex: 9999 }}
+                  >
+                    <div className="space-y-2 relative z-[9999]">
                       <h4 className="font-semibold text-sm">Volatilidade (Desvio Padrão)</h4>
                       <p className="text-xs text-muted-foreground">
                         Mede a dispersão dos Health Scores na carteira atual. Calculado como o desvio padrão dos scores individuais.
@@ -534,7 +544,7 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                         <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
                           <li>Valor baixo: Carteira homogênea, clientes com scores similares</li>
                           <li>Valor alto: Carteira heterogênea, grande variação entre clientes</li>
-                          <li>Nem sempre é bom ou ruim - depende do contexto e estratégia</li>
+                          <li>Interpretação depende do contexto e estratégia da carteira</li>
                         </ul>
                       </div>
                     </div>
