@@ -12,11 +12,15 @@ import {
   PieChart,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Info
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Client, Planner } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
+import { temporalService } from '@/services/temporalService';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { subDays } from 'date-fns';
 
 interface PortfolioMetricsProps {
   clients: Client[];
@@ -36,9 +40,8 @@ interface PortfolioData {
     excellent: number;
   };
   trendDirection: {
-    improving: number;
-    declining: number;
-    stable: number;
+    scoreChangePercent: number; // Mudança percentual do score nos últimos 7 dias
+    isImproving: boolean; // true se melhorou, false se piorou
   };
   volatilityIndex: number;
   totalClients: number;
@@ -173,12 +176,18 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
   }, [plannerRiskData, sortColumn, sortDirection]);
 
   // Calcular métricas do portfólio
-  const calculatePortfolioMetrics = (clients: Client[]): PortfolioData => {
+  const calculatePortfolioMetrics = async (
+    clients: Client[],
+    selectedPlanner: Planner | "all",
+    manager: string | "all",
+    mediator: string | "all",
+    leader: string | "all"
+  ): Promise<PortfolioData> => {
     if (clients.length === 0) {
       return {
         portfolioHealthIndex: 0,
         riskConcentration: { critical: 0, warning: 0, stable: 0, excellent: 0 },
-        trendDirection: { improving: 0, declining: 0, stable: 0 },
+        trendDirection: { scoreChangePercent: 0, isImproving: false },
         volatilityIndex: 0,
         totalClients: 0,
         averageScore: 0
@@ -200,17 +209,71 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
       excellent: healthScores.filter(score => score.category === "Ótimo").length
     };
 
-    // Trend Direction (simulado - baseado na distribuição atual)
-    const totalRisk = riskConcentration.critical + riskConcentration.warning;
-    const totalHealthy = riskConcentration.stable + riskConcentration.excellent;
-    
-    const trendDirection = {
-      improving: Math.round((totalHealthy / totalClients) * 100),
-      declining: Math.round((totalRisk / totalClients) * 100),
-      stable: Math.round(((totalClients - totalRisk - totalHealthy) / totalClients) * 100)
-    };
+    // Trend Direction: Comparar score médio atual vs 7 dias atrás
+    let trendDirection = { scoreChangePercent: 0, isImproving: false };
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sevenDaysAgo = subDays(today, 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    // Volatility Index (simulado - baseado no desvio padrão dos scores)
+      // Buscar dados temporais agregados
+      const hierarchyFilters = {
+        managers: manager !== 'all' ? [manager] : undefined,
+        mediators: mediator !== 'all' ? [mediator] : undefined,
+        leaders: leader !== 'all' ? [leader] : undefined
+      };
+
+      const temporalData = selectedPlanner === 'all'
+        ? await temporalService.getAggregatedTemporalAnalysis(sevenDaysAgo, today, hierarchyFilters)
+        : await temporalService.getTemporalAnalysis(sevenDaysAgo, today, selectedPlanner, hierarchyFilters);
+
+      // Encontrar o registro mais recente (hoje ou mais próximo)
+      const latestRecord = temporalData
+        .filter(record => record.recordedDate <= today)
+        .sort((a, b) => b.recordedDate.getTime() - a.recordedDate.getTime())[0];
+
+      // Encontrar o registro de 7 dias atrás (ou mais próximo disponível)
+      const pastRecord = temporalData
+        .filter(record => {
+          const recordDate = record.recordedDate;
+          return recordDate >= sevenDaysAgo && recordDate < today;
+        })
+        .sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime())[0];
+
+      // Usar score atual calculado (mais preciso) e comparar com histórico
+      const currentScore = averageScore;
+      
+      if (pastRecord && pastRecord.avgHealthScore > 0) {
+        // Comparar com dados de 7 dias atrás
+        const pastScore = pastRecord.avgHealthScore;
+        const change = currentScore - pastScore;
+        const changePercent = (change / pastScore) * 100;
+        
+        trendDirection = {
+          scoreChangePercent: Math.round(changePercent * 10) / 10, // Arredondar para 1 casa decimal
+          isImproving: change > 0
+        };
+      } else if (latestRecord && latestRecord.avgHealthScore > 0 && latestRecord.recordedDate < today) {
+        // Se não temos dados de 7 dias atrás, mas temos dados históricos, comparar com o mais recente disponível
+        const pastScore = latestRecord.avgHealthScore;
+        const change = currentScore - pastScore;
+        const changePercent = pastScore > 0 
+          ? (change / pastScore) * 100 
+          : 0;
+        
+        trendDirection = {
+          scoreChangePercent: Math.round(changePercent * 10) / 10,
+          isImproving: change > 0
+        };
+      }
+    } catch (error) {
+      console.warn('Erro ao calcular tendência temporal:', error);
+      // Em caso de erro, usar score atual como fallback
+      trendDirection = { scoreChangePercent: 0, isImproving: false };
+    }
+
+    // Volatility Index: Desvio padrão dos scores (cálculo correto)
     const scores = healthScores.map(score => score.score);
     const mean = averageScore;
     const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / totalClients;
@@ -271,32 +334,39 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
       setLoading(true);
     }
     
-    // Calcular métricas (sem delay artificial)
-    const metrics = calculatePortfolioMetrics(filteredClients);
-    const riskData = calculatePlannerRiskData(filteredClients);
-    
-    // Atualizar cache
-    cacheRef.current = {
-      clientsHash: currentHash,
-      portfolioData: metrics,
-      plannerRiskData: riskData
-    };
-    
-    setPortfolioData(metrics);
-    setPlannerRiskData(riskData);
-    setLoading(false);
+    // Calcular métricas (agora é async para buscar dados temporais)
+    (async () => {
+      try {
+        const metrics = await calculatePortfolioMetrics(filteredClients, selectedPlanner, manager, mediator, leader);
+        const riskData = calculatePlannerRiskData(filteredClients);
+        
+        // Atualizar cache
+        cacheRef.current = {
+          clientsHash: currentHash,
+          portfolioData: metrics,
+          plannerRiskData: riskData
+        };
+        
+        setPortfolioData(metrics);
+        setPlannerRiskData(riskData);
+        setLoading(false);
 
-    // Restaurar scroll position após um pequeno delay para garantir que o DOM foi atualizado
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (scrollPositionRef.current > 0) {
-          window.scrollTo({
-            top: scrollPositionRef.current,
-            behavior: 'instant' as ScrollBehavior
+        // Restaurar scroll position após um pequeno delay para garantir que o DOM foi atualizado
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (scrollPositionRef.current > 0) {
+              window.scrollTo({
+                top: scrollPositionRef.current,
+                behavior: 'instant' as ScrollBehavior
+              });
+            }
           });
-        }
-      });
-    });
+        });
+      } catch (error) {
+        console.error('Erro ao calcular métricas do portfólio:', error);
+        setLoading(false);
+      }
+    })();
   }, [filteredClients, selectedPlanner, manager, mediator, leader]);
 
   // Dados para gráficos
@@ -378,28 +448,106 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
 
         <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tendência</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-medium">Tendência</CardTitle>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      aria-label="Informações sobre Tendência"
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm p-4" side="right" align="start">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Tendência (Últimos 7 dias)</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Mostra a variação percentual do Health Score médio comparado a 7 dias atrás.
+                      </p>
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs font-medium mb-2">Como interpretar:</p>
+                        <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                          <li>Valor positivo (verde): Score melhorou nos últimos 7 dias</li>
+                          <li>Valor negativo (vermelho): Score piorou nos últimos 7 dias</li>
+                          <li>Comparação baseada em dados históricos reais do sistema</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
+            {portfolioData?.trendDirection.isImproving ? (
+              <TrendingUp className="h-4 w-4 text-green-500" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-red-500" />
+            )}
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              {portfolioData?.trendDirection.improving || 0}%
+            <div className={`text-2xl font-bold ${
+              portfolioData?.trendDirection.isImproving 
+                ? 'text-green-600 dark:text-green-400' 
+                : portfolioData?.trendDirection.scoreChangePercent < 0
+                ? 'text-red-600 dark:text-red-400'
+                : isDarkMode ? 'text-white' : 'text-gray-900'
+            }`}>
+              {portfolioData?.trendDirection.scoreChangePercent !== undefined
+                ? `${portfolioData.trendDirection.scoreChangePercent > 0 ? '+' : ''}${portfolioData.trendDirection.scoreChangePercent}%`
+                : '0%'}
             </div>
             <p className="text-xs text-muted-foreground">
-              Clientes melhorando
+              {portfolioData?.trendDirection.isImproving 
+                ? 'Score melhorou' 
+                : portfolioData?.trendDirection.scoreChangePercent < 0
+                ? 'Score piorou'
+                : 'Sem mudança'}
             </p>
           </CardContent>
         </Card>
 
         <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Volatilidade</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-medium">Volatilidade</CardTitle>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      aria-label="Informações sobre Volatilidade"
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm p-4" side="right" align="start">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Volatilidade (Desvio Padrão)</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Mede a dispersão dos Health Scores na carteira atual. Calculado como o desvio padrão dos scores individuais.
+                      </p>
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs font-medium mb-2">Como interpretar:</p>
+                        <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                          <li>Valor baixo: Carteira homogênea, clientes com scores similares</li>
+                          <li>Valor alto: Carteira heterogênea, grande variação entre clientes</li>
+                          <li>Nem sempre é bom ou ruim - depende do contexto e estratégia</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{portfolioData?.volatilityIndex || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Índice de estabilidade
+              Desvio padrão dos scores
             </p>
           </CardContent>
         </Card>
