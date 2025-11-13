@@ -650,7 +650,10 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                         <div className="flex items-center gap-4">
                           <div className="font-medium">{client.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            {new Date(client.updatedAt).toLocaleDateString('pt-BR')}
+                            {client.lastSeenAt 
+                              ? new Date(client.lastSeenAt).toLocaleDateString('pt-BR')
+                              : new Date(client.updatedAt).toLocaleDateString('pt-BR')
+                            }
                           </div>
                         </div>
                         <div className="flex items-center gap-4">

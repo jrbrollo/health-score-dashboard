@@ -14,12 +14,14 @@ interface DatePickerWithRangeProps {
   };
   onDateChange: (date: { from: Date; to: Date }) => void;
   className?: string;
+  minDate?: Date; // Data mínima permitida
 }
 
 export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
   date,
   onDateChange,
-  className
+  className,
+  minDate
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [tempRange, setTempRange] = useState<{ from?: Date; to?: Date }>({});
@@ -110,6 +112,10 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
             numberOfMonths={2}
             locale={ptBR}
             disabled={(date) => {
+              // Desabilitar datas antes da data mínima (se especificada)
+              if (minDate && date < minDate) {
+                return true;
+              }
               // Se já temos data inicial, desabilita datas antes dela
               if (tempRange.from && !tempRange.to) {
                 return date < tempRange.from;

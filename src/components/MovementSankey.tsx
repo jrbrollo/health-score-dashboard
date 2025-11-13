@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { 
   Waves, 
   TrendingUp, 
@@ -21,6 +22,10 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } f
 import { HealthScoreBadge } from './HealthScoreBadge';
 import { temporalService } from '@/services/temporalService';
 import { HealthScoreHistory } from '@/types/temporal';
+import { format, subDays, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { supabase } from '@/lib/supabase';
+import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
 
 interface MovementSankeyProps {
   clients: Client[];
@@ -61,11 +66,20 @@ interface TrendAnalysis {
   lostClientsList: Client[];
 }
 
+const DEFAULT_DAYS = 30;
+const QUICK_RANGES = [
+  { label: '30 dias', value: 30 },
+  { label: '60 dias', value: 60 },
+  { label: '90 dias', value: 90 },
+  { label: 'Ano atual', value: null }, // Será calculado dinamicamente
+];
+
 const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanner, manager = 'all', mediator = 'all', leader = 'all', isDarkMode = false }) => {
   const [movementData, setMovementData] = useState<MovementData[]>([]);
   const [categoryFlows, setCategoryFlows] = useState<CategoryFlow[]>([]);
   const [trendAnalysis, setTrendAnalysis] = useState<TrendAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState<string>('');
   const [openDrawer, setOpenDrawer] = useState<string | null>(null);
   const [drawerClients, setDrawerClients] = useState<Client[]>([]);
   const [drawerTitle, setDrawerTitle] = useState<string>('');
@@ -78,6 +92,25 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   const [openNetChangeDrawer, setOpenNetChangeDrawer] = useState<string | null>(null);
   const [netChangeDrawerClients, setNetChangeDrawerClients] = useState<Client[]>([]);
   const [netChangeDrawerTitle, setNetChangeDrawerTitle] = useState<string>('');
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const fromDate = startOfDay(subDays(today, DEFAULT_DAYS));
+    // Garantir que data inicial não seja anterior à data mínima confiável
+    const safeFromDate = clampToMinHistoryDate(fromDate);
+    return {
+      from: safeFromDate,
+      to: today
+    };
+  });
+  const [startDateHistory, setStartDateHistory] = useState<Map<string, HealthScoreHistory>>(new Map());
+  const [endDateHistory, setEndDateHistory] = useState<Map<string, HealthScoreHistory>>(new Map());
+  
+  // Cache de histórico para evitar re-buscar os mesmos dados
+  const historyCache = useRef<Map<string, Map<string, HealthScoreHistory>>>(new Map());
+  
+  // Cache de Health Scores calculados
+  const healthScoreCache = useRef<Map<string, ReturnType<typeof calculateHealthScore>>>(new Map());
 
   // Filtrar clientes por planejador
   const filteredClients = useMemo(() => {
@@ -90,95 +123,316 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     });
   }, [clients, selectedPlanner, manager, mediator, leader]);
 
-  // Gerar dados de movimento baseados nos clientes reais
-  const generateMovementData = (): MovementData[] => {
-    const movements: MovementData[] = [];
+  // Buscar histórico de clientes em uma data específica (OTIMIZADO)
+  const loadClientHistoryForDate = useCallback(async (targetDate: Date, clientIds: (string | number)[]): Promise<Map<string, HealthScoreHistory>> => {
+    const historyMap = new Map<string, HealthScoreHistory>();
     
-    // Analisar clientes atuais e simular movimentos baseados em padrões
-    const currentScores = filteredClients.map(client => ({
-      id: client.id,
-      name: client.name,
-      score: calculateHealthScore(client),
-      category: calculateHealthScore(client).category
-    }));
+    if (clientIds.length === 0) return historyMap;
 
-    // Contar clientes por categoria atual
-    const categoryCounts = currentScores.reduce((acc, client) => {
-      acc[client.category] = (acc[client.category] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Simular movimentos baseados na distribuição atual
-    // Para cada movimento, vamos pegar clientes que estão na categoria de destino
-    const movementsData = [
-      { 
-        from: 'Crítico', 
-        to: 'Atenção', 
-        value: Math.max(1, Math.floor((categoryCounts['Crítico'] || 0) * 0.3)),
-        clients: currentScores.filter(c => c.category === 'Crítico').slice(0, 3).map(c => c.name),
-        clientObjects: filteredClients.filter(c => {
-          const score = calculateHealthScore(c);
-          return score.category === 'Atenção';
-        }).slice(0, Math.max(1, Math.floor((categoryCounts['Crítico'] || 0) * 0.3)))
-      },
-      { 
-        from: 'Atenção', 
-        to: 'Estável', 
-        value: Math.max(1, Math.floor((categoryCounts['Atenção'] || 0) * 0.4)),
-        clients: currentScores.filter(c => c.category === 'Atenção').slice(0, 5).map(c => c.name),
-        clientObjects: filteredClients.filter(c => {
-          const score = calculateHealthScore(c);
-          return score.category === 'Estável';
-        }).slice(0, Math.max(1, Math.floor((categoryCounts['Atenção'] || 0) * 0.4)))
-      },
-      { 
-        from: 'Estável', 
-        to: 'Ótimo', 
-        value: Math.max(1, Math.floor((categoryCounts['Estável'] || 0) * 0.3)),
-        clients: currentScores.filter(c => c.category === 'Estável').slice(0, 4).map(c => c.name),
-        clientObjects: filteredClients.filter(c => {
-          const score = calculateHealthScore(c);
-          return score.category === 'Ótimo';
-        }).slice(0, Math.max(1, Math.floor((categoryCounts['Estável'] || 0) * 0.3)))
-      },
-      { 
-        from: 'Ótimo', 
-        to: 'Estável', 
-        value: Math.max(1, Math.floor((categoryCounts['Ótimo'] || 0) * 0.1)),
-        clients: currentScores.filter(c => c.category === 'Ótimo').slice(0, 2).map(c => c.name),
-        clientObjects: filteredClients.filter(c => {
-          const score = calculateHealthScore(c);
-          return score.category === 'Estável';
-        }).slice(0, Math.max(1, Math.floor((categoryCounts['Ótimo'] || 0) * 0.1)))
-      },
-      { 
-        from: 'Estável', 
-        to: 'Atenção', 
-        value: Math.max(1, Math.floor((categoryCounts['Estável'] || 0) * 0.05)),
-        clients: currentScores.filter(c => c.category === 'Estável').slice(0, 1).map(c => c.name),
-        clientObjects: filteredClients.filter(c => {
-          const score = calculateHealthScore(c);
-          return score.category === 'Atenção';
-        }).slice(0, Math.max(1, Math.floor((categoryCounts['Estável'] || 0) * 0.05)))
-      },
-      { 
-        from: 'Atenção', 
-        to: 'Crítico', 
-        value: Math.max(1, Math.floor((categoryCounts['Atenção'] || 0) * 0.1)),
-        clients: currentScores.filter(c => c.category === 'Atenção').slice(0, 1).map(c => c.name),
-        clientObjects: filteredClients.filter(c => {
-          const score = calculateHealthScore(c);
-          return score.category === 'Crítico';
-        }).slice(0, Math.max(1, Math.floor((categoryCounts['Atenção'] || 0) * 0.1)))
+    try {
+      const dateStr = targetDate.toISOString().split('T')[0];
+      const cacheKey = `${dateStr}-${clientIds.length}`;
+      
+      // Verificar cache primeiro
+      if (historyCache.current.has(cacheKey)) {
+        const cached = historyCache.current.get(cacheKey)!;
+        // Verificar se todos os clientIds estão no cache
+        const allCached = clientIds.every(id => cached.has(String(id)));
+        if (allCached) {
+          console.log(`✅ Usando cache para ${clientIds.length} clientes até ${dateStr}`);
+          return cached;
+        }
       }
-    ];
+      
+      // Converter IDs para string para garantir compatibilidade
+      const clientIdsStr = clientIds.map(id => String(id));
+      
+      console.log(`🔍 Buscando histórico para ${clientIdsStr.length} clientes até ${dateStr}...`);
+      setLoadingProgress(`Buscando histórico para ${clientIdsStr.length} clientes...`);
+      
+      // OTIMIZAÇÃO: Usar query mais eficiente - buscar apenas o registro mais recente por cliente
+      // Em vez de buscar tudo e filtrar, usar DISTINCT ON ou subquery
+      const allRecords: any[] = [];
+      const batchSize = 500;
+      const totalBatches = Math.ceil(clientIdsStr.length / batchSize);
+      
+      // Processar em lotes paralelos (limitado a 3 simultâneos para não sobrecarregar)
+      const maxConcurrent = 3;
+      for (let i = 0; i < clientIdsStr.length; i += batchSize * maxConcurrent) {
+        const batches: Promise<any>[] = [];
+        
+        for (let j = 0; j < maxConcurrent && (i + j * batchSize) < clientIdsStr.length; j++) {
+          const batchStart = i + j * batchSize;
+          const batch = clientIdsStr.slice(batchStart, batchStart + batchSize);
+          
+          if (batch.length === 0) continue;
+          
+          const batchPromise = (async () => {
+            try {
+              // OTIMIZAÇÃO: Buscar apenas campos necessários e limitar resultados
+              // IMPORTANTE: Filtrar apenas dados a partir da data mínima confiável (13/11/2025)
+              const minDateStr = MIN_HISTORY_DATE.toISOString().split('T')[0];
+              const { data, error } = await (supabase as any)
+                .from('health_score_history')
+                .select('id, client_id, recorded_date, client_name, planner, health_score, health_category, nps_score_v3_pillar, referral_pillar, payment_pillar, cross_sell_pillar, tenure_pillar, meeting_engagement, app_usage, payment_status, ecosystem_engagement, nps_score, last_meeting, has_scheduled_meeting, app_usage_status, payment_status_detail, has_referrals, nps_score_detail, ecosystem_usage, created_at')
+                .in('client_id', batch)
+                .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
+                .lte('recorded_date', dateStr)
+                .order('recorded_date', { ascending: false })
+                .limit(10000); // Limite de segurança
+              
+              if (error) {
+                console.error(`Erro ao buscar histórico do lote ${batchStart}-${batchStart + batch.length}:`, error);
+                return [];
+              }
+              
+              return data || [];
+            } catch (err) {
+              console.error(`Erro ao processar lote ${batchStart}-${batchStart + batch.length}:`, err);
+              return [];
+            }
+          })();
+          
+          batches.push(batchPromise);
+        }
+        
+        const results = await Promise.all(batches);
+        results.forEach(data => {
+          if (data && data.length > 0) {
+            allRecords.push(...data);
+          }
+        });
+        
+        // Atualizar progresso
+        const processedBatches = Math.min(Math.ceil((i + batchSize * maxConcurrent) / batchSize), totalBatches);
+        setLoadingProgress(`Processando histórico... ${processedBatches}/${totalBatches} lotes`);
+      }
+      
+      console.log(`✅ Encontrados ${allRecords.length} registros históricos`);
 
-    return movementsData.filter(movement => movement.value > 0);
+      // OTIMIZAÇÃO: Processar mais eficientemente - usar Map direto
+      const latestByClient = new Map<string, HealthScoreHistory>();
+      const recordsByClient = new Map<string, any>();
+      
+      // Agrupar e pegar apenas o mais recente de cada cliente em uma única passada
+      allRecords.forEach((record: any) => {
+        const clientId = String(record.client_id);
+        const recordDate = new Date(record.recorded_date);
+        recordDate.setHours(0, 0, 0, 0);
+        
+        // Filtrar apenas registros até a data alvo
+        if (recordDate > targetDate) return;
+        
+        const existing = recordsByClient.get(clientId);
+        if (!existing) {
+          recordsByClient.set(clientId, record);
+        } else {
+          // Comparar datas e manter apenas o mais recente
+          const existingDate = new Date(existing.recorded_date).getTime();
+          const currentDate = recordDate.getTime();
+          if (currentDate > existingDate) {
+            recordsByClient.set(clientId, record);
+          }
+        }
+      });
+      
+      // Converter para HealthScoreHistory
+      recordsByClient.forEach((record, clientId) => {
+        latestByClient.set(clientId, databaseToHealthScoreHistory(record));
+      });
+
+      // Salvar no cache
+      historyCache.current.set(cacheKey, latestByClient);
+      
+      // Limitar tamanho do cache (manter apenas últimos 10)
+      if (historyCache.current.size > 10) {
+        const firstKey = historyCache.current.keys().next().value;
+        historyCache.current.delete(firstKey);
+      }
+
+      console.log(`✅ Processados ${latestByClient.size} clientes com histórico`);
+      return latestByClient;
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      return historyMap;
+    }
+  }, []);
+
+  // Função auxiliar para converter dados do banco
+  const databaseToHealthScoreHistory = (dbData: any): HealthScoreHistory => {
+    const parseDate = (value: any) => {
+      if (!value) return new Date();
+      if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+      const text = value.toString();
+      const isoDate = text.includes('T') ? text.split('T')[0] : text;
+      const [yearStr, monthStr, dayStr] = isoDate.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      const day = Number(dayStr);
+      if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+        return new Date(year, month - 1, day);
+      }
+      return new Date();
+    };
+
+    return {
+      id: dbData.id,
+      clientId: dbData.client_id,
+      recordedDate: parseDate(dbData.recorded_date),
+      clientName: dbData.client_name,
+      planner: dbData.planner,
+      healthScore: dbData.health_score,
+      healthCategory: dbData.health_category,
+      breakdown: {
+        nps: dbData.nps_score_v3_pillar ?? 0,
+        referral: dbData.referral_pillar ?? 0,
+        payment: dbData.payment_pillar ?? 0,
+        crossSell: dbData.cross_sell_pillar ?? 0,
+        tenure: dbData.tenure_pillar ?? 0,
+        meetingEngagement: dbData.meeting_engagement ?? 0,
+        appUsage: dbData.app_usage ?? 0,
+        paymentStatus: dbData.payment_status ?? 0,
+        ecosystemEngagement: dbData.ecosystem_engagement ?? 0,
+        npsScore: dbData.nps_score ?? 0,
+      },
+      originalData: {
+        lastMeeting: dbData.last_meeting,
+        hasScheduledMeeting: dbData.has_scheduled_meeting,
+        appUsageStatus: dbData.app_usage_status,
+        paymentStatusDetail: dbData.payment_status_detail,
+        hasReferrals: dbData.has_referrals,
+        npsScoreDetail: dbData.nps_score_detail,
+        ecosystemUsage: dbData.ecosystem_usage,
+      },
+      createdAt: new Date(dbData.created_at || new Date()),
+    };
   };
 
-  // Calcular fluxos por categoria
-  const calculateCategoryFlows = (movements: MovementData[]): CategoryFlow[] => {
+  // Gerar dados de movimento baseados em comparação temporal real
+  const generateMovementData = async (): Promise<MovementData[]> => {
+    const movements: MovementData[] = [];
+    
+    const clientIds = filteredClients.map(c => String(c.id));
+    
+    // Buscar histórico na data inicial
+    const startHistory = await loadClientHistoryForDate(dateRange.from, clientIds);
+    setStartDateHistory(startHistory);
+    
+    // Para a data final, usar estado atual se for hoje, senão buscar histórico
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = dateRange.to;
+    endDate.setHours(0, 0, 0, 0);
+    
+    let endHistory: Map<string, HealthScoreHistory>;
+    
+    if (endDate.getTime() === today.getTime()) {
+      // Se a data final for hoje, usar estado atual dos clientes
+      endHistory = new Map();
+      filteredClients.forEach(client => {
+        const score = calculateHealthScore(client);
+        endHistory.set(String(client.id), {
+          id: '',
+          clientId: String(client.id),
+          recordedDate: today,
+          clientName: client.name,
+          planner: client.planner || '',
+          healthScore: score.score,
+          healthCategory: score.category,
+          breakdown: score.breakdown,
+          originalData: {
+            lastMeeting: client.lastMeeting || null,
+            hasScheduledMeeting: client.hasScheduledMeeting || false,
+            appUsageStatus: client.appUsage || null,
+            paymentStatusDetail: client.paymentStatus || null,
+            hasReferrals: client.hasNpsReferral || false,
+            npsScoreDetail: client.npsScoreV3 ? String(client.npsScoreV3) : null,
+            ecosystemUsage: client.ecosystemUsage || null,
+          },
+          createdAt: new Date(),
+        });
+      });
+    } else {
+      // Buscar histórico na data final
+      endHistory = await loadClientHistoryForDate(endDate, clientIds);
+    }
+    
+    setEndDateHistory(endHistory);
+
+    // Comparar estados e calcular movimentos reais
+    const movementMap = new Map<string, { from: string; to: string; clients: Client[] }>();
+    
+    filteredClients.forEach(client => {
+      const clientIdStr = String(client.id);
+      const startState = startHistory.get(clientIdStr);
+      const endState = endHistory.get(clientIdStr);
+      
+      // Se não tem estado inicial, considerar como novo cliente
+      if (!startState) {
+        if (endState) {
+          const key = `Novo → ${endState.healthCategory}`;
+          if (!movementMap.has(key)) {
+            movementMap.set(key, { from: 'Novo', to: endState.healthCategory, clients: [] });
+          }
+          movementMap.get(key)!.clients.push(client);
+        }
+        return;
+      }
+      
+      // Se não tem estado final, considerar como cliente perdido
+      if (!endState) {
+        const key = `${startState.healthCategory} → Perdido`;
+        if (!movementMap.has(key)) {
+          movementMap.set(key, { from: startState.healthCategory, to: 'Perdido', clients: [] });
+        }
+        movementMap.get(key)!.clients.push(client);
+        return;
+      }
+      
+      // Se mudou de categoria, registrar movimento
+      if (startState.healthCategory !== endState.healthCategory) {
+        const key = `${startState.healthCategory} → ${endState.healthCategory}`;
+        if (!movementMap.has(key)) {
+          movementMap.set(key, { from: startState.healthCategory, to: endState.healthCategory, clients: [] });
+        }
+        movementMap.get(key)!.clients.push(client);
+      }
+    });
+
+    // Converter para formato MovementData
+    const movementsData: MovementData[] = Array.from(movementMap.entries())
+      .filter(([_, movement]) => movement.from !== 'Perdido' && movement.to !== 'Perdido') // Filtrar movimentos para "Perdido" por enquanto
+      .map(([_, movement]) => ({
+        from: movement.from,
+        to: movement.to,
+        value: movement.clients.length,
+        clients: movement.clients.map(c => c.name),
+        clientObjects: movement.clients
+      }))
+      .filter(m => m.value > 0);
+
+    return movementsData;
+  };
+
+  // Calcular fluxos por categoria (OTIMIZADO - memoiza Health Scores)
+  const calculateCategoryFlows = useCallback((movements: MovementData[], allClients: Client[]): CategoryFlow[] => {
     const categories = ['Ótimo', 'Estável', 'Atenção', 'Crítico'];
+    
+    // OTIMIZAÇÃO: Calcular todos os Health Scores uma única vez e cachear
+    const scoresByClientId = new Map<string, ReturnType<typeof calculateHealthScore>>();
+    allClients.forEach(client => {
+      const cacheKey = String(client.id);
+      if (!healthScoreCache.current.has(cacheKey)) {
+        healthScoreCache.current.set(cacheKey, calculateHealthScore(client));
+      }
+      scoresByClientId.set(cacheKey, healthScoreCache.current.get(cacheKey)!);
+    });
+    
+    // Criar mapa de nomes para clientes para busca rápida
+    const clientsByName = new Map<string, Client>();
+    allClients.forEach(client => {
+      clientsByName.set(client.name, client);
+    });
     
     return categories.map(category => {
       const incoming = movements
@@ -191,15 +445,15 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       
       const netChange = incoming - outgoing;
       
-      const clients = [
+      const clientNames = [
         ...movements.filter(m => m.to === category).flatMap(m => m.clients),
         ...movements.filter(m => m.from === category).flatMap(m => m.clients)
       ];
 
-      // Obter objetos de clientes completos para esta categoria
-      const clientObjects = filteredClients.filter(client => {
-        const score = calculateHealthScore(client);
-        return score.category === category;
+      // OTIMIZAÇÃO: Obter objetos de clientes completos para esta categoria usando scores já calculados
+      const clientObjects = allClients.filter(client => {
+        const score = scoresByClientId.get(String(client.id));
+        return score?.category === category;
       });
 
       return {
@@ -207,49 +461,70 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         incoming,
         outgoing,
         netChange,
-        clients: [...new Set(clients)], // Remove duplicatas
+        clients: [...new Set(clientNames)], // Remove duplicatas de nomes
         clientObjects
       };
     });
-  };
+  }, []);
 
-  // Análise de tendências baseada nos dados reais
-  const calculateTrendAnalysis = (): TrendAnalysis => {
-    const clientsWithScores = filteredClients.map(client => ({
-      client,
-      score: calculateHealthScore(client),
-      category: calculateHealthScore(client).category
-    }));
+  // Análise de tendências baseada em comparação temporal real (OTIMIZADO)
+  const calculateTrendAnalysis = useCallback((movements: MovementData[], clients: Client[]): TrendAnalysis => {
+    const categoryRank = { 'Crítico': 1, 'Atenção': 2, 'Estável': 3, 'Ótimo': 4 };
     
-    // Clientes melhorando: estão em categorias boas (Ótimo ou Estável) e podem ter melhorado
-    // Para simplificar, vamos considerar clientes em Ótimo como melhorando
-    const improvingClients = clientsWithScores
-      .filter(c => c.category === 'Ótimo')
-      .map(c => c.client);
+    // Clientes melhorando: mudaram de categoria pior para melhor
+    const improvingClients: Client[] = [];
+    movements.forEach(movement => {
+      const fromRank = categoryRank[movement.from as keyof typeof categoryRank] || 0;
+      const toRank = categoryRank[movement.to as keyof typeof categoryRank] || 0;
+      if (toRank > fromRank) {
+        improvingClients.push(...movement.clientObjects);
+      }
+    });
     
-    // Clientes piorando: estão em categorias ruins (Atenção ou Crítico)
-    const decliningClients = clientsWithScores
-      .filter(c => c.category === 'Atenção' || c.category === 'Crítico')
-      .map(c => c.client);
+    // Clientes piorando: mudaram de categoria melhor para pior
+    const decliningClients: Client[] = [];
+    movements.forEach(movement => {
+      const fromRank = categoryRank[movement.from as keyof typeof categoryRank] || 0;
+      const toRank = categoryRank[movement.to as keyof typeof categoryRank] || 0;
+      if (toRank < fromRank) {
+        decliningClients.push(...movement.clientObjects);
+      }
+    });
     
-    // Clientes estáveis: estão na categoria Estável
-    const stableClients = clientsWithScores
-      .filter(c => c.category === 'Estável')
-      .map(c => c.client);
+    // Clientes estáveis: não mudaram de categoria (não aparecem em movements)
+    const stableClients: Client[] = [];
+    const movedClientIds = new Set(movements.flatMap(m => m.clientObjects.map(c => c.id)));
     
-    // Novos clientes: por enquanto, vamos considerar uma amostra aleatória
-    // Em uma implementação real, você compararia com histórico
-    const newClientsList: Client[] = []; // Será preenchido quando tivermos histórico
+    // OTIMIZAÇÃO: Usar cache de Health Scores
+    clients.forEach(client => {
+      if (!movedClientIds.has(client.id)) {
+        const cacheKey = String(client.id);
+        if (!healthScoreCache.current.has(cacheKey)) {
+          healthScoreCache.current.set(cacheKey, calculateHealthScore(client));
+        }
+        const score = healthScoreCache.current.get(cacheKey)!;
+        if (score.category === 'Estável') {
+          stableClients.push(client);
+        }
+      }
+    });
     
-    // Clientes perdidos: por enquanto, vazio
-    // Em uma implementação real, você compararia com histórico
+    // Novos clientes: aparecem em movimentos com "Novo" como origem
+    const newClientsList: Client[] = [];
+    movements.forEach(movement => {
+      if (movement.from === 'Novo') {
+        newClientsList.push(...movement.clientObjects);
+      }
+    });
+    
+    // Clientes perdidos: não têm estado final (já filtrado em generateMovementData)
     const lostClientsList: Client[] = [];
     
     return {
       improving: improvingClients.length,
       declining: decliningClients.length,
       stable: stableClients.length,
-      newClients: newClientsList.length || Math.max(1, Math.floor(filteredClients.length * 0.1)),
+      newClients: newClientsList.length,
       lostClients: lostClientsList.length,
       improvingClients,
       decliningClients,
@@ -257,7 +532,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       newClientsList,
       lostClientsList
     };
-  };
+  }, []);
 
   // Função para abrir o drawer com os clientes
   const handleCardClick = (type: 'improving' | 'declining' | 'stable' | 'new' | 'lost') => {
@@ -331,19 +606,48 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   };
 
   useEffect(() => {
-    setLoading(true);
-    
-    setTimeout(() => {
-      const movements = generateMovementData();
-      const flows = calculateCategoryFlows(movements);
-      const trends = calculateTrendAnalysis();
+    const loadData = async () => {
+      if (filteredClients.length === 0) {
+        setLoading(false);
+        setMovementData([]);
+        setCategoryFlows([]);
+        setTrendAnalysis(null);
+        return;
+      }
       
-      setMovementData(movements);
-      setCategoryFlows(flows);
-      setTrendAnalysis(trends);
-      setLoading(false);
-    }, 500);
-  }, [filteredClients]);
+      setLoading(true);
+      setLoadingProgress('Iniciando análise...');
+      console.log('🔄 Iniciando carregamento de dados de movimento...');
+      
+      try {
+        // Limpar cache de Health Scores quando mudar o conjunto de clientes
+        healthScoreCache.current.clear();
+        
+        setLoadingProgress('Calculando movimentos...');
+        const movements = await generateMovementData();
+        console.log(`✅ Movimentos calculados: ${movements.length}`);
+        
+        setLoadingProgress('Processando fluxos e tendências...');
+        const flows = calculateCategoryFlows(movements, filteredClients);
+        const trends = calculateTrendAnalysis(movements, filteredClients);
+        
+        setMovementData(movements);
+        setCategoryFlows(flows);
+        setTrendAnalysis(trends);
+        console.log('✅ Dados de movimento carregados com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados de movimento:', error);
+        setMovementData([]);
+        setCategoryFlows([]);
+        setTrendAnalysis(null);
+      } finally {
+        setLoading(false);
+        setLoadingProgress('');
+      }
+    };
+    
+    loadData();
+  }, [filteredClients, dateRange, loadClientHistoryForDate, calculateCategoryFlows, calculateTrendAnalysis]);
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -377,7 +681,10 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-          <p className="text-gray-500">Carregando análise de movimentos...</p>
+          <p className="text-gray-500 dark:text-gray-400">Carregando análise de movimentos...</p>
+          {loadingProgress && (
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">{loadingProgress}</p>
+          )}
         </div>
       </div>
     );
@@ -397,6 +704,85 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
           </p>
         </div>
       </div>
+
+      {/* Seletor de Período */}
+      <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Período de Análise
+          </CardTitle>
+          <CardDescription>
+            Selecione o período para comparar mudanças de categoria dos clientes
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex-1">
+              <DatePickerWithRange
+                date={dateRange}
+                onDateChange={(range) => {
+                  if (range?.from) {
+                    const from = startOfDay(range.from);
+                    // Garantir que data não seja anterior à data mínima confiável
+                    const safeFrom = clampToMinHistoryDate(from);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const to = range?.to 
+                      ? startOfDay(range.to.getTime() > today.getTime() ? today : range.to)
+                      : startOfDay(safeFrom.getTime() > today.getTime() ? today : safeFrom);
+                    setDateRange({ from: safeFrom, to });
+                  }
+                }}
+                minDate={MIN_HISTORY_DATE}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_RANGES.map((range) => {
+                const handleQuickRange = () => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  if (range.value === null) {
+                    // Ano atual - mas garantir que não seja antes da data mínima
+                    const yearStart = new Date(today.getFullYear(), 0, 1);
+                    const safeYearStart = clampToMinHistoryDate(startOfDay(yearStart));
+                    setDateRange({ from: safeYearStart, to: today });
+                  } else {
+                    const fromDate = startOfDay(subDays(today, range.value));
+                    const safeFromDate = clampToMinHistoryDate(fromDate);
+                    setDateRange({
+                      from: safeFromDate,
+                      to: today
+                    });
+                  }
+                };
+                const isActive = range.value === null 
+                  ? false // Ano atual precisa de lógica mais complexa para verificar
+                  : differenceInCalendarDays(dateRange.to, dateRange.from) === range.value;
+                
+                return (
+                  <Button
+                    key={range.label}
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={handleQuickRange}
+                  >
+                    {range.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="mt-4 text-sm text-muted-foreground">
+            <p>
+              Comparando estado dos clientes de{' '}
+              <span className="font-semibold">{format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })}</span>
+              {' '}até{' '}
+              <span className="font-semibold">{format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}</span>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Análise de Tendências */}
       {trendAnalysis && (

@@ -12,6 +12,7 @@ import { ptBR } from 'date-fns/locale';
 import { Client } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
 import { AnalysisInfoTooltip } from './AnalysisInfoTooltip';
+import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
 
 interface TemporalAnalysisProps {
   isDarkMode?: boolean;
@@ -45,8 +46,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const fromDate = startOfDay(subDays(today, DEFAULT_DAYS));
+    // Garantir que data inicial não seja anterior à data mínima confiável
+    const safeFromDate = clampToMinHistoryDate(fromDate);
     return {
-      from: startOfDay(subDays(today, DEFAULT_DAYS)),
+      from: safeFromDate,
       to: today // Usar apenas a data de hoje, sem hora
     };
   });
@@ -65,8 +69,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   const handleQuickRange = (days: number) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const fromDate = startOfDay(subDays(today, days));
+    // Garantir que data inicial não seja anterior à data mínima confiável
+    const safeFromDate = clampToMinHistoryDate(fromDate);
     setDateRange({
-      from: startOfDay(subDays(today, days)),
+      from: safeFromDate,
       to: today // Não usar endOfDay para evitar incluir horas futuras
     });
   };
@@ -74,13 +81,15 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   const handleDateChange = (range: { from?: Date; to?: Date }) => {
     if (!range?.from) return;
     const from = startOfDay(range.from);
+    // Garantir que data não seja anterior à data mínima confiável
+    const safeFrom = clampToMinHistoryDate(from);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     // Garantir que a data final não seja futura
     const to = range?.to 
       ? startOfDay(range.to.getTime() > today.getTime() ? today : range.to)
-      : startOfDay(range.from.getTime() > today.getTime() ? today : range.from);
-    setDateRange({ from, to });
+      : startOfDay(safeFrom.getTime() > today.getTime() ? today : safeFrom);
+    setDateRange({ from: safeFrom, to });
   };
 
   // Cores para os gráficos
@@ -320,6 +329,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 borderRadius: '8px',
                 color: isDarkMode ? '#f9fafb' : '#111827'
               }}
+              formatter={(value: any) => {
+                const formattedValue = typeof value === 'number' ? value.toFixed(2) : value || 0;
+                return [`${formattedValue}`, 'Score Médio'];
+              }}
+              labelFormatter={(label) => `Data: ${label}`}
             />
             {chartType === 'area' ? (
               <Area
@@ -329,6 +343,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 fill={colors.score}
                 fillOpacity={0.3}
                 strokeWidth={2}
+                name="Score Médio"
               />
             ) : chartType === 'line' ? (
               <Line
@@ -338,9 +353,10 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 strokeWidth={3}
                 dot={{ fill: colors.score, strokeWidth: 2, r: 4 }}
                 activeDot={{ r: 6, stroke: colors.score, strokeWidth: 2 }}
+                name="Score Médio"
               />
             ) : (
-              <Bar dataKey="avgScore" fill={colors.score} />
+              <Bar dataKey="avgScore" fill={colors.score} name="Health Score" />
             )}
           </ChartComponent>
         </ResponsiveContainer>
@@ -368,11 +384,21 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 borderRadius: '8px',
                 color: isDarkMode ? '#f9fafb' : '#111827'
               }}
+              formatter={(value: any, name: string) => {
+                const labels: Record<string, string> = {
+                  excellent: 'Ótimo',
+                  stable: 'Estável',
+                  warning: 'Atenção',
+                  critical: 'Crítico'
+                };
+                return [`${value}`, labels[name] || name];
+              }}
+              labelFormatter={(label) => `Data: ${label}`}
             />
-            <Area type="monotone" dataKey="excellent" stackId="1" stroke={colors.excellent} fill={colors.excellent} />
-            <Area type="monotone" dataKey="stable" stackId="1" stroke={colors.stable} fill={colors.stable} />
-            <Area type="monotone" dataKey="warning" stackId="1" stroke={colors.warning} fill={colors.warning} />
-            <Area type="monotone" dataKey="critical" stackId="1" stroke={colors.critical} fill={colors.critical} />
+            <Area type="monotone" dataKey="excellent" stackId="1" stroke={colors.excellent} fill={colors.excellent} name="Ótimo" />
+            <Area type="monotone" dataKey="stable" stackId="1" stroke={colors.stable} fill={colors.stable} name="Estável" />
+            <Area type="monotone" dataKey="warning" stackId="1" stroke={colors.warning} fill={colors.warning} name="Atenção" />
+            <Area type="monotone" dataKey="critical" stackId="1" stroke={colors.critical} fill={colors.critical} name="Crítico" />
           </AreaChart>
         </ResponsiveContainer>
       );
@@ -467,6 +493,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 date={dateRange}
                 onDateChange={handleDateChange}
                 className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
+                minDate={MIN_HISTORY_DATE}
               />
             </div>
 

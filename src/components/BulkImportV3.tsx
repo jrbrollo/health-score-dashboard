@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { supabase } from '@/lib/supabase';
+import { MIN_HISTORY_DATE } from '@/lib/constants';
 import { useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -244,9 +245,33 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
       setSpousesMarked(spousesCount);
       setErrors(newErrors);
       const warningsWithDate = [...newWarnings];
-      if (!parsedSheetDateIso) {
+      
+      // Validação de data da planilha
+      if (parsedSheetDateIso) {
+        const sheetDate = new Date(parsedSheetDateIso);
+        const today = new Date();
+        today.setHours(23, 59, 59, 999); // Fim do dia de hoje
+        
+        // Verificar se data não é futura
+        if (sheetDate > today) {
+          newErrors.push(`Data da planilha (${parsedSheetDateRaw}) é futura. Verifique a coluna R.`);
+        }
+        
+        // Verificar se data não é muito antiga (antes da data mínima)
+        if (sheetDate < MIN_HISTORY_DATE) {
+          newErrors.push(`Data da planilha (${parsedSheetDateRaw}) é anterior à data mínima confiável (13/11/2025). Verifique a coluna R.`);
+        }
+        
+        // Verificar se já existe histórico para esta data (proteção contra reimportação)
+        // Esta verificação será feita antes do import, apenas avisar aqui
+        const daysDiff = Math.floor((today.getTime() - sheetDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 7) {
+          warningsWithDate.push(`⚠️ A planilha é de ${daysDiff} dias atrás. Certifique-se de que esta é a planilha correta.`);
+        }
+      } else {
         warningsWithDate.push('Não foi possível identificar a data da planilha (coluna R). Usaremos a data atual como fallback.');
       }
+      
       setWarnings(warningsWithDate);
       setPreview(finalClients.slice(0, 10));
       setParsedClients(finalClients);
@@ -283,7 +308,7 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
     }
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (parsedClients.length === 0) {
       toast({
         title: "Nenhum dado para importar",
@@ -300,6 +325,38 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
         variant: "destructive",
       });
       return;
+    }
+
+    // Verificar se já existe histórico para esta data (proteção contra reimportação)
+    if (sheetDateIso) {
+      try {
+        const { data: existingHistory, error: historyError } = await supabase
+          .from('health_score_history')
+          .select('recorded_date')
+          .eq('recorded_date', sheetDateIso)
+          .limit(1);
+        
+        if (historyError) {
+          console.warn('Erro ao verificar histórico existente:', historyError);
+        } else if (existingHistory && existingHistory.length > 0) {
+          // Já existe histórico para esta data
+          const confirmMessage = `⚠️ Já existe histórico registrado para a data ${sheetDateRaw || sheetDateIso}.\n\n` +
+            `Se você continuar, os dados históricos desta data serão atualizados.\n\n` +
+            `Deseja continuar mesmo assim?`;
+          
+          if (!window.confirm(confirmMessage)) {
+            toast({
+              title: "Importação cancelada",
+              description: "A importação foi cancelada para evitar sobrescrever dados existentes.",
+              variant: "default",
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao verificar histórico:', err);
+        // Continuar mesmo com erro na verificação
+      }
     }
 
     const allData = parsedClients.map(client => ({ ...client }));

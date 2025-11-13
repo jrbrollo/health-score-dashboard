@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { HealthScoreHistory, TemporalAnalysis, TrendAnalysis, PeriodComparison } from '@/types/temporal';
 import { Planner } from '@/types/client';
+import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const averageFromRecords = (records: any[], selector: (record: any) => number | null | undefined) => {
@@ -105,11 +106,15 @@ export const temporalService = {
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
+      // Garantir que datas não sejam anteriores à data mínima confiável
+      const safeStartDate = clampToMinHistoryDate(startDate);
+      const safeEndDate = clampToMinHistoryDate(endDate);
+      
       // Tenta RPC as-of; se não existir (404), volta para view antiga
       const { data, error } = await supabase
         .rpc('get_temporal_analysis_asof', {
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
+          start_date: safeStartDate.toISOString().split('T')[0],
+          end_date: safeEndDate.toISOString().split('T')[0],
           planner_filter: planner ?? 'all',
           managers: hierarchyFilters?.managers ?? null,
           mediators: hierarchyFilters?.mediators ?? null,
@@ -120,13 +125,15 @@ export const temporalService = {
         });
 
       if (error || !data) {
-        return this.calculatePlannerAnalysis(startDate, endDate, planner ?? 'all', hierarchyFilters);
+        return this.calculatePlannerAnalysis(safeStartDate, safeEndDate, planner ?? 'all', hierarchyFilters);
       }
 
       return data.map(databaseToTemporalAnalysis);
     } catch (error) {
       console.error('Erro no getTemporalAnalysis:', error);
-      return this.calculatePlannerAnalysis(startDate, endDate, planner ?? 'all', hierarchyFilters);
+      const safeStartDate = clampToMinHistoryDate(startDate);
+      const safeEndDate = clampToMinHistoryDate(endDate);
+      return this.calculatePlannerAnalysis(safeStartDate, safeEndDate, planner ?? 'all', hierarchyFilters);
     }
   },
 
@@ -137,18 +144,22 @@ export const temporalService = {
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
+      // Garantir que datas não sejam anteriores à data mínima confiável
+      const safeStartDate = clampToMinHistoryDate(startDate);
+      const safeEndDate = clampToMinHistoryDate(endDate);
+      
       // Se houver filtros hierárquicos, calcular manualmente a partir do histórico
       if (hierarchyFilters && (
         (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) ||
         (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) ||
         (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0)
       )) {
-        return this.calculateAggregatedAnalysis(startDate, endDate, hierarchyFilters);
+        return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
       }
       const { data, error } = await supabase
         .rpc('get_temporal_analysis_asof', {
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
+          start_date: safeStartDate.toISOString().split('T')[0],
+          end_date: safeEndDate.toISOString().split('T')[0],
           planner_filter: 'all',
           managers: hierarchyFilters?.managers ?? null,
           mediators: hierarchyFilters?.mediators ?? null,
@@ -159,7 +170,7 @@ export const temporalService = {
         });
 
       if (error || !data) {
-        return this.calculateAggregatedAnalysis(startDate, endDate, hierarchyFilters);
+        return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
       }
 
       return data.map((item: any) => ({
@@ -169,7 +180,9 @@ export const temporalService = {
     } catch (error) {
       console.error('Erro no getAggregatedTemporalAnalysis:', error);
       // Fallback: agregar manualmente
-      return this.calculateAggregatedAnalysis(startDate, endDate);
+      const safeStartDate = clampToMinHistoryDate(startDate);
+      const safeEndDate = clampToMinHistoryDate(endDate);
+      return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate);
     }
   },
 
@@ -180,6 +193,10 @@ export const temporalService = {
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
     try {
+      // Garantir que datas não sejam anteriores à data mínima confiável
+      const safeStartDate = clampToMinHistoryDate(startDate);
+      const safeEndDate = clampToMinHistoryDate(endDate);
+      
       // Buscar dados com paginação para evitar timeout
       let allData: any[] = [];
       let offset = 0;
@@ -190,8 +207,8 @@ export const temporalService = {
         const { data, error } = await supabase
           .from('health_score_history')
           .select('*')
-          .gte('recorded_date', startDate.toISOString().split('T')[0])
-          .lte('recorded_date', endDate.toISOString().split('T')[0])
+          .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
+          .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
           .neq('planner', '0')
           .neq('client_name', '0')
           .range(offset, offset + pageSize - 1)
@@ -274,8 +291,12 @@ export const temporalService = {
     planner: Planner | "all",
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
+    // Garantir que datas não sejam anteriores à data mínima confiável
+    const safeStartDate = clampToMinHistoryDate(startDate);
+    const safeEndDate = clampToMinHistoryDate(endDate);
+    
     if (!planner || planner === 'all') {
-      return this.calculateAggregatedAnalysis(startDate, endDate, hierarchyFilters);
+      return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
     }
 
     try {
@@ -290,8 +311,8 @@ export const temporalService = {
           .from('health_score_history')
           .select('*')
           .eq('planner', planner)
-          .gte('recorded_date', startDate.toISOString().split('T')[0])
-          .lte('recorded_date', endDate.toISOString().split('T')[0])
+          .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
+          .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
           .range(offset, offset + pageSize - 1)
           .order('recorded_date', { ascending: true });
         

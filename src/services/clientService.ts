@@ -127,6 +127,11 @@ export const clientService = {
       return allRows.map(databaseToClient)
     } catch (error) {
       console.error('Erro no getAllClients:', error)
+      // MELHORADO: Log mais detalhado para debug, mas ainda retorna array vazio
+      // para não quebrar a aplicação (comportamento mantido por segurança)
+      if (error instanceof Error) {
+        console.error('Detalhes do erro:', error.message, error.stack)
+      }
       return []
     }
   },
@@ -226,16 +231,19 @@ export const clientService = {
       const allInserted: Client[] = []
       const importedIdentityKeys: string[] = []
 
-      // Derivar data do snapshot (importDate) do lado do app, se existir no CSV futuro
-      // Por ora, usa a data atual como fallback
-      const seenAt = new Date().toISOString()
+      // IMPORTANTE: Usar data da planilha para last_seen_at e histórico
+      // Converter data da planilha para TIMESTAMPTZ (início do dia)
       const importDate = (options?.sheetDate && /^\d{4}-\d{2}-\d{2}$/.test(options.sheetDate))
         ? options.sheetDate
-        : seenAt.slice(0,10)
+        : new Date().toISOString().slice(0, 10)
+      
+      // seenAt deve usar a data da planilha (início do dia), não a data atual
+      const seenAt = importDate ? `${importDate}T00:00:00.000Z` : new Date().toISOString()
+      
       if (!options?.sheetDate) {
         console.log('⚠️ Data da planilha não informada, usando data atual como referência do import:', importDate)
       } else {
-        console.log('📅 Data da planilha informada:', options.sheetDate, '→ import_date enviado:', importDate)
+        console.log('📅 Data da planilha informada:', options.sheetDate, '→ import_date:', importDate, '→ seen_at:', seenAt)
       }
 
       for (let i = 0; i < clientsData.length; i += BATCH_SIZE) {
