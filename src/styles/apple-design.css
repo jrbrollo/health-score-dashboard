@@ -1,0 +1,294 @@
+/* Apple/iOS Design System for Health Score Dashboard */
+
+/* ============================================
+   VARIABLES - iOS COLOR PALETTE
+   ============================================ */
+:root {
+  --ios-green: #34C759;
+  --ios-blue: #007AFF;
+  --ios-orange: #FF9500;
+  --ios-red: #FF3B30;
+  --ios-gray: #8E8E93;
+  
+  /* Glassmorphism backgrounds */
+  --glass-bg-dark: rgba(255, 255, 255, 0.05);
+  --glass-bg-light: rgba(255, 255, 255, 0.8);
+  --glass-border-dark: rgba(255, 255, 255, 0.1);
+  --glass-border-light: rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   TYPOGRAPHY - APPLE SYSTEM FONTS
+   ============================================ */
+.apple-font {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+.apple-section-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  line-height: 1.6;
+}
+
+.apple-metric-number {
+  font-size: 56px;
+  font-weight: 300;
+  letter-spacing: -2px;
+  line-height: 1.2;
+}
+
+.apple-label {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.9;
+  line-height: 1.6;
+}
+
+.apple-description {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.85;
+  line-height: 1.6;
+}
+
+/* ============================================
+   GLASSMORPHISM CARDS
+   ============================================ */
+.apple-glass-card {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border-dark);
+  border-radius: 20px;
+  padding: 32px;
+  background: var(--glass-bg-dark);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.apple-glass-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 
+    0 12px 48px 0 rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Light mode glassmorphism */
+.apple-glass-card-light {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border-light);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+}
+
+.apple-glass-card-light:hover {
+  box-shadow: 
+    0 12px 48px 0 rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+}
+
+/* ============================================
+   COLOR VARIANTS WITH GRADIENTS
+   ============================================ */
+.apple-card-green {
+  background: linear-gradient(135deg, 
+    rgba(52, 199, 89, 0.1) 0%, 
+    rgba(52, 199, 89, 0.05) 100%
+  );
+}
+
+.apple-card-blue {
+  background: linear-gradient(135deg, 
+    rgba(0, 122, 255, 0.1) 0%, 
+    rgba(0, 122, 255, 0.05) 100%
+  );
+}
+
+.apple-card-orange {
+  background: linear-gradient(135deg, 
+    rgba(255, 149, 0, 0.1) 0%, 
+    rgba(255, 149, 0, 0.05) 100%
+  );
+}
+
+.apple-card-red {
+  background: linear-gradient(135deg, 
+    rgba(255, 59, 48, 0.1) 0%, 
+    rgba(255, 59, 48, 0.05) 100%
+  );
+}
+
+.apple-card-gray {
+  background: linear-gradient(135deg, 
+    rgba(142, 142, 147, 0.1) 0%, 
+    rgba(142, 142, 147, 0.05) 100%
+  );
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.apple-fade-in {
+  animation: fadeSlideUp 0.6s ease-out;
+  animation-fill-mode: both;
+}
+
+.apple-delay-1 { animation-delay: 0.1s; }
+.apple-delay-2 { animation-delay: 0.2s; }
+.apple-delay-3 { animation-delay: 0.3s; }
+.apple-delay-4 { animation-delay: 0.4s; }
+.apple-delay-5 { animation-delay: 0.5s; }
+.apple-delay-6 { animation-delay: 0.6s; }
+
+/* ============================================
+   BADGES & PILLS
+   ============================================ */
+.apple-badge {
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.apple-badge:hover {
+  transform: scale(1.02);
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+.apple-button {
+  border-radius: 14px;
+  padding: 12px 24px;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.apple-button:hover {
+  transform: scale(1.02);
+}
+
+/* ============================================
+   INPUTS & DROPDOWNS
+   ============================================ */
+.apple-input {
+  border-radius: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--glass-border-dark);
+  background: var(--glass-bg-dark);
+  backdrop-filter: blur(20px);
+  transition: all 0.2s ease;
+}
+
+.apple-input:focus {
+  outline: none;
+  border-color: var(--ios-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+/* ============================================
+   BACKGROUND GRADIENTS
+   ============================================ */
+.apple-bg-gradient-dark {
+  background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+}
+
+.apple-bg-gradient-dark-radial {
+  background: radial-gradient(ellipse at top, #1a1a1a 0%, #0a0a0a 100%);
+}
+
+/* ============================================
+   LAYOUT UTILITIES
+   ============================================ */
+.apple-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 48px;
+}
+
+/* Override Card component padding when using apple-glass-card */
+.apple-glass-card > * {
+  padding: 0 !important;
+}
+
+/* Padding padrão pode ser sobrescrito por inline styles */
+.apple-glass-card {
+  padding: 32px;
+}
+
+.apple-grid-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 64px;
+  width: 100%;
+}
+
+/* Garantir que os cards sejam menores e fiquem na mesma linha */
+.apple-grid-metrics > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Responsividade - manter todos na mesma linha sempre */
+@media (max-width: 1200px) {
+  .apple-grid-metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .apple-grid-metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+.apple-card-aspect {
+  aspect-ratio: 1.2 / 1;
+}
+
+/* ============================================
+   ICONS
+   ============================================ */
+.apple-icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.5px;
+}
+
+/* ============================================
+   SPACING
+   ============================================ */
+.apple-section-spacing {
+  margin-top: 64px;
+}
+
+.apple-card-gap {
+  gap: 24px;
+}
+
+.apple-card-padding {
+  padding: 32px;
+}
+

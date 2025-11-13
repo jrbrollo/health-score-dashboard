@@ -241,7 +241,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Movement Sankey Diagram
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mt-1">

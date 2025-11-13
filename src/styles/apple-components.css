@@ -1,0 +1,809 @@
+/* Apple/iOS Design System - Componentes Específicos */
+
+/* ============================================
+   VARIÁVEIS DE CORES POR CATEGORIA
+   ============================================ */
+:root {
+  /* Status Health Score */
+  --color-otimo: #34C759;
+  --color-otimo-rgb: 52, 199, 89;
+  
+  --color-estavel: #007AFF;
+  --color-estavel-rgb: 0, 122, 255;
+  
+  --color-atencao: #FF9500;
+  --color-atencao-rgb: 255, 149, 0;
+  
+  --color-critico: #FF3B30;
+  --color-critico-rgb: 255, 59, 48;
+  
+  /* Tendências */
+  --color-melhorando: #34C759;
+  --color-piorando: #FF3B30;
+  --color-novos: #5AC8FA;
+  --color-perdidos: #FF2D55;
+  
+  /* Neutros */
+  --color-gray: #8E8E93;
+  --color-gray-rgb: 142, 142, 147;
+}
+
+/* ============================================
+   1. CARDS DE INSIGHTS/RECOMENDAÇÕES
+   ============================================ */
+.insight-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 24px;
+  border-left: 3px solid var(--accent-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.insight-card:hover {
+  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.08);
+  border-left-width: 4px;
+}
+
+.insight-card.positive {
+  border-left-color: var(--color-otimo);
+}
+
+.insight-card.negative {
+  border-left-color: var(--color-critico);
+}
+
+.insight-card.neutral {
+  border-left-color: var(--color-estavel);
+}
+
+.insight-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, 
+    rgba(var(--color-rgb), 0.2), 
+    rgba(var(--color-rgb), 0.1)
+  );
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.points-badge {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+/* ============================================
+   2. GRÁFICOS E VISUALIZAÇÕES
+   ============================================ */
+.chart-container {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chart-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
+  line-height: 1.6;
+}
+
+.chart-subtitle {
+  font-size: 14px;
+  opacity: 0.6;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* Tooltip dos gráficos */
+.chart-tooltip {
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Configurações Recharts */
+.recharts-wrapper {
+  animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recharts-line {
+  stroke-width: 3px;
+}
+
+.recharts-dot {
+  r: 4px;
+}
+
+.recharts-dot:hover {
+  r: 6px;
+}
+
+.recharts-bar {
+  rx: 8;
+  ry: 8;
+}
+
+.recharts-pie-sector {
+  stroke-width: 0;
+}
+
+/* ============================================
+   3. BARRAS DE PROGRESSO
+   ============================================ */
+.progress-bar-container {
+  margin-bottom: 20px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 8px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, 
+    var(--color) 0%, 
+    var(--color-light) 100%
+  );
+}
+
+.percentage-badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+/* ============================================
+   4. TABELAS
+   ============================================ */
+.data-table {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.table-header {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 16px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+}
+
+.table-row {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease;
+}
+
+.table-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+/* Estilos para tabela HTML tradicional */
+.table-header-row {
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-header-cell {
+  padding: 16px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.table-header-cell.sortable {
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.table-header-cell.sortable:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.table-cell {
+  padding: 20px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.2s ease;
+}
+
+tbody tr:last-child .table-cell {
+  border-bottom: none;
+}
+
+/* Centralizar badges nas células */
+.table-cell .metric-badge {
+  margin: 0 auto;
+}
+
+.table-cell .percentage-badge {
+  margin: 0 auto;
+  display: inline-block;
+}
+
+.metric-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--color);
+  background: rgba(var(--color-rgb), 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color);
+}
+
+/* ============================================
+   5. ABAS DE NAVEGAÇÃO (Tabs)
+   ============================================ */
+.tab-navigation {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  padding: 6px !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  margin-bottom: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.tab-button {
+  padding: 12px 16px !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: normal !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 44px !important;
+  height: auto !important;
+  flex: 1 !important;
+  text-align: center !important;
+}
+
+.tab-button:hover {
+  color: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.tab-button[data-state="active"],
+.tab-button.active {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ============================================
+   6. FILTROS E CONTROLES
+   ============================================ */
+.filter-group {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-bottom: 8px;
+  display: block;
+  line-height: 1.6;
+}
+
+.select-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: white;
+  font-size: 14px;
+  min-width: 180px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.select-input:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.select-input:focus {
+  outline: none;
+  border-color: #007AFF;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.date-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all 0.2s ease;
+}
+
+.date-input:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #007AFF;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+/* ============================================
+   7. CARDS DE MÉTRICA COM ÍCONES
+   ============================================ */
+.metric-summary-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+  will-change: transform;
+}
+
+.metric-summary-card:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.metric-icon-container {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg,
+    rgba(var(--color-rgb), 0.2),
+    rgba(var(--color-rgb), 0.1)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.metric-label {
+  font-size: 13px;
+  opacity: 0.7;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* ============================================
+   8. LISTA DE FLUXOS
+   ============================================ */
+.flow-list-item {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+  will-change: transform;
+}
+
+.flow-list-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(4px);
+}
+
+.flow-categories {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.category-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(var(--color-rgb), 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+}
+
+.category-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color);
+}
+
+.flow-arrow {
+  opacity: 0.5;
+  font-size: 18px;
+}
+
+.flow-count {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+/* ============================================
+   9. SEÇÕES COLAPSÁVEIS/EXPANSÍVEIS
+   ============================================ */
+.collapsible-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.section-header {
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.section-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 1.6;
+}
+
+.expand-icon {
+  transition: transform 0.3s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.section-content {
+  padding: 0 24px 24px 24px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   10. CARDS DE TENDÊNCIA - EQUAL HEIGHT COLUMNS
+   ============================================ */
+
+/* Container principal da análise de tendência */
+.trend-analysis-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 48px;
+  max-width: 100%;
+}
+
+/* Limitar largura dos cards para ficarem menores */
+.trend-analysis-container .chart-container {
+  max-width: 100%;
+}
+
+/* Cards de tendência agora usam a mesma estrutura dos cards de Portfolio Metrics */
+/* Usam apple-grid-metrics e trend-card (definidos em outros lugares) */
+
+.trend-value {
+  font-size: 36px; /* Mesmo tamanho dos cards da Visão Geral */
+  font-weight: 300;
+  letter-spacing: -1px;
+  margin-bottom: 8px;
+  color: var(--trend-color);
+  line-height: 1.2;
+}
+
+.trend-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 12px;
+  background: rgba(var(--color-rgb), 0.15);
+  border-radius: 8px;
+  margin-top: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.trend-label {
+  font-size: 12px; /* Mesmo tamanho dos labels da Visão Geral */
+  opacity: 0.7;
+  margin-top: 0;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Linha separada para cards de melhorias */
+.improvements-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+/* Card de melhorias/preocupações - seguindo identidade visual dos outros cards */
+.improvements-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.improvements-card:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.3);
+}
+
+.improvements-card.positive {
+  border-left: 3px solid #34C759;
+}
+
+.improvements-card.negative {
+  border-left: 3px solid #FF3B30;
+}
+
+.improvements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(var(--color-rgb), 0.2);
+  color: var(--color);
+  border: 1px solid rgba(var(--color-rgb), 0.3);
+  backdrop-filter: blur(10px);
+}
+
+/* ============================================
+   ANIMAÇÕES GLOBAIS
+   ============================================ */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+  }
+  to { 
+    opacity: 1; 
+  }
+}
+
+.page-content {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1); 
+  }
+  50% { 
+    transform: scale(1.05); 
+  }
+}
+
+.metric-value.updating {
+  animation: pulse 0.5s ease;
+}
+
+@keyframes shimmer {
+  0% { 
+    background-position: -1000px 0; 
+  }
+  100% { 
+    background-position: 1000px 0; 
+  }
+}
+
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 8px;
+}
+
+/* ============================================
+   RESPONSIVIDADE
+   ============================================ */
+/* Desktop: 1440px+ */
+@media (min-width: 1440px) {
+  .metrics-grid { 
+    grid-template-columns: repeat(6, 1fr); 
+  }
+  .chart-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+  }
+}
+
+/* Laptop: 1024px - 1439px */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .metrics-grid { 
+    grid-template-columns: repeat(3, 1fr); 
+  }
+  .chart-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+  }
+}
+
+/* Tablet: 768px - 1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .metrics-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+  }
+  .chart-grid { 
+    grid-template-columns: 1fr; 
+  }
+  .container-padding { 
+    padding: 32px; 
+  }
+  .card-padding { 
+    padding: 20px; 
+  }
+}
+
+/* Mobile: < 768px */
+@media (max-width: 767px) {
+  .metrics-grid { 
+    grid-template-columns: 1fr; 
+  }
+  .chart-grid { 
+    grid-template-columns: 1fr; 
+  }
+  .container-padding { 
+    padding: 20px; 
+  }
+  .card-padding { 
+    padding: 20px; 
+  }
+  .metric-value { 
+    font-size: 40px; 
+  }
+  .trend-value {
+    font-size: 36px;
+  }
+}
+

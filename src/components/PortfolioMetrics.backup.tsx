@@ -9,10 +9,7 @@ import {
   Shield, 
   Activity,
   BarChart3,
-  PieChart,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown
+  PieChart
 } from 'lucide-react';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Client, Planner } from '@/types/client';
@@ -54,15 +51,10 @@ interface PlannerRiskData {
   total: number;
 }
 
-type SortColumn = 'planner' | 'total' | 'excellent' | 'stable' | 'warning' | 'critical' | 'risk';
-type SortDirection = 'asc' | 'desc' | null;
-
 const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPlanner, manager = 'all', mediator = 'all', leader = 'all', isDarkMode = false }) => {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [plannerRiskData, setPlannerRiskData] = useState<PlannerRiskData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
@@ -73,80 +65,6 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
       return true;
     });
   }, [clients, selectedPlanner, manager, mediator, leader]);
-
-  // Função para ordenar os dados
-  const handleSort = (column: SortColumn) => {
-    if (sortColumn === column) {
-      if (sortDirection === 'asc') {
-        setSortDirection('desc');
-      } else if (sortDirection === 'desc') {
-        setSortColumn(null);
-        setSortDirection(null);
-      } else {
-        setSortDirection('asc');
-      }
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
-
-  // Dados ordenados
-  const sortedRiskData = useMemo(() => {
-    if (!sortColumn || !sortDirection) {
-      return plannerRiskData;
-    }
-
-    const sorted = [...plannerRiskData].sort((a, b) => {
-      let aValue: number | string;
-      let bValue: number | string;
-
-      switch (sortColumn) {
-        case 'planner':
-          aValue = a.planner;
-          bValue = b.planner;
-          break;
-        case 'total':
-          aValue = a.total;
-          bValue = b.total;
-          break;
-        case 'excellent':
-          aValue = a.excellent;
-          bValue = b.excellent;
-          break;
-        case 'stable':
-          aValue = a.stable;
-          bValue = b.stable;
-          break;
-        case 'warning':
-          aValue = a.warning;
-          bValue = b.warning;
-          break;
-        case 'critical':
-          aValue = a.critical;
-          bValue = b.critical;
-          break;
-        case 'risk':
-          aValue = Math.round(((a.critical + a.warning) / a.total) * 100);
-          bValue = Math.round(((b.critical + b.warning) / b.total) * 100);
-          break;
-        default:
-          return 0;
-      }
-
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      } else {
-        return sortDirection === 'asc'
-          ? (aValue as number) - (bValue as number)
-          : (bValue as number) - (aValue as number);
-      }
-    });
-
-    return sorted;
-  }, [plannerRiskData, sortColumn, sortDirection]);
 
   // Calcular métricas do portfólio
   const calculatePortfolioMetrics = (clients: Client[]): PortfolioData => {
@@ -278,7 +196,7 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Portfolio Health Metrics
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -322,7 +240,7 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <div className="text-2xl font-bold text-green-600">
               {portfolioData?.trendDirection.improving || 0}%
             </div>
             <p className="text-xs text-muted-foreground">
@@ -427,108 +345,17 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th 
-                    className="text-left p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('planner')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Planejador
-                      {sortColumn === 'planner' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('total')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Total
-                      {sortColumn === 'total' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('excellent')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Ótimo
-                      {sortColumn === 'excellent' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('stable')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Estável
-                      {sortColumn === 'stable' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('warning')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Atenção
-                      {sortColumn === 'warning' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('critical')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      Crítico
-                      {sortColumn === 'critical' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
-                    onClick={() => handleSort('risk')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      % Risco
-                      {sortColumn === 'risk' ? (
-                        sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
-                        <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
+                  <th className="text-left p-2">Planejador</th>
+                  <th className="text-center p-2">Total</th>
+                  <th className="text-center p-2">Ótimo</th>
+                  <th className="text-center p-2">Estável</th>
+                  <th className="text-center p-2">Atenção</th>
+                  <th className="text-center p-2">Crítico</th>
+                  <th className="text-center p-2">% Risco</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedRiskData.map((data) => {
+                {plannerRiskData.map((data) => {
                   const riskPercentage = Math.round(((data.critical + data.warning) / data.total) * 100);
                   return (
                     <tr key={data.planner} className="border-b hover:bg-background/50">

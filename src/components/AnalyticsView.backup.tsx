@@ -83,7 +83,7 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
       {/* Header */}
       <div className="text-center">
         <div className="flex items-center justify-center gap-2">
-          <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             Análise de Indicadores - {selectedPlanner ? selectedPlanner : "Equipe Filtrada"}
           </h2>
           <AnalysisInfoTooltip

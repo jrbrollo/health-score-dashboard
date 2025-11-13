@@ -14,6 +14,7 @@ import {
 import { Client, Planner } from '@/types/client';
 import PortfolioMetrics from './PortfolioMetrics';
 import MovementSankey from './MovementSankey';
+import AdvancedTrends from './AdvancedTrends';
 import { AnalysisInfoTooltip } from './AnalysisInfoTooltip';
 
 interface AdvancedAnalyticsProps {
@@ -49,6 +50,13 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
       description: 'Fluxo entre categorias',
       icon: Waves,
       component: <MovementSankey clients={clients} selectedPlanner={selectedPlanner} manager={manager} mediator={mediator} leader={leader} isDarkMode={isDarkMode} />
+    },
+    {
+      id: 'trends',
+      title: 'Análise de Tendências',
+      description: 'Padrões temporais avançados',
+      icon: TrendingUp,
+      component: <AdvancedTrends clients={clients} selectedPlanner={selectedPlanner} isDarkMode={isDarkMode} manager={manager} mediator={mediator} leader={leader} />
     }
   ];
 
@@ -57,15 +65,16 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-2">
-          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Análises Avançadas
           </h2>
           <AnalysisInfoTooltip
             title="Análises Avançadas"
-            description="Esta seção oferece análises avançadas e especializadas, incluindo métricas de portfólio e visualização de movimentação entre categorias."
+            description="Esta seção oferece análises avançadas e especializadas, incluindo métricas de portfólio, visualização de movimentação entre categorias e análise de tendências temporais."
             tips={[
               "Use as Métricas de Portfólio para uma visão agregada da saúde da carteira",
               "O Movement Sankey mostra como clientes migram entre categorias ao longo do tempo",
+              "A Análise de Tendências identifica padrões sazonais e previsões",
               "Compare diferentes períodos para entender mudanças de longo prazo",
               "Use os filtros para analisar subconjuntos específicos da carteira"
             ]}
@@ -79,7 +88,7 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
 
       {/* Tabs de Módulos */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {analyticsModules.map((module) => {
             const Icon = module.icon;
             return (

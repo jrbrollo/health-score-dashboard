@@ -396,26 +396,24 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
   }
 
   return (
-    <div className="space-y-16 apple-font">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="apple-section-title">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Análise de Tendências Avançadas
           </h2>
-          <p className="apple-description mt-2">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             Análise preditiva e padrões de evolução do Health Score
             {selectedPlanner !== "all" && ` - ${selectedPlanner}`}
           </p>
         </div>
         
-        <div className="filter-group">
+        <div className="flex gap-2">
           <Button
             variant={timeframe === '7d' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setTimeframe('7d')}
-            className="apple-button"
-            style={{ borderRadius: '12px' }}
           >
             7 dias
           </Button>
@@ -423,8 +421,6 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
             variant={timeframe === '30d' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setTimeframe('30d')}
-            className="apple-button"
-            style={{ borderRadius: '12px' }}
           >
             30 dias
           </Button>
@@ -432,8 +428,6 @@ const AdvancedTrends: React.FC<AdvancedTrendsProps> = ({ clients, selectedPlanne
             variant={timeframe === '90d' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setTimeframe('90d')}
-            className="apple-button"
-            style={{ borderRadius: '12px' }}
           >
             90 dias
           </Button>

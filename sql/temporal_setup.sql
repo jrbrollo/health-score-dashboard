@@ -377,7 +377,10 @@ CREATE POLICY "Enable all operations for health_score_history" ON health_score_h
 FOR ALL USING (true);
 
 -- View para facilitar consultas de análise temporal
-CREATE OR REPLACE VIEW temporal_health_analysis AS
+-- Criada com security_invoker = true para respeitar RLS e permissões do usuário que consulta
+-- No PostgreSQL 15+, isso garante que a view respeite as políticas RLS da tabela subjacente
+CREATE OR REPLACE VIEW temporal_health_analysis 
+WITH (security_invoker = true) AS
 SELECT 
   recorded_date,
   planner,
