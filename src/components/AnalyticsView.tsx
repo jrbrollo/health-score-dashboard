@@ -320,53 +320,6 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
         </Card>
       </div>
 
-      {/* Planner Rankings */}
-      {selectedPlanner === "all" && (
-        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5" />
-              Ranking de Planejadores
-            </CardTitle>
-            <CardDescription>Performance ordenada por Health Score médio</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {analytics.plannerRankings.map((planner, index) => (
-                <div key={planner.planner} className="flex items-center justify-between p-4 rounded-lg border bg-background/50">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      index === 0 ? "bg-health-excellent text-health-excellent-foreground" :
-                      index === 1 ? "bg-health-stable text-health-stable-foreground" :
-                      index === 2 ? "bg-health-warning text-health-warning-foreground" :
-                      "bg-muted text-muted-foreground"
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <div>
-                      <div className="font-medium">{planner.planner}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {planner.clientCount} {planner.clientCount === 1 ? 'cliente' : 'clientes'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-lg font-semibold">{planner.avgScore}</div>
-                      <Progress value={planner.avgScore} className="w-20 h-2" />
-                    </div>
-                    <HealthScoreBadge
-                      category={planner.category as HealthCategory}
-                      score={planner.avgScore}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Action Items */}
       <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
         <CardHeader>
@@ -455,6 +408,82 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
           </div>
         </CardContent>
       </Card>
+
+      {/* Planner Rankings */}
+      {analytics.plannerRankings.length > 0 && (
+        <Card className={`${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
+          <CardHeader>
+            <CardTitle className={`flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <Award className="h-5 w-5" />
+              Ranking de Planejadores
+            </CardTitle>
+            <CardDescription className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+              Performance ordenada por Health Score médio
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {analytics.plannerRankings.map((planner, index) => {
+                const getRankColor = () => {
+                  if (index === 0) return isDarkMode ? 'bg-green-900/50 text-green-300 border-green-700' : 'bg-green-100 text-green-800 border-green-300';
+                  if (index === 1) return isDarkMode ? 'bg-blue-900/50 text-blue-300 border-blue-700' : 'bg-blue-100 text-blue-800 border-blue-300';
+                  if (index === 2) return isDarkMode ? 'bg-amber-900/50 text-amber-300 border-amber-700' : 'bg-amber-100 text-amber-800 border-amber-300';
+                  return isDarkMode ? 'bg-gray-800/50 text-gray-400 border-gray-700' : 'bg-gray-100 text-gray-600 border-gray-300';
+                };
+
+                const getCategoryColor = (category: string) => {
+                  switch (category) {
+                    case "Ótimo": return isDarkMode ? 'text-green-400' : 'text-green-600';
+                    case "Estável": return isDarkMode ? 'text-blue-400' : 'text-blue-600';
+                    case "Atenção": return isDarkMode ? 'text-amber-400' : 'text-amber-600';
+                    case "Crítico": return isDarkMode ? 'text-red-400' : 'text-red-600';
+                    default: return isDarkMode ? 'text-gray-400' : 'text-gray-600';
+                  }
+                };
+
+                return (
+                  <div 
+                    key={planner.planner} 
+                    className={`flex items-center justify-between p-4 rounded-lg border ${isDarkMode ? 'bg-gray-800/30 border-gray-700' : 'bg-white border-gray-200'}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border ${getRankColor()}`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {planner.planner}
+                        </div>
+                        <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {planner.clientCount} {planner.clientCount === 1 ? 'cliente' : 'clientes'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {planner.avgScore}
+                        </div>
+                        <div className="text-xs mt-1">
+                          <span className={getCategoryColor(planner.category)}>{planner.category}</span>
+                        </div>
+                        <Progress 
+                          value={planner.avgScore} 
+                          className={`w-24 h-2 mt-2 ${isDarkMode ? '' : ''}`}
+                        />
+                      </div>
+                      <HealthScoreBadge
+                        category={planner.category as HealthCategory}
+                        score={planner.avgScore}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Drawer de Oportunidades */}
       <Drawer open={!!openOpportunityDrawer} onOpenChange={(open) => !open && setOpenOpportunityDrawer(null)}>

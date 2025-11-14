@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { Client, Planner, BulkImportPayload } from "@/types/client";
 import { Dashboard } from "@/components/Dashboard";
@@ -19,6 +19,7 @@ const Index = () => {
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true); // Tema escuro como padrão
+  const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
   const [authFilters, setAuthFilters] = useState<HierarchyFilters | null>(null);
   const [showProfileError, setShowProfileError] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
@@ -143,6 +144,25 @@ const Index = () => {
 
   const handleCancelForm = () => {
     setShowForm(false);
+  };
+
+  // Função otimizada para trocar tema com loading overlay
+  const handleToggleDarkMode = () => {
+    // Mostrar overlay imediatamente
+    setIsThemeTransitioning(true);
+    
+    // Pequeno delay antes de iniciar a transição para garantir que o overlay apareça
+    setTimeout(() => {
+      // Usar startTransition para marcar como não urgente e agrupar todas as atualizações
+      startTransition(() => {
+        setIsDarkMode(prev => !prev);
+      });
+      
+      // Remover loading após a transição CSS completar
+      setTimeout(() => {
+        setIsThemeTransitioning(false);
+      }, 250); // Tempo suficiente para a transição CSS (150ms) + margem de segurança
+    }, 50); // Pequeno delay para garantir que o overlay apareça primeiro
   };
 
   const handleBulkImport = async ({ clients: importedClients, sheetDate }: BulkImportPayload) => {
@@ -381,26 +401,61 @@ const Index = () => {
 
   if (showClientManager) {
     return (
-      <ClientManager
-        clients={clients}
-        selectedPlanner={selectedPlanner}
-        onBack={handleBackToDashboard}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        authFilters={authFilters}
-      />
+      <>
+        <ClientManager
+          clients={clients}
+          selectedPlanner={selectedPlanner}
+          onBack={handleBackToDashboard}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={handleToggleDarkMode}
+          authFilters={authFilters}
+        />
+        
+        {/* Overlay de loading durante troca de tema */}
+        {isThemeTransitioning && (
+          <div 
+            className="fixed inset-0 z-[9999] bg-black/20 backdrop-blur-sm flex items-center justify-center"
+            style={{ pointerEvents: 'none' }}
+          >
+            <div className={`bg-white dark:bg-gray-800 rounded-lg p-4 shadow-xl flex items-center gap-3 ${isDarkMode ? 'dark' : ''}`}>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-gray-100"></div>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Aplicando tema...
+              </span>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
   return (
-    <Dashboard
-      clients={clients}
-      onBulkImport={handleBulkImport}
-      onManageClients={() => handleManageClients()}
-      isDarkMode={isDarkMode}
-      onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-      authFilters={authFilters}
-    />
+    <>
+      <Dashboard
+        clients={clients}
+        onBulkImport={handleBulkImport}
+        onManageClients={() => handleManageClients()}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={handleToggleDarkMode}
+        authFilters={authFilters}
+        importProgress={importProgress}
+      />
+      
+      {/* Overlay de loading durante troca de tema */}
+      {isThemeTransitioning && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-sm flex items-center justify-center"
+          style={{ pointerEvents: 'none' }}
+        >
+          <div className={`rounded-lg p-4 shadow-xl flex items-center gap-3 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className={`animate-spin rounded-full h-6 w-6 border-b-2 ${isDarkMode ? 'border-gray-100' : 'border-gray-900'}`}></div>
+            <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              Aplicando tema...
+            </span>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

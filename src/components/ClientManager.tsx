@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, memo } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -128,7 +128,8 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
   }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, debouncedSearchTerm, filterCategory, authFilters, profile]);
 
 
-  const getHealthScoreColor = (category: string) => {
+  // Memoizar função de cores para evitar recriação a cada render
+  const getHealthScoreColor = useCallback((category: string) => {
     if (isDarkMode) {
       switch (category) {
         case "Ótimo": return "text-green-300 bg-green-900/30 border border-green-700";
@@ -146,10 +147,131 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
         default: return "text-gray-600 bg-gray-100";
       }
     }
+  }, [isDarkMode]);
+
+  // Memoizar classes CSS baseadas no tema para evitar recálculo
+  const themeClasses = useMemo(() => ({
+    card: isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover',
+    textSecondary: isDarkMode ? 'text-gray-300' : 'text-gray-600',
+    textMuted: isDarkMode ? 'text-gray-400' : 'text-gray-500',
+    bg: isDarkMode ? 'bg-gray-900' : 'bg-white',
+    border: isDarkMode ? '#374151' : '#e5e7eb',
+    text: isDarkMode ? '#f9fafb' : '#111827',
+    line: isDarkMode ? '#9ca3af' : '#6b7280',
+    chartLine: isDarkMode ? '#3b82f6' : '#2563eb',
+  }), [isDarkMode]);
+
+  // Memoizar health scores calculados para evitar recálculo desnecessário
+  const clientHealthScores = useMemo(() => {
+    const scores = new Map<string, ReturnType<typeof calculateHealthScore>>();
+    filteredClients.forEach(client => {
+      scores.set(client.id, calculateHealthScore(client));
+    });
+    return scores;
+  }, [filteredClients]);
+
+  // Componente memoizado para card de cliente - evita re-renderização desnecessária
+  type ThemeClasses = {
+    card: string;
+    textSecondary: string;
+    textMuted: string;
+    bg: string;
+    border: string;
+    text: string;
+    line: string;
+    chartLine: string;
   };
 
+  const ClientCard = memo(({ 
+    client, 
+    healthScore, 
+    onViewDetails,
+    themeClasses,
+    getHealthScoreColor
+  }: { 
+    client: Client; 
+    healthScore: ReturnType<typeof calculateHealthScore>;
+    onViewDetails: (client: Client) => void;
+    themeClasses: ThemeClasses;
+    getHealthScoreColor: (category: string) => string;
+  }) => {
+    return (
+      <Card className={themeClasses.card}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div>
+                <h3 className="text-lg font-semibold">{client.name}</h3>
+                <p className={`text-sm ${themeClasses.textSecondary}`}>
+                  Planejador: {client.planner}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <HealthScoreBadge score={healthScore.score} category={healthScore.category} />
+                <Badge className={getHealthScoreColor(healthScore.category)}>
+                  {healthScore.category}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onViewDetails(client)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Ver Detalhes
+              </Button>
+            </div>
+          </div>
+
+          {/* Informações rápidas - Métricas v3 */}
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div>
+              <span className={themeClasses.textMuted}>NPS Score:</span>
+              <p className="font-medium">
+                {client.npsScoreV3 !== null && client.npsScoreV3 !== undefined 
+                  ? client.npsScoreV3 
+                  : "Não avaliado"}
+              </p>
+            </div>
+            <div>
+              <span className={themeClasses.textMuted}>Tem Indicação:</span>
+              <p className="font-medium">{client.hasNpsReferral ? "Sim" : "Não"}</p>
+            </div>
+            <div>
+              <span className={themeClasses.textMuted}>Inadimplência:</span>
+              <p className="font-medium">
+                {client.overdueInstallments === 0 || !client.overdueInstallments
+                  ? "Em dia"
+                  : `${client.overdueInstallments} parcela${client.overdueInstallments > 1 ? 's' : ''} (${client.overdueDays || 0} dias)`}
+              </p>
+            </div>
+            <div>
+              <span className={themeClasses.textMuted}>Cross Sell:</span>
+              <p className="font-medium">{client.crossSellCount || 0} produto{(client.crossSellCount || 0) !== 1 ? 's' : ''}</p>
+            </div>
+            <div>
+              <span className={themeClasses.textMuted}>Meses Relacionamento:</span>
+              <p className="font-medium">
+                {client.monthsSinceClosing !== null && client.monthsSinceClosing !== undefined
+                  ? `${client.monthsSinceClosing} mês${client.monthsSinceClosing !== 1 ? 'es' : ''}`
+                  : "Não informado"}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  });
+  
+  ClientCard.displayName = 'ClientCard';
+
   return (
-    <div className={`min-h-screen p-6 transition-colors duration-300 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
+    <div 
+      className={`min-h-screen p-6 transition-colors duration-150 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}
+      style={{ willChange: 'background-color, color' }}
+    >
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -175,7 +297,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
         </div>
 
         {/* Filtros */}
-        <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
+        <Card className={themeClasses.card}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />
@@ -424,7 +546,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
         {/* Lista de Clientes */}
         <div className="space-y-4">
           {filteredClients.length === 0 ? (
-            <Card className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
+            <Card className={themeClasses.card}>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Users className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Nenhum cliente encontrado</h3>
@@ -434,95 +556,42 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
               </CardContent>
             </Card>
           ) : (
-            filteredClients.map((client) => {
-              const healthScore = calculateHealthScore(client);
+            <div className="space-y-4">
+              {filteredClients.map((client) => {
+                const healthScore = clientHealthScores.get(client.id) || calculateHealthScore(client);
               
               return (
-                <Card key={client.id} className={`animate-fade-in-up ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{client.name}</h3>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            Planejador: {client.planner}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <HealthScoreBadge score={healthScore.score} category={healthScore.category} />
-                          <Badge className={getHealthScoreColor(healthScore.category)}>
-                            {healthScore.category}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewingClient(client)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver Detalhes
-                        </Button>
-                      </div>
+                  <ClientCard
+                    key={client.id}
+                    client={client}
+                    healthScore={healthScore}
+                    onViewDetails={setViewingClient}
+                    themeClasses={themeClasses}
+                    getHealthScoreColor={getHealthScoreColor}
+                  />
+                );
+              })}
                     </div>
-
-                    {/* Informações rápidas - Métricas v3 */}
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                      <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NPS Score:</span>
-                        <p className="font-medium">
-                          {client.npsScoreV3 !== null && client.npsScoreV3 !== undefined 
-                            ? client.npsScoreV3 
-                            : "Não avaliado"}
-                        </p>
-                      </div>
-                      <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Tem Indicação:</span>
-                        <p className="font-medium">{client.hasNpsReferral ? "Sim" : "Não"}</p>
-                      </div>
-                      <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Inadimplência:</span>
-                        <p className="font-medium">
-                          {client.overdueInstallments === 0 || !client.overdueInstallments
-                            ? "Em dia"
-                            : `${client.overdueInstallments} parcela${client.overdueInstallments > 1 ? 's' : ''} (${client.overdueDays || 0} dias)`}
-                        </p>
-                      </div>
-                      <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Cross Sell:</span>
-                        <p className="font-medium">{client.crossSellCount || 0} produto{(client.crossSellCount || 0) !== 1 ? 's' : ''}</p>
-                      </div>
-                      <div>
-                        <span className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Meses Relacionamento:</span>
-                        <p className="font-medium">
-                          {client.monthsSinceClosing !== null && client.monthsSinceClosing !== undefined
-                            ? `${client.monthsSinceClosing} mês${client.monthsSinceClosing !== 1 ? 'es' : ''}`
-                            : "Não informado"}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
           )}
         </div>
       </div>
 
       {/* Drawer de Detalhes do Cliente */}
       <Drawer open={!!viewingClient} onOpenChange={(open) => !open && setViewingClient(null)}>
-        <DrawerContent className={`max-h-[90vh] ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <DrawerContent className={`max-h-[90vh] ${isDarkMode ? 'gradient-bg-dark' : 'bg-white'}`}>
           {viewingClient && (
             <>
               <DrawerHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <div>
-                    <DrawerTitle className="text-2xl">{viewingClient.name}</DrawerTitle>
-                    <DrawerDescription className="mt-2">
+                    <DrawerTitle className={`text-2xl ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {viewingClient.name}
+                    </DrawerTitle>
+                    <DrawerDescription className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                       Planejador: {viewingClient.planner} • 
                       {viewingClient.manager && ` Gerente: ${viewingClient.manager} •`}
                       {viewingClient.mediator && ` Mediador: ${viewingClient.mediator}`}
+                      {viewingClient.leader && ` • Líder: ${viewingClient.leader}`}
                     </DrawerDescription>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => setViewingClient(null)}>
@@ -531,7 +600,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                 </div>
               </DrawerHeader>
               
-              <div className="overflow-y-auto p-6 space-y-6">
+              <div className={`overflow-y-auto p-6 space-y-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 {/* Score Atual */}
                 <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
                   <CardHeader>
@@ -556,25 +625,25 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                           <div className="space-y-3 mt-4">
                             <h4 className="font-semibold text-sm">Breakdown Detalhado:</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
-                                <span className="text-sm">NPS</span>
-                                <span className="font-semibold">{healthScore.breakdown.nps} pts</span>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>NPS</span>
+                                <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{healthScore.breakdown.nps} pts</span>
                               </div>
-                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
-                                <span className="text-sm">Indicação</span>
-                                <span className="font-semibold">{healthScore.breakdown.referral} pts</span>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Indicação</span>
+                                <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{healthScore.breakdown.referral} pts</span>
                               </div>
-                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
-                                <span className="text-sm">Inadimplência</span>
-                                <span className="font-semibold">{healthScore.breakdown.payment} pts</span>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Inadimplência</span>
+                                <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{healthScore.breakdown.payment} pts</span>
                               </div>
-                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
-                                <span className="text-sm">Cross Sell</span>
-                                <span className="font-semibold">{healthScore.breakdown.crossSell} pts</span>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Cross Sell</span>
+                                <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{healthScore.breakdown.crossSell} pts</span>
                               </div>
-                              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800 md:col-span-2">
-                                <span className="text-sm">Meses Relacionamento</span>
-                                <span className="font-semibold">{healthScore.breakdown.tenure} pts</span>
+                              <div className={`flex items-center justify-between p-3 rounded-lg md:col-span-2 ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-100'}`}>
+                                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Meses Relacionamento</span>
+                                <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{healthScore.breakdown.tenure} pts</span>
                               </div>
                             </div>
                           </div>
@@ -595,11 +664,11 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                   <CardContent>
                     {loadingHistory ? (
                       <div className="flex items-center justify-center h-64">
-                        <p className="text-muted-foreground">Carregando histórico...</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Carregando histórico...</p>
                       </div>
                     ) : clientHistory.length === 0 ? (
                       <div className="flex items-center justify-center h-64">
-                        <p className="text-muted-foreground">Nenhum histórico disponível ainda</p>
+                        <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Nenhum histórico disponível ainda</p>
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height={300}>
@@ -610,35 +679,35 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                             return recordDate >= MIN_HISTORY_DATE;
                           })
                           .map(h => ({
-                            date: h.recordedDate.toLocaleDateString('pt-BR'),
-                            score: h.healthScore,
-                            category: h.healthCategory
-                          }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
+                          date: h.recordedDate.toLocaleDateString('pt-BR'),
+                          score: h.healthScore,
+                          category: h.healthCategory
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={themeClasses.border} />
                           <XAxis 
                             dataKey="date" 
-                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            stroke={themeClasses.line}
                             fontSize={12}
                           />
                           <YAxis 
-                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            stroke={themeClasses.line}
                             fontSize={12}
                             domain={[0, 100]}
                           />
                           <RechartsTooltip 
                             contentStyle={{
-                              backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-                              border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+                              backgroundColor: themeClasses.bg,
+                              border: `1px solid ${themeClasses.border}`,
                               borderRadius: '8px',
-                              color: isDarkMode ? '#f9fafb' : '#111827'
+                              color: themeClasses.text
                             }}
                           />
                           <Line 
                             type="monotone" 
                             dataKey="score" 
-                            stroke={isDarkMode ? '#3b82f6' : '#2563eb'} 
+                            stroke={themeClasses.chartLine} 
                             strokeWidth={2}
-                            dot={{ fill: isDarkMode ? '#3b82f6' : '#2563eb', r: 4 }}
+                            dot={{ fill: themeClasses.chartLine, r: 4 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -654,28 +723,28 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">NPS Score v3:</span>
-                        <p className="font-medium">{viewingClient.npsScoreV3 ?? 'Não informado'}</p>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>NPS Score v3:</span>
+                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{viewingClient.npsScoreV3 ?? 'Não informado'}</p>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Tem Indicação:</span>
-                        <p className="font-medium">{viewingClient.hasNpsReferral ? 'Sim' : 'Não'}</p>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Tem Indicação:</span>
+                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{viewingClient.hasNpsReferral ? 'Sim' : 'Não'}</p>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Parcelas em Atraso:</span>
-                        <p className="font-medium">{viewingClient.overdueInstallments ?? 0}</p>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Parcelas em Atraso:</span>
+                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{viewingClient.overdueInstallments ?? 0}</p>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Dias em Atraso:</span>
-                        <p className="font-medium">{viewingClient.overdueDays ?? 0}</p>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Dias em Atraso:</span>
+                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{viewingClient.overdueDays ?? 0}</p>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Produtos Cross Sell:</span>
-                        <p className="font-medium">{viewingClient.crossSellCount ?? 0}</p>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Produtos Cross Sell:</span>
+                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{viewingClient.crossSellCount ?? 0}</p>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Meses desde Fechamento:</span>
-                        <p className="font-medium">{viewingClient.monthsSinceClosing ?? 'Não informado'}</p>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Meses desde Fechamento:</span>
+                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{viewingClient.monthsSinceClosing ?? 'Não informado'}</p>
                       </div>
                     </div>
                   </CardContent>

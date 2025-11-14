@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -84,6 +84,23 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
   const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
   const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
+
+  // Memoizar classes CSS baseadas no tema para evitar recálculo
+  const themeClasses = useMemo(() => ({
+    card: isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover',
+    textSecondary: isDarkMode ? 'text-gray-300' : 'text-gray-600',
+    textMuted: isDarkMode ? 'text-gray-400' : 'text-gray-500',
+    bg: isDarkMode ? 'bg-gray-900' : 'bg-white',
+    border: isDarkMode ? '#374151' : '#e5e7eb',
+    text: isDarkMode ? '#f9fafb' : '#111827',
+    line: isDarkMode ? '#9ca3af' : '#6b7280',
+    chartLine: isDarkMode ? '#3b82f6' : '#2563eb',
+    excellentCard: isDarkMode ? 'bg-gradient-to-br from-emerald-900/80 to-green-900/80 border-emerald-700/50' : 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200/50',
+    excellentGradient: isDarkMode ? 'from-emerald-500 to-green-600' : 'from-emerald-400 to-green-500',
+    excellentText: isDarkMode ? 'text-emerald-200' : 'text-emerald-800',
+    excellentBg: isDarkMode ? 'bg-emerald-500/25 group-hover:bg-emerald-500/35' : 'bg-emerald-100 group-hover:bg-emerald-200',
+    excellentIcon: isDarkMode ? 'text-emerald-300' : 'text-emerald-700',
+  }), [isDarkMode]);
   const plannerLabel = selectedPlanner ? `👤 ${selectedPlanner}` : "Todos os Planejadores";
   const managerLabel = selectedManager !== "all" ? selectedManager : "Todos os Gerentes";
   const mediatorLabel = selectedMediator !== "all" ? selectedMediator : "Todos os Mediadores";
@@ -336,7 +353,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   }
 
   return (
-    <div className={`min-h-screen p-6 transition-colors duration-300 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
+    <div className={`min-h-screen p-6 transition-colors duration-150 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -649,7 +666,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
             </div>
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-              <Card className={`animate-fade-in-up animate-delay-100 ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
+              <Card className={`animate-fade-in-up animate-delay-100 ${themeClasses.card}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
@@ -662,7 +679,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardContent>
               </Card>
 
-              <Card className={`animate-fade-in-up animate-delay-200 ${isDarkMode ? 'gradient-card-dark card-hover-dark' : 'gradient-card-light card-hover'}`}>
+              <Card className={`animate-fade-in-up animate-delay-200 ${themeClasses.card}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Score Médio</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -679,13 +696,13 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
 
               <Card 
                 onClick={() => handleCategoryCardClick('Ótimo')}
-                className={`animate-fade-in-up animate-delay-300 group relative overflow-hidden transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl cursor-pointer ${isDarkMode ? 'bg-gradient-to-br from-emerald-900/80 to-green-900/80 border-emerald-700/50' : 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200/50'}`}
+                className={`animate-fade-in-up animate-delay-300 group relative overflow-hidden transition-all duration-150 hover:scale-105 shadow-lg hover:shadow-xl cursor-pointer ${themeClasses.excellentCard}`}
               >
-                <div className={`absolute inset-0 bg-gradient-to-r opacity-20 transition-opacity duration-300 group-hover:opacity-30 ${isDarkMode ? 'from-emerald-500 to-green-600' : 'from-emerald-400 to-green-500'}`}></div>
+                <div className={`absolute inset-0 bg-gradient-to-r opacity-20 transition-opacity duration-150 group-hover:opacity-30 ${themeClasses.excellentGradient}`}></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                  <CardTitle className={`text-sm font-bold ${isDarkMode ? 'text-emerald-200' : 'text-emerald-800'}`}>Ótimos</CardTitle>
-                  <div className={`p-2 rounded-lg transition-all duration-300 group-hover:rotate-12 ${isDarkMode ? 'bg-emerald-500/25 group-hover:bg-emerald-500/35' : 'bg-emerald-100 group-hover:bg-emerald-200'}`}>
-                    <Award className={`h-4 w-4 transition-colors duration-300 ${isDarkMode ? 'text-emerald-300' : 'text-emerald-700'}`} />
+                  <CardTitle className={`text-sm font-bold ${themeClasses.excellentText}`}>Ótimos</CardTitle>
+                  <div className={`p-2 rounded-lg transition-all duration-150 group-hover:rotate-12 ${themeClasses.excellentBg}`}>
+                    <Award className={`h-4 w-4 transition-colors duration-150 ${themeClasses.excellentIcon}`} />
                   </div>
                 </CardHeader>
                 <CardContent className="relative z-10">
