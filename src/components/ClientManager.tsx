@@ -445,8 +445,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                         <div>
                           <h3 className="text-lg font-semibold">{client.name}</h3>
                           <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            Planejador: {client.planner} • 
-                            Última atualização: {new Date(client.updatedAt).toLocaleDateString('pt-BR')}
+                            Planejador: {client.planner}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
