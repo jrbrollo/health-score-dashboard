@@ -160,3 +160,5 @@ Antes de fazer deploy, testar:
 **Fase 1 Concluída** ✅  
 **Próxima Fase:** Implementar timeouts e retry logic
 
+
+

@@ -45,6 +45,7 @@ import { Eye, X } from "lucide-react";
 import { temporalService } from "@/services/temporalService";
 import { HealthScoreHistory } from "@/types/temporal";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
+import { MIN_HISTORY_DATE } from "@/lib/constants";
 
 interface DashboardProps {
   clients: Client[];
@@ -258,15 +259,34 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   useEffect(() => {
     if (viewingClient) {
       setLoadingHistory(true);
+      setClientHistory([]); // Reset histórico ao mudar de cliente
       temporalService.getClientHistory(viewingClient.id)
         .then(history => {
-          setClientHistory(history);
+          // Filtrar novamente no frontend para garantir (já filtrado no backend, mas garantia extra)
+          const filteredHistory = (history || []).filter(h => {
+            const recordDate = new Date(h.recordedDate);
+            recordDate.setHours(0, 0, 0, 0);
+            return recordDate >= MIN_HISTORY_DATE;
+          });
+          
+          console.log(`[Dashboard] Histórico para ${viewingClient.name}:`, {
+            total: history?.length || 0,
+            filtrado: filteredHistory.length,
+            minDate: MIN_HISTORY_DATE.toLocaleDateString('pt-BR')
+          });
+          
+          setClientHistory(filteredHistory);
           setLoadingHistory(false);
         })
         .catch(err => {
           console.error('Erro ao carregar histórico:', err);
+          setClientHistory([]); // Garantir array vazio em caso de erro
           setLoadingHistory(false);
         });
+    } else {
+      // Reset quando fechar o drawer
+      setClientHistory([]);
+      setLoadingHistory(false);
     }
   }, [viewingClient]);
 
@@ -1022,11 +1042,17 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={clientHistory.map(h => ({
-                          date: h.recordedDate.toLocaleDateString('pt-BR'),
-                          score: h.healthScore,
-                          category: h.healthCategory
-                        }))}>
+                        <LineChart data={clientHistory
+                          .filter(h => {
+                            const recordDate = new Date(h.recordedDate);
+                            recordDate.setHours(0, 0, 0, 0);
+                            return recordDate >= MIN_HISTORY_DATE;
+                          })
+                          .map(h => ({
+                            date: h.recordedDate.toLocaleDateString('pt-BR'),
+                            score: h.healthScore,
+                            category: h.healthCategory
+                          }))}>
                           <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
                           <XAxis 
                             dataKey="date" 
@@ -1055,6 +1081,41 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                         </LineChart>
                       </ResponsiveContainer>
                     )}
+                  </CardContent>
+                </Card>
+
+                {/* Informações Detalhadas */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle>Informações Detalhadas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">NPS Score v3:</span>
+                        <p className="font-medium">{viewingClient.npsScoreV3 ?? 'Não informado'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tem Indicação:</span>
+                        <p className="font-medium">{viewingClient.hasNpsReferral ? 'Sim' : 'Não'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Parcelas em Atraso:</span>
+                        <p className="font-medium">{viewingClient.overdueInstallments ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Dias em Atraso:</span>
+                        <p className="font-medium">{viewingClient.overdueDays ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Produtos Cross Sell:</span>
+                        <p className="font-medium">{viewingClient.crossSellCount ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Meses desde Fechamento:</span>
+                        <p className="font-medium">{viewingClient.monthsSinceClosing ?? 'Não informado'}</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

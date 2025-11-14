@@ -151,3 +151,5 @@ O código mantém **compatibilidade retroativa**: se as variáveis de ambiente n
 
 **Última atualização:** 2025-01-XX
 
+
+

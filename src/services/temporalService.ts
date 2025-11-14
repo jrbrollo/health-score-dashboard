@@ -211,13 +211,13 @@ export const temporalService = {
       while (hasMore) {
         const { data, error } = await executeQueryWithTimeout(
           () => supabase
-            .from('health_score_history')
-            .select('*')
+          .from('health_score_history')
+          .select('*')
             .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
             .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
-            .neq('planner', '0')
-            .neq('client_name', '0')
-            .range(offset, offset + pageSize - 1)
+          .neq('planner', '0')
+          .neq('client_name', '0')
+          .range(offset, offset + pageSize - 1)
             .order('recorded_date', { ascending: true }),
           60000 // 60 segundos para queries paginadas
         );
@@ -317,12 +317,12 @@ export const temporalService = {
       while (hasMore) {
         const { data, error } = await executeQueryWithTimeout(
           () => supabase
-            .from('health_score_history')
-            .select('*')
-            .eq('planner', planner)
+          .from('health_score_history')
+          .select('*')
+          .eq('planner', planner)
             .gte('recorded_date', safeStartDate.toISOString().split('T')[0])
             .lte('recorded_date', safeEndDate.toISOString().split('T')[0])
-            .range(offset, offset + pageSize - 1)
+          .range(offset, offset + pageSize - 1)
             .order('recorded_date', { ascending: true }),
           60000 // 60 segundos para queries paginadas
         );
@@ -514,9 +514,9 @@ export const temporalService = {
     try {
       const { data, error } = await executeQueryWithTimeout(
         () => supabase
-          .from('temporal_health_analysis')
-          .select('planner, avg_health_score')
-          .order('recorded_date', { ascending: false })
+        .from('temporal_health_analysis')
+        .select('planner, avg_health_score')
+        .order('recorded_date', { ascending: false })
           .limit(20), // Últimos registros
         30000 // 30 segundos para query simples
       );
@@ -541,18 +541,122 @@ export const temporalService = {
   // Obter histórico de um cliente específico
   async getClientHistory(clientId: string): Promise<HealthScoreHistory[]> {
     try {
+      // Filtrar apenas dados a partir da data mínima confiável (13/11/2025)
+      const minDateStr = MIN_HISTORY_DATE.toISOString().split('T')[0];
+      
       const { data, error } = await executeQueryWithTimeout(
         () => supabase
-          .from('health_score_history')
-          .select('*')
-          .eq('client_id', clientId)
-          .order('recorded_date', { ascending: true }),
+        .from('health_score_history')
+        .select('*')
+        .eq('client_id', clientId)
+        .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
+        .order('recorded_date', { ascending: true }),
         30000 // 30 segundos para histórico de um cliente
       );
 
       if (error) throw error;
 
-      return (data || []).map(databaseToHealthScoreHistory);
+      const history = (data || []).map(databaseToHealthScoreHistory);
+      
+      // Se não há histórico e estamos após a data mínima, tentar criar um registro com os dados atuais
+      if (history.length === 0) {
+        console.log(`[temporalService] Cliente ${clientId} sem histórico. Tentando criar automaticamente...`);
+        try {
+          // Buscar dados atuais do cliente para pegar a data do último snapshot
+          const { data: clientData, error: clientError } = await executeQueryWithTimeout(
+            () => supabase
+              .from('clients')
+              .select('id, last_seen_at, is_spouse, name')
+              .eq('id', clientId)
+              .single(),
+            10000 // 10 segundos
+          );
+          
+          if (clientError) {
+            console.warn(`[temporalService] Erro ao buscar cliente ${clientId}:`, clientError);
+            return history;
+          }
+          
+          if (!clientData) {
+            console.warn(`[temporalService] Cliente ${clientId} não encontrado`);
+            return history;
+          }
+          
+          // Usar a data do último snapshot (last_seen_at) ou data atual, o que for maior
+          let recordDate = new Date();
+          if (clientData.last_seen_at) {
+            const lastSeen = new Date(clientData.last_seen_at);
+            lastSeen.setHours(0, 0, 0, 0);
+            // Usar a data do snapshot se for >= data mínima, senão usar data atual
+            if (lastSeen >= MIN_HISTORY_DATE) {
+              recordDate = lastSeen;
+              console.log(`[temporalService] Usando data do snapshot: ${recordDate.toLocaleDateString('pt-BR')}`);
+            } else {
+              recordDate.setHours(0, 0, 0, 0);
+              // Só criar se data atual for >= data mínima
+              if (recordDate < MIN_HISTORY_DATE) {
+                console.warn(`[temporalService] Data do snapshot (${lastSeen.toLocaleDateString('pt-BR')}) e data atual (${recordDate.toLocaleDateString('pt-BR')}) são anteriores à data mínima (${MIN_HISTORY_DATE.toLocaleDateString('pt-BR')})`);
+                return history; // Não criar histórico antes da data mínima
+              }
+              console.log(`[temporalService] Usando data atual: ${recordDate.toLocaleDateString('pt-BR')}`);
+            }
+          } else {
+            recordDate.setHours(0, 0, 0, 0);
+            // Só criar se data atual for >= data mínima
+            if (recordDate < MIN_HISTORY_DATE) {
+              console.warn(`[temporalService] Data atual (${recordDate.toLocaleDateString('pt-BR')}) é anterior à data mínima (${MIN_HISTORY_DATE.toLocaleDateString('pt-BR')})`);
+              return history; // Não criar histórico antes da data mínima
+            }
+            console.log(`[temporalService] Cliente sem last_seen_at, usando data atual: ${recordDate.toLocaleDateString('pt-BR')}`);
+          }
+          
+          // Criar histórico usando a função RPC (agora funciona para cônjuges também)
+          const recordDateStr = recordDate.toISOString().split('T')[0];
+          console.log(`[temporalService] Chamando RPC record_health_score_history_v3 para cliente ${clientId} (cônjuge: ${clientData.is_spouse ? 'sim' : 'não'}) com data ${recordDateStr}`);
+          
+          const { error: createError } = await executeQueryWithTimeout(
+            () => supabase.rpc('record_health_score_history_v3', {
+              p_client_id: clientId,
+              p_recorded_date: recordDateStr
+            }),
+            10000 // 10 segundos
+          );
+          
+          if (createError) {
+            console.error(`[temporalService] Erro ao criar histórico automático para ${clientId}:`, createError);
+            return history;
+          }
+          
+          console.log(`[temporalService] Histórico criado com sucesso. Buscando novamente...`);
+          
+          // Buscar novamente após criar
+          const { data: newData, error: newError } = await executeQueryWithTimeout(
+            () => supabase
+              .from('health_score_history')
+              .select('*')
+              .eq('client_id', clientId)
+              .gte('recorded_date', minDateStr)
+              .order('recorded_date', { ascending: true }),
+            10000
+          );
+          
+          if (newError) {
+            console.error(`[temporalService] Erro ao buscar histórico após criação:`, newError);
+            return history;
+          }
+          
+          if (newData && newData.length > 0) {
+            console.log(`[temporalService] Histórico encontrado após criação: ${newData.length} registro(s)`);
+            return newData.map(databaseToHealthScoreHistory);
+          } else {
+            console.warn(`[temporalService] Histórico criado mas não encontrado na busca (pode ser problema de filtro de data)`);
+          }
+        } catch (createErr) {
+          console.error(`[temporalService] Exceção ao criar histórico automático para ${clientId}:`, createErr);
+        }
+      }
+      
+      return history;
     } catch (error) {
       console.error('Erro ao buscar histórico do cliente:', error);
       return [];

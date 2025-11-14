@@ -232,11 +232,9 @@ BEGIN
     last_seen_at = GREATEST(EXCLUDED.last_seen_at, clients.last_seen_at)
   RETURNING * INTO result;
 
-  -- Registrar health score no histórico (apenas para não-cônjuges)
+  -- Registrar health score no histórico (agora inclui cônjuges também)
   -- IMPORTANTE: Usar p_import_date (data da planilha), não CURRENT_DATE
-  IF result.is_spouse IS NULL OR result.is_spouse = FALSE THEN
-    PERFORM record_health_score_history_v3(result.id, p_import_date);
-  END IF;
+  PERFORM record_health_score_history_v3(result.id, p_import_date);
 
   RETURN result;
 END;

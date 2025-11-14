@@ -72,17 +72,17 @@ function databaseToClient(dbClient: any): Client {
 }
 
 export const clientService = {
-  // Buscar todos os clientes (v3 - filtra cônjuges automaticamente)
+  // Buscar todos os clientes (v3 - inclui cônjuges)
   async getAllClients(): Promise<Client[]> {
     try {
       // Snapshot: buscar apenas clientes com last_seen_at na data mais recente (fonte: planilha do dia)
       // 1) Obter a data do último snapshot
       const { data: lastDateRows, error: lastDateError } = await executeQueryWithTimeout(
         () => supabase
-          .from('clients')
-          .select('last_seen_at')
-          .not('last_seen_at', 'is', null)
-          .order('last_seen_at', { ascending: false })
+        .from('clients')
+        .select('last_seen_at')
+        .not('last_seen_at', 'is', null)
+        .order('last_seen_at', { ascending: false })
           .limit(1),
         30000 // 30 segundos para query simples
       );
@@ -111,10 +111,10 @@ export const clientService = {
           () => query,
           60000 // 60 segundos para queries de paginação
         );
-        if (error) {
+      if (error) {
           console.error('Erro ao buscar snapshot de clientes:', error)
-          throw error
-        }
+        throw error
+      }
 
         pageCount++
         const fetchedCount = data?.length || 0
@@ -156,9 +156,9 @@ export const clientService = {
 
       const { data, error } = await executeQueryWithTimeout(
         () => supabase
-          .from('clients')
-          .insert([dbClient])
-          .select()
+        .from('clients')
+        .insert([dbClient])
+        .select()
           .single(),
         30000 // 30 segundos para insert simples
       );
@@ -218,10 +218,10 @@ export const clientService = {
 
       const { data, error } = await executeQueryWithTimeout(
         () => supabase
-          .from('clients')
-          .update(updateData)
-          .eq('id', clientId)
-          .select()
+        .from('clients')
+        .update(updateData)
+        .eq('id', clientId)
+        .select()
           .single(),
         30000 // 30 segundos para update simples
       );
@@ -243,8 +243,8 @@ export const clientService = {
     try {
       const { error } = await executeQueryWithTimeout(
         () => supabase
-          .from('clients')
-          .delete()
+        .from('clients')
+        .delete()
           .eq('id', clientId),
         30000 // 30 segundos para delete simples
       );
@@ -321,9 +321,9 @@ export const clientService = {
 
         const { data, error } = await executeQueryWithTimeout(
           () => supabase.rpc('bulk_insert_clients_v3', {
-            clients_json: dbBatch,
-            p_import_date: importDate,
-            p_seen_at: seenAt
+          clients_json: dbBatch,
+          p_import_date: importDate,
+          p_seen_at: seenAt
           } as any),
           120000 // 120 segundos para bulk insert (pode demorar mais)
         );

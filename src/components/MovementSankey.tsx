@@ -15,7 +15,7 @@ import {
   Eye,
   X
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Label, LabelList, LineChart, Line, Legend } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Label, LabelList, LineChart, Line, Legend, Tooltip as RechartsTooltip } from 'recharts';
 import { Client, Planner } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from './ui/drawer';
@@ -23,9 +23,9 @@ import { HealthScoreBadge } from './HealthScoreBadge';
 import { temporalService } from '@/services/temporalService';
 import { HealthScoreHistory } from '@/types/temporal';
 import { format, subDays, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
-import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
 
 interface MovementSankeyProps {
   clients: Client[];
@@ -191,15 +191,15 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
               // IMPORTANTE: Filtrar apenas dados a partir da data mínima confiável (13/11/2025)
               const minDateStr = MIN_HISTORY_DATE.toISOString().split('T')[0];
               const { data, error } = await (supabase as any)
-                .from('health_score_history')
+          .from('health_score_history')
                 .select('id, client_id, recorded_date, client_name, planner, health_score, health_category, nps_score_v3_pillar, referral_pillar, payment_pillar, cross_sell_pillar, tenure_pillar, meeting_engagement, app_usage, payment_status, ecosystem_engagement, nps_score, last_meeting, has_scheduled_meeting, app_usage_status, payment_status_detail, has_referrals, nps_score_detail, ecosystem_usage, created_at')
                 .in('client_id', batch)
                 .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
-                .lte('recorded_date', dateStr)
-                .order('recorded_date', { ascending: false })
+          .lte('recorded_date', dateStr)
+          .order('recorded_date', { ascending: false })
                 .limit(10000); // Limite de segurança
-              
-              if (error) {
+        
+        if (error) {
                 console.error(`Erro ao buscar histórico do lote ${batchStart}-${batchStart + batch.length}:`, error);
                 return [];
               }
@@ -216,9 +216,9 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         
         const results = await Promise.all(batches);
         results.forEach(data => {
-          if (data && data.length > 0) {
-            allRecords.push(...data);
-          }
+        if (data && data.length > 0) {
+          allRecords.push(...data);
+        }
         });
         
         // Atualizar progresso
@@ -625,15 +625,21 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   useEffect(() => {
     if (viewingClient) {
       setLoadingHistory(true);
+      setClientHistory([]); // Reset histórico ao mudar de cliente
       temporalService.getClientHistory(viewingClient.id)
         .then(history => {
-          setClientHistory(history);
+          setClientHistory(history || []);
           setLoadingHistory(false);
         })
         .catch(err => {
           console.error('Erro ao carregar histórico:', err);
+          setClientHistory([]); // Garantir array vazio em caso de erro
           setLoadingHistory(false);
         });
+    } else {
+      // Reset quando fechar o drawer
+      setClientHistory([]);
+      setLoadingHistory(false);
     }
   }, [viewingClient]);
 
@@ -677,7 +683,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         setTrendAnalysis(null);
         return;
       }
-
+      
       // Gerar hash para comparação
       const { clientsHash, dateRangeHash } = generateDataHash(filteredClients, dateRange);
       
@@ -702,7 +708,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       // Só mostrar loading se realmente não temos dados ainda
       const hasData = dataCacheRef.current.movementData.length > 0;
       if (!hasData) {
-        setLoading(true);
+      setLoading(true);
         setLoadingProgress('Iniciando análise...');
       }
       console.log('🔄 Iniciando carregamento de dados de movimento...');
@@ -1367,23 +1373,42 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={clientHistory.map(h => ({
-                          date: h.recordedDate.toLocaleDateString('pt-BR'),
-                          score: h.healthScore,
-                          category: h.healthCategory
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis domain={[0, 100]} />
-                          <Tooltip />
-                          <Legend />
+                        <LineChart data={clientHistory
+                          .filter(h => {
+                            const recordDate = new Date(h.recordedDate);
+                            recordDate.setHours(0, 0, 0, 0);
+                            return recordDate >= MIN_HISTORY_DATE;
+                          })
+                          .map(h => ({
+                            date: h.recordedDate.toLocaleDateString('pt-BR'),
+                            score: h.healthScore,
+                            category: h.healthCategory
+                          }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                          />
+                          <YAxis 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                            domain={[0, 100]}
+                          />
+                          <RechartsTooltip 
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+                              border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              color: isDarkMode ? '#f9fafb' : '#111827'
+                            }}
+                          />
                           <Line 
                             type="monotone" 
                             dataKey="score" 
-                            stroke="#8884d8" 
+                            stroke={isDarkMode ? '#3b82f6' : '#2563eb'} 
                             strokeWidth={2}
-                            name="Health Score"
-                            dot={{ r: 4 }}
+                            dot={{ fill: isDarkMode ? '#3b82f6' : '#2563eb', r: 4 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>

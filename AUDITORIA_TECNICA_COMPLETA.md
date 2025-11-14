@@ -596,3 +596,5 @@ CREATE POLICY "Enable all operations for clients" ON clients
 
 **Fim do Relatório de Auditoria Técnica**
 
+
+

@@ -29,7 +29,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { temporalService } from "@/services/temporalService";
 import { HealthScoreHistory } from "@/types/temporal";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+import { MIN_HISTORY_DATE } from "@/lib/constants";
 
 interface ClientManagerProps {
   clients: Client[];
@@ -63,15 +64,21 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
   useEffect(() => {
     if (viewingClient) {
       setLoadingHistory(true);
+      setClientHistory([]); // Reset histórico ao mudar de cliente
       temporalService.getClientHistory(viewingClient.id)
         .then(history => {
-          setClientHistory(history);
+          setClientHistory(history || []);
           setLoadingHistory(false);
         })
         .catch(err => {
           console.error('Erro ao carregar histórico:', err);
+          setClientHistory([]); // Garantir array vazio em caso de erro
           setLoadingHistory(false);
         });
+    } else {
+      // Reset quando fechar o drawer
+      setClientHistory([]);
+      setLoadingHistory(false);
     }
   }, [viewingClient]);
 
@@ -597,23 +604,42 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={clientHistory.map(h => ({
-                          date: h.recordedDate.toLocaleDateString('pt-BR'),
-                          score: h.healthScore,
-                          category: h.healthCategory
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis domain={[0, 100]} />
-                          <Tooltip />
-                          <Legend />
+                        <LineChart data={clientHistory
+                          .filter(h => {
+                            const recordDate = new Date(h.recordedDate);
+                            recordDate.setHours(0, 0, 0, 0);
+                            return recordDate >= MIN_HISTORY_DATE;
+                          })
+                          .map(h => ({
+                            date: h.recordedDate.toLocaleDateString('pt-BR'),
+                            score: h.healthScore,
+                            category: h.healthCategory
+                          }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                          />
+                          <YAxis 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                            domain={[0, 100]}
+                          />
+                          <RechartsTooltip 
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+                              border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              color: isDarkMode ? '#f9fafb' : '#111827'
+                            }}
+                          />
                           <Line 
                             type="monotone" 
                             dataKey="score" 
-                            stroke="#8884d8" 
+                            stroke={isDarkMode ? '#3b82f6' : '#2563eb'} 
                             strokeWidth={2}
-                            name="Health Score"
-                            dot={{ r: 4 }}
+                            dot={{ fill: isDarkMode ? '#3b82f6' : '#2563eb', r: 4 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>

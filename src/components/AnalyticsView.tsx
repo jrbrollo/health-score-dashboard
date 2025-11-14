@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts";
-import { TrendingUp, TrendingDown, Target, Award, AlertTriangle, Users, Lightbulb, BarChart, X } from "lucide-react";
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
+import { TrendingUp, TrendingDown, Target, Award, AlertTriangle, Users, Lightbulb, BarChart, X, Eye } from "lucide-react";
 import { Client, HealthCategory } from "@/types/client";
 import { uniqueById } from "@/lib/filters";
 import { calculateHealthScore, getHealthCategory } from "@/utils/healthScore";
@@ -13,6 +13,9 @@ import { AnalysisInfoTooltip } from "./AnalysisInfoTooltip";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { Button } from "./ui/button";
 import { toast } from "@/hooks/use-toast";
+import { temporalService } from "@/services/temporalService";
+import { HealthScoreHistory } from "@/types/temporal";
+import { MIN_HISTORY_DATE } from "@/lib/constants";
 
 interface AnalyticsViewProps {
   clients: Client[];
@@ -35,6 +38,9 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
   const [openOpportunityDrawer, setOpenOpportunityDrawer] = useState<string | null>(null);
   const [opportunityTitle, setOpportunityTitle] = useState<string>('');
   const [opportunityClients, setOpportunityClients] = useState<OpportunityClient[]>([]);
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
+  const [clientHistory, setClientHistory] = useState<HealthScoreHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
@@ -94,6 +100,48 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
     };
   }, [clients, selectedPlanner]);
 
+  // Carregar histórico quando visualizar cliente
+  useEffect(() => {
+    if (viewingClient) {
+      setLoadingHistory(true);
+      setClientHistory([]); // Reset histórico ao mudar de cliente
+      temporalService.getClientHistory(viewingClient.id)
+        .then(history => {
+          setClientHistory(history || []);
+          setLoadingHistory(false);
+        })
+        .catch(err => {
+          console.error('Erro ao carregar histórico:', err);
+          setClientHistory([]); // Garantir array vazio em caso de erro
+          setLoadingHistory(false);
+        });
+    } else {
+      // Reset quando fechar o drawer
+      setClientHistory([]);
+      setLoadingHistory(false);
+    }
+  }, [viewingClient]);
+
+  const getHealthScoreColor = (category: string) => {
+    if (isDarkMode) {
+      switch (category) {
+        case "Ótimo": return "text-green-300 bg-green-900/30 border border-green-700";
+        case "Estável": return "text-blue-300 bg-blue-900/30 border border-blue-700";
+        case "Atenção": return "text-amber-300 bg-amber-900/30 border border-amber-700";
+        case "Crítico": return "text-red-300 bg-red-900/30 border border-red-700";
+        default: return "text-gray-300 bg-gray-800 border border-gray-700";
+      }
+    } else {
+      switch (category) {
+        case "Ótimo": return "text-green-700 bg-green-50 border border-green-200";
+        case "Estável": return "text-blue-700 bg-blue-50 border border-blue-200";
+        case "Atenção": return "text-amber-700 bg-amber-50 border border-amber-200";
+        case "Crítico": return "text-red-700 bg-red-50 border border-red-200";
+        default: return "text-gray-600 bg-gray-100";
+      }
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -132,7 +180,7 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
             if (type === "negative") return "border-l-4 border-l-red-500";
             return "border-l-4 border-l-blue-500";
           };
-
+          
           const handleInsightClick = () => {
             try {
               const filteredClients = uniqueById(!selectedPlanner ? clients : clients.filter(c => c.planner === selectedPlanner));
@@ -474,6 +522,15 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
                                 </div>
                               )}
                             </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setViewingClient(opp.client)}
+                              className="flex items-center gap-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Ver Detalhes
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -483,6 +540,184 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
               )}
             </div>
           </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Drawer de Detalhes do Cliente */}
+      <Drawer open={!!viewingClient} onOpenChange={(open) => !open && setViewingClient(null)}>
+        <DrawerContent className={`max-h-[90vh] ${isDarkMode ? 'gradient-bg-dark' : 'bg-white'}`}>
+          {viewingClient && (
+            <>
+              <DrawerHeader className="border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DrawerTitle className={`text-2xl ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {viewingClient.name}
+                    </DrawerTitle>
+                    <DrawerDescription className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Planejador: {viewingClient.planner} • 
+                      {viewingClient.manager && ` Gerente: ${viewingClient.manager} •`}
+                      {viewingClient.mediator && ` Mediador: ${viewingClient.mediator}`}
+                    </DrawerDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setViewingClient(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DrawerHeader>
+              
+              <div className={`overflow-y-auto p-6 space-y-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                {/* Score Atual */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Health Score Atual
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const healthScore = calculateHealthScore(viewingClient);
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <HealthScoreBadge score={healthScore.score} category={healthScore.category} />
+                            <Badge className={getHealthScoreColor(healthScore.category)}>
+                              {healthScore.category}
+                            </Badge>
+                          </div>
+                          
+                          {/* Breakdown Visual */}
+                          <div className="space-y-3 mt-4">
+                            <h4 className="font-semibold text-sm">Breakdown Detalhado:</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">NPS</span>
+                                <span className="font-semibold">{healthScore.breakdown.nps} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Indicação</span>
+                                <span className="font-semibold">{healthScore.breakdown.referral} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Inadimplência</span>
+                                <span className="font-semibold">{healthScore.breakdown.payment} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Cross Sell</span>
+                                <span className="font-semibold">{healthScore.breakdown.crossSell} pts</span>
+                              </div>
+                              <div className={`flex items-center justify-between p-3 rounded-lg md:col-span-2 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                <span className="text-sm">Meses Relacionamento</span>
+                                <span className="font-semibold">{healthScore.breakdown.tenure} pts</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico de Evolução Temporal */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle>Evolução do Health Score</CardTitle>
+                    <CardDescription>
+                      Histórico de pontuação ao longo do tempo
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingHistory ? (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-muted-foreground">Carregando histórico...</p>
+                      </div>
+                    ) : clientHistory.length === 0 ? (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-muted-foreground">Nenhum histórico disponível ainda</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={clientHistory
+                          .filter(h => {
+                            const recordDate = new Date(h.recordedDate);
+                            recordDate.setHours(0, 0, 0, 0);
+                            return recordDate >= MIN_HISTORY_DATE;
+                          })
+                          .map(h => ({
+                            date: h.recordedDate.toLocaleDateString('pt-BR'),
+                            score: h.healthScore,
+                            category: h.healthCategory
+                          }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                          />
+                          <YAxis 
+                            stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
+                            fontSize={12}
+                            domain={[0, 100]}
+                          />
+                          <RechartsTooltip 
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+                              border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              color: isDarkMode ? '#f9fafb' : '#111827'
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="score" 
+                            stroke={isDarkMode ? '#3b82f6' : '#2563eb'} 
+                            strokeWidth={2}
+                            dot={{ fill: isDarkMode ? '#3b82f6' : '#2563eb', r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Informações Detalhadas */}
+                <Card className={isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'}>
+                  <CardHeader>
+                    <CardTitle>Informações Detalhadas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">NPS Score v3:</span>
+                        <p className="font-medium">{viewingClient.npsScoreV3 ?? 'Não informado'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tem Indicação:</span>
+                        <p className="font-medium">{viewingClient.hasNpsReferral ? 'Sim' : 'Não'}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Parcelas em Atraso:</span>
+                        <p className="font-medium">{viewingClient.overdueInstallments ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Dias em Atraso:</span>
+                        <p className="font-medium">{viewingClient.overdueDays ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Produtos Cross Sell:</span>
+                        <p className="font-medium">{viewingClient.crossSellCount ?? 0}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Meses desde Fechamento:</span>
+                        <p className="font-medium">{viewingClient.monthsSinceClosing ?? 'Não informado'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
         </DrawerContent>
       </Drawer>
     </div>

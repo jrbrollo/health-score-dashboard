@@ -64,7 +64,7 @@ function calculateNPS(client: Client): number {
   const npsValue = client.npsScoreV3;
   
   if (npsValue === null || npsValue === undefined) {
-    // "Não Encontrou" = neutro (cliente novo ≤6 meses ou cônjuge)
+    // "Não Encontrou" = neutro (cliente novo ≤6 meses ou não respondeu)
     return 10;
   }
   
