@@ -310,6 +310,11 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
           if (partner.client.monthsSinceClosing != null) {
             row.client.monthsSinceClosing = partner.client.monthsSinceClosing;
           }
+          // NOVO: Armazenar nome do pagante para herdar NPS
+          row.client.spousePartnerName = partner.client.name;
+        } else if (row.spousePartnerRaw) {
+          // Se não encontrou o parceiro, usar o nome raw da planilha
+          row.client.spousePartnerName = row.spousePartnerRaw;
         }
       }
 

@@ -4,8 +4,11 @@ import { Client, HealthScore, HealthCategory } from "@/types/client";
  * Calcula o Health Score v3 (escala 0-100)
  * Pilares: NPS (-10 a 20) + Indicação (10) + Inadimplência (-20 a 40) + Cross Sell (15) + Meses Relacionamento (15)
  * Score mínimo: 0 (sem valores negativos)
+ * 
+ * @param client - Cliente para calcular o score
+ * @param payerNpsMap - Mapa opcional de NPS do pagante (chave: "nome|planner", valor: nps ou null)
  */
-export function calculateHealthScore(client: Client): HealthScore {
+export function calculateHealthScore(client: Client, payerNpsMap?: Map<string, number | null>): HealthScore {
   // Override rule: 3+ parcelas em atraso = Health Score = 0
   if (client.overdueInstallments !== undefined && client.overdueInstallments >= 3) {
     return {
@@ -23,7 +26,7 @@ export function calculateHealthScore(client: Client): HealthScore {
   }
 
   // Calculate each pillar score (v3)
-  const nps = calculateNPS(client);
+  const nps = calculateNPS(client, payerNpsMap);
   const referral = calculateReferral(client);
   const payment = calculatePayment(client);
   const crossSell = calculateCrossSell(client);
@@ -58,13 +61,32 @@ export function calculateHealthScore(client: Client): HealthScore {
  * - Detrator (0-6) = -10 pontos
  * - Neutro (7-8) = 10 pontos
  * - Promotor (9-10) = 20 pontos
- * - Null (não respondeu) = 10 pontos (neutro padrão para clientes ≤6 meses)
+ * - Null (não respondeu) = 10 pontos (neutro padrão para clientes não-cônjuges)
+ * - Cônjuge sem NPS próprio nem do pagante = 0 pontos
+ * 
+ * HERANÇA DE NPS: Se cliente é cônjuge e não tem NPS próprio, herda do pagante
  */
-function calculateNPS(client: Client): number {
-  const npsValue = client.npsScoreV3;
+function calculateNPS(client: Client, payerNpsMap?: Map<string, number | null>): number {
+  let npsValue = client.npsScoreV3;
+  
+  // NOVA LÓGICA: Se for cônjuge e não tem NPS próprio, buscar do pagante
+  if ((npsValue === null || npsValue === undefined) && client.isSpouse && client.spousePartnerName) {
+    if (payerNpsMap) {
+      // Buscar NPS do pagante no mapa (chave: nome normalizado + planner)
+      const payerKey = `${client.spousePartnerName.toLowerCase().trim()}|${client.planner}`;
+      const payerNps = payerNpsMap.get(payerKey);
+      if (payerNps !== undefined) {
+        npsValue = payerNps;
+      }
+    }
+  }
   
   if (npsValue === null || npsValue === undefined) {
-    // "Não Encontrou" = neutro (cliente novo ≤6 meses ou não respondeu)
+    // Se for cônjuge sem NPS (próprio nem do pagante) = 0 pontos
+    if (client.isSpouse) {
+      return 0;
+    }
+    // Cliente não-cônjuge sem NPS = 10 pontos (neutro)
     return 10;
   }
   
@@ -182,4 +204,22 @@ export function getHealthCategoryColor(category: HealthCategory): string {
     case "Crítico":
       return "health-critical";
   }
+}
+
+/**
+ * Cria um mapa de NPS do pagante para uso na herança de NPS para cônjuges
+ * Chave: "nome normalizado|planner", Valor: nps_score_v3 ou null
+ */
+export function createPayerNpsMap(clients: Client[]): Map<string, number | null> {
+  const map = new Map<string, number | null>();
+  
+  for (const client of clients) {
+    // Apenas clientes não-cônjuges (pagantes) entram no mapa
+    if (!client.isSpouse) {
+      const key = `${client.name.toLowerCase().trim()}|${client.planner}`;
+      map.set(key, client.npsScoreV3 ?? null);
+    }
+  }
+  
+  return map;
 }

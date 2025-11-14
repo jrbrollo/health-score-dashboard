@@ -22,6 +22,7 @@ export interface Client {
   
   // Flags
   isSpouse?: boolean;   // Cônjuge (marcado explicitamente nas análises)
+  spousePartnerName?: string; // Nome do cliente pagante vinculado (para herdar NPS)
   
   // Métricas v3
   monthsSinceClosing?: number | null;  // Meses desde fechamento
