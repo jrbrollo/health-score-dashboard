@@ -18,12 +18,26 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover', '@radix-ui/react-select'],
-          'charts-vendor': ['recharts'],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          'icons-vendor': ['lucide-react'],
+        manualChunks(id) {
+          // Garantir que lucide-react seja sempre incluído no bundle principal
+          // para evitar problemas de carregamento após logout/login
+          if (id.includes('lucide-react')) {
+            return 'index'; // Incluir no bundle principal
+          }
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'ui-vendor';
+            }
+            if (id.includes('recharts')) {
+              return 'charts-vendor';
+            }
+            if (id.includes('@supabase')) {
+              return 'supabase-vendor';
+            }
+          }
         },
       },
     },

@@ -14,10 +14,19 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('SW registered: ', registration);
+        // Verificar atualizações periodicamente e forçar atualização após logout/login
+        registration.update();
       })
       .catch((registrationError) => {
         console.log('SW registration failed: ', registrationError);
       });
+    
+    // Limpar cache ao fazer logout/login
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        registration.update();
+      });
+    });
   });
 }
 

@@ -10,8 +10,8 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 // Importar ícones de forma explícita para evitar problemas de tree-shaking após logout/login
-import * as LucideIcons from "lucide-react";
-const {
+// Importar cada ícone individualmente para garantir que sejam sempre incluídos no bundle
+import { 
   Search, 
   Users, 
   X,
@@ -25,7 +25,27 @@ const {
   Bookmark,
   ChevronLeft,
   ChevronRight
-} = LucideIcons;
+} from "lucide-react";
+
+// Garantir que os ícones sejam sempre referenciados (evitar tree-shaking)
+// Esta referência garante que os ícones sejam incluídos mesmo após logout/login
+const ICONS_REF = {
+  Search, 
+  Users, 
+  X,
+  Filter,
+  Eye,
+  TrendingUp,
+  ChevronsUpDown,
+  Check,
+  Download,
+  Save,
+  Bookmark,
+  ChevronLeft,
+  ChevronRight
+};
+// Usar void para evitar warnings de variável não usada, mas garantir que seja incluída
+void ICONS_REF;
 import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";

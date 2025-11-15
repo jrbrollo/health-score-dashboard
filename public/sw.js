@@ -1,5 +1,6 @@
 // Service Worker para cache offline
-const CACHE_NAME = 'health-score-dashboard-v1';
+// Incrementar versão para forçar atualização quando houver mudanças
+const CACHE_NAME = 'health-score-dashboard-v2';
 const urlsToCache = [
   '/',
   '/login',

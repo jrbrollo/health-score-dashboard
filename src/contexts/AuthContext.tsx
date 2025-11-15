@@ -213,6 +213,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.user) {
+        // Limpar cache do Service Worker após login para garantir que módulos sejam recarregados
+        if ('serviceWorker' in navigator && 'caches' in window) {
+          try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            registrations.forEach(registration => {
+              registration.update();
+            });
+          } catch (e) {
+            console.warn('Erro ao atualizar Service Worker:', e);
+          }
+        }
+        
         await loadUserProfile(data.user.id);
         toast({
           title: 'Login realizado!',
@@ -373,6 +385,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       } catch (e) {
         console.warn('Erro ao limpar localStorage:', e);
+      }
+
+      // Limpar cache do Service Worker após logout
+      if ('serviceWorker' in navigator && 'caches' in window) {
+        try {
+          // Limpar todos os caches
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => caches.delete(cacheName))
+          );
+          
+          // Desregistrar todos os service workers
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations.map(registration => registration.unregister())
+          );
+        } catch (e) {
+          console.warn('Erro ao limpar cache do Service Worker:', e);
+        }
       }
 
       // Redirecionar para login após logout
