@@ -100,16 +100,16 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   }, []);
 
   // Unique planners (ainda vem dos clientes, mas filtra valores numéricos)
+  // IMPORTANTE: No Dashboard, Gerentes/Mediadores/Líderes DEVEM aparecer na lista de Planejadores
+  // para que possam filtrar seus próprios clientes quando atendem como planejadores
   const planners = useMemo(() => {
     const allPlanners = buildUniqueList(clients, 'planner');
-    // Filtrar valores numéricos e nomes que são Gerentes/Mediadores/Líderes
+    // Filtrar apenas valores numéricos - NÃO excluir Gerentes/Mediadores/Líderes
     return allPlanners.filter(p => {
-      // Excluir valores que são apenas números
-      if (/^[0-9]+$/.test(p.trim())) return false;
-      // Excluir nomes que são Gerentes, Mediadores ou Líderes
-      return !managers.includes(p) && !mediators.includes(p) && !leaders.includes(p);
+      // Excluir apenas valores que são números
+      return !/^[0-9]+$/.test(p.trim());
     });
-  }, [clients, managers, mediators, leaders]);
+  }, [clients]);
 
   // Memoizar classes CSS baseadas no tema para evitar recálculo
   const themeClasses = useMemo(() => ({
