@@ -9,7 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { 
+// Importar ícones de forma explícita para evitar problemas de tree-shaking após logout/login
+import * as LucideIcons from "lucide-react";
+const {
   Search, 
   Users, 
   X,
@@ -23,7 +25,7 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight
-} from "lucide-react";
+} = LucideIcons;
 import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";

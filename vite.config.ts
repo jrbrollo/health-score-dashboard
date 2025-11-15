@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => ({
           'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover', '@radix-ui/react-select'],
           'charts-vendor': ['recharts'],
           'supabase-vendor': ['@supabase/supabase-js'],
+          'icons-vendor': ['lucide-react'],
         },
       },
     },
