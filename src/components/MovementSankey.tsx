@@ -171,12 +171,13 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       // OTIMIZAÇÃO: Usar query mais eficiente - buscar apenas o registro mais recente por cliente
       // Em vez de buscar tudo e filtrar, usar DISTINCT ON ou subquery
       const allRecords: any[] = [];
-      // Aumentado batch size para reduzir número de queries (otimização)
-      const batchSize = 1000;
+      // Reduzido batch size para evitar URLs muito longas (erro 400 do Supabase)
+      // O limite seguro é ~500 IDs por query para evitar problemas de URL length
+      const batchSize = 500;
       const totalBatches = Math.ceil(clientIdsStr.length / batchSize);
       
-      // Processar em lotes paralelos (aumentado para 5 simultâneos para melhor performance)
-      const maxConcurrent = 5;
+      // Processar em lotes paralelos (reduzido para 3 simultâneos para evitar sobrecarga)
+      const maxConcurrent = 3;
       for (let i = 0; i < clientIdsStr.length; i += batchSize * maxConcurrent) {
         const batches: Promise<any>[] = [];
         
@@ -198,7 +199,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
                 .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
           .lte('recorded_date', dateStr)
           .order('recorded_date', { ascending: false })
-                .limit(5000); // Limite otimizado (reduzido de 10000 para melhor performance)
+                .limit(1000); // Limite reduzido para evitar problemas com queries grandes
         
         if (error) {
                 console.error(`Erro ao buscar histórico do lote ${batchStart}-${batchStart + batch.length}:`, error);
