@@ -10,6 +10,23 @@ export function isInvalid(value?: string | null): boolean {
   return INVALID_TOKENS.has(v);
 }
 
+/**
+ * Normaliza texto removendo diacríticos, convertendo para lowercase e trim
+ * Retorna null se o valor for inválido
+ */
+export function normalizeText(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (isInvalid(trimmed)) return null;
+  
+  // Normalizar: remover diacríticos, lowercase, trim
+  return trimmed
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export function normalizeOrNull(value?: string | null): string | null {
   return isInvalid(value) ? null : value as string;
 }
@@ -35,33 +52,89 @@ export function applyHierarchyFilters(
   clients: Client[],
   filters: HierarchyFilters
 ): Client[] {
-  const planners = filters.selectedPlanner ? [filters.selectedPlanner] : [];
-  const managers = filters.managers ?? [];
-  const mediators = filters.mediators ?? [];
-  const leaders = filters.leaders ?? [];
+  // Normalizar valores dos filtros para comparação consistente
+  const planners = filters.selectedPlanner ? [normalizeText(filters.selectedPlanner) || filters.selectedPlanner] : [];
+  const managers = (filters.managers ?? []).map(m => normalizeText(m) || m).filter(Boolean);
+  const mediators = (filters.mediators ?? []).map(m => normalizeText(m) || m).filter(Boolean);
+  const leaders = (filters.leaders ?? []).map(l => normalizeText(l) || l).filter(Boolean);
 
-  return clients.filter(c => {
+  // Debug: log dos filtros aplicados
+  if (mediators.length > 0 || leaders.length > 0 || managers.length > 0) {
+    console.log('🔍 Aplicando filtros de hierarquia:', {
+      planners,
+      managers,
+      mediators,
+      leaders,
+      totalClients: clients.length
+    });
+  }
+
+  const filtered = clients.filter(c => {
     if (!c.name || isInvalid(c.name)) return false;
 
     // Planejador: só filtra quando um planner específico foi escolhido
-    if (planners.length > 0) {
-      if (normalizeOrNull(c.planner) !== planners[0]) return false;
+    if (planners.length > 0 && planners[0]) {
+      const clientPlannerNorm = normalizeText(c.planner);
+      if (!clientPlannerNorm || clientPlannerNorm !== planners[0]) return false;
     }
 
     if (managers.length > 0) {
-      const val = normalizeOrNull(c.manager);
-      if (!val || !managers.includes(val)) return false;
+      const val = normalizeText(c.manager);
+      if (!val || !managers.some(m => {
+        const normalizedFilter = normalizeText(m);
+        // Comparação flexível: verifica se o valor do cliente começa com o filtro OU se o filtro começa com o valor
+        // Isso permite que "Matheus Okamura" corresponda a "Matheus Okamura Lopes"
+        return normalizedFilter === val || val.startsWith(normalizedFilter) || normalizedFilter.startsWith(val);
+      })) return false;
     }
     if (mediators.length > 0) {
-      const val = normalizeOrNull(c.mediator);
-      if (!val || !mediators.includes(val)) return false;
+      const val = normalizeText(c.mediator);
+      if (!val || !mediators.some(m => {
+        const normalizedFilter = normalizeText(m);
+        // Comparação flexível: verifica se o valor do cliente começa com o filtro OU se o filtro começa com o valor
+        // Isso permite que "Matheus Okamura" corresponda a "Matheus Okamura Lopes"
+        return normalizedFilter === val || val.startsWith(normalizedFilter) || normalizedFilter.startsWith(val);
+      })) return false;
     }
     if (leaders.length > 0) {
-      const val = normalizeOrNull(c.leader);
-      if (!val || !leaders.includes(val)) return false;
+      const val = normalizeText(c.leader);
+      if (!val || !leaders.some(l => {
+        const normalizedFilter = normalizeText(l);
+        // Comparação flexível: verifica se o valor do cliente começa com o filtro OU se o filtro começa com o valor
+        // Isso permite que "Matheus Okamura" corresponda a "Matheus Okamura Lopes"
+        return normalizedFilter === val || val.startsWith(normalizedFilter) || normalizedFilter.startsWith(val);
+      })) return false;
     }
     return true;
   });
+
+  // Debug: log do resultado
+  if (mediators.length > 0 || leaders.length > 0 || managers.length > 0) {
+    // Encontrar alguns exemplos de clientes que não passaram no filtro para debug
+    const exemploRejeitado = clients.find(c => {
+      if (!c.name || isInvalid(c.name)) return false;
+      if (mediators.length > 0) {
+        const val = normalizeText(c.mediator);
+        const normalizedFilter = normalizeText(mediators[0]);
+        return val && normalizedFilter && val !== normalizedFilter && !val.startsWith(normalizedFilter) && !normalizedFilter.startsWith(val);
+      }
+      return false;
+    });
+    
+    console.log('✅ Filtros aplicados:', {
+      filtrados: filtered.length,
+      total: clients.length,
+      exemploMediator: mediators[0],
+      exemploClientMediator: filtered[0]?.mediator,
+      exemploRejeitado: exemploRejeitado ? {
+        mediator: exemploRejeitado.mediator,
+        normalized: normalizeText(exemploRejeitado.mediator),
+        filterNormalized: normalizeText(mediators[0])
+      } : null
+    });
+  }
+
+  return filtered;
 }
 
 export function uniqueById(clients: Client[]): Client[] {

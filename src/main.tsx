@@ -3,6 +3,22 @@ import App from "./App.tsx";
 import "./index.css";
 
 // Aplicar tema escuro por padrão ao carregar a aplicação
-document.documentElement.classList.add('dark');
+const savedTheme = localStorage.getItem('healthScoreDarkMode');
+if (savedTheme === 'true' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  document.documentElement.classList.add('dark');
+}
+
+// Registrar Service Worker para cache offline
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('SW registered: ', registration);
+      })
+      .catch((registrationError) => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
+}
 
 createRoot(document.getElementById("root")!).render(<App />);

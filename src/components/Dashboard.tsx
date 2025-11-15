@@ -42,7 +42,8 @@ import { Avatar, AvatarFallback } from "./ui/avatar";
 import { AnalysisInfoTooltip } from "./AnalysisInfoTooltip";
 import { Logo } from "./Logo";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
-import { Eye, X } from "lucide-react";
+import { Eye, X, Download } from "lucide-react";
+import { exportClients } from "@/utils/exportUtils";
 import { temporalService } from "@/services/temporalService";
 import { HealthScoreHistory } from "@/types/temporal";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
@@ -51,7 +52,7 @@ import { MIN_HISTORY_DATE } from "@/lib/constants";
 interface DashboardProps {
   clients: Client[];
   onBulkImport?: (payload: BulkImportPayload) => void;
-  onDeleteClient?: (clientId: string) => void;
+  onDeleteClient?: (clientId: string, clientName: string) => void;
   onManageClients?: () => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
@@ -337,12 +338,17 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   const plannerStats = useMemo(() => {
     if (selectedPlanner) return [];
     
-    return planners.map(planner => {
-      const plannerClients = clients.filter(client => {
+    // Usar filteredClients em vez de clients para respeitar filtros de hierarquia
+    // Extrair lista única de planejadores dos clientes filtrados
+    const uniquePlanners = Array.from(new Set(
+      filteredClients
+        .filter(c => c.planner && c.planner !== '0' && c.isActive !== false)
+        .map(c => c.planner)
+    ));
+    
+    return uniquePlanners.map(planner => {
+      const plannerClients = filteredClients.filter(client => {
         if (!client.planner || client.planner === '0') return false;
-        if (selectedManager !== "all" && client.manager !== selectedManager) return false;
-        if (selectedMediator !== "all" && client.mediator !== selectedMediator) return false;
-        if (selectedLeader !== "all" && client.leader !== selectedLeader) return false;
         if (client.isActive === false) return false;
         return client.planner === planner;
       });
@@ -358,7 +364,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
         category: avgScore >= 100 ? "Ótimo" : avgScore >= 60 ? "Estável" : avgScore >= 35 ? "Atenção" : "Crítico"
       };
     }).filter(stat => stat.clientCount > 0);
-  }, [clients, selectedPlanner]);
+  }, [filteredClients, selectedPlanner]);
 
   const handleBulkImport = (payload: BulkImportPayload) => {
     if (onBulkImport) {
@@ -379,19 +385,19 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   }
 
   return (
-    <div className={`min-h-screen p-6 transition-colors duration-150 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className={`min-h-screen p-4 sm:p-6 transition-colors duration-150 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}>
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-10">
-            <Logo isDarkMode={isDarkMode} className="scale-125" />
+          <div className="flex items-center gap-4 sm:gap-6 md:gap-10">
+            <Logo isDarkMode={isDarkMode} className="scale-110 sm:scale-125" />
             <ThemeToggle 
               isDark={isDarkMode} 
               onToggle={onToggleDarkMode || (() => {})} 
             />
           </div>
           
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-4 w-full">
             {/* Menu do Usuário */}
             {profile && (
               <DropdownMenu>
@@ -441,13 +447,13 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                   variant="outline"
                   role="combobox"
                   aria-expanded={plannerSearchOpen}
-                  className={cn("w-56 justify-between")}
+                  className={cn("w-full sm:w-56 sm:min-w-[140px] justify-between")}
                 >
                   <span className="truncate">{plannerLabel}</span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="start">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar planejador..." />
                   <CommandList>
@@ -489,13 +495,13 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                   variant="outline"
                   role="combobox"
                   aria-expanded={managerSearchOpen}
-                  className={cn("w-56 justify-between")}
+                  className={cn("w-full sm:w-56 sm:min-w-[140px] justify-between")}
                 >
                   <span className="truncate">{managerLabel}</span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="start">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar gerente..." />
                   <CommandList>
@@ -537,13 +543,13 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                   variant="outline"
                   role="combobox"
                   aria-expanded={mediatorSearchOpen}
-                  className={cn("w-56 justify-between")}
+                  className={cn("w-full sm:w-56 sm:min-w-[140px] justify-between")}
                 >
                   <span className="truncate">{mediatorLabel}</span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="start">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar mediador..." />
                   <CommandList>
@@ -585,13 +591,13 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                   variant="outline"
                   role="combobox"
                   aria-expanded={leaderSearchOpen}
-                  className={cn("w-56 justify-between")}
+                  className={cn("w-full sm:w-56 sm:min-w-[140px] justify-between")}
                 >
                   <span className="truncate">{leaderLabel}</span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="start">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar líder..." />
                   <CommandList>
@@ -626,12 +632,12 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
               </PopoverContent>
             </Popover>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               {onManageClients && (
                 <Button 
                   onClick={onManageClients}
                   variant="default"
-                  className="shadow-lg"
+                  className="shadow-lg whitespace-nowrap"
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Gerenciar Clientes
@@ -641,40 +647,68 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 <Button 
                   onClick={() => setShowBulkImport(true)}
                   variant="outline"
-                  className="shadow-lg"
+                  className="shadow-lg whitespace-nowrap"
+                  aria-label="Importar CSV"
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Importar CSV
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  exportClients(filteredClients, {
+                    format: 'csv',
+                    filters: {
+                      planner: selectedPlanner || undefined,
+                      manager: selectedManager !== 'all' ? selectedManager : undefined,
+                      mediator: selectedMediator !== 'all' ? selectedMediator : undefined,
+                      leader: selectedLeader !== 'all' ? selectedLeader : undefined,
+                    }
+                  });
+                }}
+                className="shadow-lg whitespace-nowrap"
+                aria-label="Exportar dados"
+                title="Exportar lista de clientes para CSV"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Visão Geral
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Análise de Indicadores
-            </TabsTrigger>
-            <TabsTrigger value="temporal" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Análise Temporal
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Análises Avançadas
-            </TabsTrigger>
-            <TabsTrigger value="quality" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Qualidade de Dados
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <TabsList className="grid w-full grid-cols-5 min-w-[500px] sm:min-w-0">
+              <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Visão Geral</span>
+                <span className="sm:hidden">Geral</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Análise de Indicadores</span>
+                <span className="sm:hidden">Indicadores</span>
+              </TabsTrigger>
+              <TabsTrigger value="temporal" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Análise Temporal</span>
+                <span className="sm:hidden">Temporal</span>
+              </TabsTrigger>
+              <TabsTrigger value="advanced" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Análises Avançadas</span>
+                <span className="sm:hidden">Avançadas</span>
+              </TabsTrigger>
+              <TabsTrigger value="quality" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Qualidade de Dados</span>
+                <span className="sm:hidden">Qualidade</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="flex items-center gap-2 mb-4">
@@ -691,7 +725,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
               />
             </div>
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
               <Card className={`animate-fade-in-up animate-delay-100 ${themeClasses.card}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>

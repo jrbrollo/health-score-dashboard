@@ -9,6 +9,26 @@ import { Client, HealthScore, HealthCategory } from "@/types/client";
  * @param payerNpsMap - Mapa opcional de NPS do pagante (chave: "nome|planner", valor: nps ou null)
  */
 export function calculateHealthScore(client: Client, payerNpsMap?: Map<string, number | null>): HealthScore {
+  // [#19] Validação de dados de entrada
+  if (!client || typeof client !== 'object') {
+    throw new Error('Cliente inválido: deve ser um objeto');
+  }
+  
+  // Validar que campos numéricos são números válidos
+  if (client.overdueInstallments !== undefined && (typeof client.overdueInstallments !== 'number' || client.overdueInstallments < 0)) {
+    console.warn('overdueInstallments inválido:', client.overdueInstallments);
+  }
+  if (client.overdueDays !== undefined && (typeof client.overdueDays !== 'number' || client.overdueDays < 0)) {
+    console.warn('overdueDays inválido:', client.overdueDays);
+  }
+  if (client.crossSellCount !== undefined && (typeof client.crossSellCount !== 'number' || client.crossSellCount < 0)) {
+    console.warn('crossSellCount inválido:', client.crossSellCount);
+  }
+  // monthsSinceClosing pode ser null (válido), apenas validar se for número que seja >= 0
+  if (client.monthsSinceClosing !== undefined && client.monthsSinceClosing !== null && (typeof client.monthsSinceClosing !== 'number' || client.monthsSinceClosing < 0)) {
+    console.warn('monthsSinceClosing inválido:', client.monthsSinceClosing);
+  }
+  
   // Override rule: 3+ parcelas em atraso = Health Score = 0
   if (client.overdueInstallments !== undefined && client.overdueInstallments >= 3) {
     return {

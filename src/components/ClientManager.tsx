@@ -27,6 +27,17 @@ import { Logo } from "./Logo";
 import { buildUniqueList, applyHierarchyFilters, HierarchyFilters } from "@/lib/filters";
 import { getHierarchyNames } from "@/services/hierarchyService";
 import { useAuth } from "@/contexts/AuthContext";
+import { exportClients } from "@/utils/exportUtils";
+import { saveFilters, getSavedFilters, deleteSavedFilter, applySavedFilters, SavedFilters } from "@/utils/filterStorage";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { temporalService } from "@/services/temporalService";
 import { HealthScoreHistory } from "@/types/temporal";
@@ -60,6 +71,16 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
   const [managerSearchOpen, setManagerSearchOpen] = useState(false);
   const [mediatorSearchOpen, setMediatorSearchOpen] = useState(false);
   const [leaderSearchOpen, setLeaderSearchOpen] = useState(false);
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50; // Itens por página
+  
+  // Filtros salvos
+  const [savedFiltersList, setSavedFiltersList] = useState<SavedFilters[]>([]);
+  const [saveFilterDialogOpen, setSaveFilterDialogOpen] = useState(false);
+  const [filterName, setFilterName] = useState('');
+  const [loadingExport, setLoadingExport] = useState(false);
 
   // Carregar histórico quando visualizar cliente
   useEffect(() => {
@@ -102,6 +123,65 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
     };
     loadHierarchy();
   }, []);
+  
+  // Carregar filtros salvos
+  useEffect(() => {
+    setSavedFiltersList(getSavedFilters());
+  }, []);
+  
+  // Função para salvar filtros atuais
+  const handleSaveFilters = () => {
+    if (!filterName.trim()) return;
+    
+    saveFilters({
+      planner: filterPlanner === 'all' ? undefined : filterPlanner,
+      manager: filterManager === 'all' ? undefined : filterManager,
+      mediator: filterMediator === 'all' ? undefined : filterMediator,
+      leader: filterLeader === 'all' ? undefined : filterLeader,
+      category: filterCategory === 'all' ? undefined : filterCategory,
+      searchTerm: searchTerm || undefined,
+    }, filterName.trim());
+    
+    setSavedFiltersList(getSavedFilters());
+    setFilterName('');
+    setSaveFilterDialogOpen(false);
+  };
+  
+  // Função para aplicar filtros salvos
+  const handleApplySavedFilters = (savedFilter: SavedFilters) => {
+    if (savedFilter.planner) setFilterPlanner(savedFilter.planner as Planner);
+    else setFilterPlanner('all');
+    if (savedFilter.manager) setFilterManager(savedFilter.manager);
+    else setFilterManager('all');
+    if (savedFilter.mediator) setFilterMediator(savedFilter.mediator);
+    else setFilterMediator('all');
+    if (savedFilter.leader) setFilterLeader(savedFilter.leader);
+    else setFilterLeader('all');
+    if (savedFilter.category) setFilterCategory(savedFilter.category);
+    else setFilterCategory('all');
+    if (savedFilter.searchTerm) setSearchTerm(savedFilter.searchTerm);
+    else setSearchTerm('');
+  };
+  
+  // Função para exportar clientes
+  const handleExportClients = async () => {
+    setLoadingExport(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Pequeno delay para feedback visual
+      exportClients(filteredClients, {
+        format: 'csv',
+        filters: {
+          planner: filterPlanner === 'all' ? undefined : filterPlanner,
+          manager: filterManager === 'all' ? undefined : filterManager,
+          mediator: filterMediator === 'all' ? undefined : filterMediator,
+          leader: filterLeader === 'all' ? undefined : filterLeader,
+          category: filterCategory === 'all' ? undefined : filterCategory,
+        }
+      });
+    } finally {
+      setLoadingExport(false);
+    }
+  };
 
   // Unique planners (ainda vem dos clientes, mas filtra valores numéricos)
   // IMPORTANTE: No Dashboard, Gerentes/Mediadores/Líderes DEVEM aparecer na lista de Planejadores
@@ -154,6 +234,19 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [clients, filterPlanner, filterManager, filterMediator, filterLeader, debouncedSearchTerm, filterCategory, authFilters, profile]);
+
+  // Paginação dos clientes filtrados
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedClients = useMemo(() => {
+    return filteredClients.slice(startIndex, endIndex);
+  }, [filteredClients, startIndex, endIndex]);
+
+  // Reset página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterPlanner, filterManager, filterMediator, filterLeader, debouncedSearchTerm, filterCategory]);
 
 
   // Memoizar função de cores para evitar recriação a cada render
@@ -297,20 +390,20 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
 
   return (
     <div 
-      className={`min-h-screen p-6 transition-colors duration-150 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}
+      className={`min-h-screen p-4 sm:p-6 transition-colors duration-150 ${isDarkMode ? 'gradient-bg-dark text-white' : 'gradient-bg-light text-gray-900'}`}
       style={{ willChange: 'background-color, color' }}
     >
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-10">
-            <Logo isDarkMode={isDarkMode} />
+          <div className="flex items-center gap-4 sm:gap-6 md:gap-10">
+            <Logo isDarkMode={isDarkMode} className="scale-110 sm:scale-100" />
             <div className="hidden md:block border-l pl-4 ml-2">
               <h2 className="text-lg font-semibold">Gerenciar Clientes</h2>
               <p className="text-muted-foreground text-sm">
                 {filterPlanner === "all" 
-                  ? `Visualizando clientes de todos os planejadores (${filteredClients.length} clientes)`
-                  : `Visualizando clientes de ${filterPlanner} (${filteredClients.length} clientes)`
+                  ? `Visualizando clientes de todos os planejadores (${filteredClients.length} clientes${totalPages > 1 ? ` - Página ${currentPage}/${totalPages}` : ''})`
+                  : `Visualizando clientes de ${filterPlanner} (${filteredClients.length} clientes${totalPages > 1 ? ` - Página ${currentPage}/${totalPages}` : ''})`
                 }
               </p>
             </div>
@@ -319,7 +412,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
               onToggle={onToggleDarkMode || (() => {})} 
             />
           </div>
-          <Button variant="outline" onClick={onBack} className="shadow-lg">
+          <Button variant="outline" onClick={onBack} className="shadow-lg w-full sm:w-auto">
             Voltar ao Dashboard
           </Button>
         </div>
@@ -363,7 +456,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 p-0" align="start">
+                  <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Buscar planejador..." />
                       <CommandList>
@@ -414,7 +507,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 p-0" align="start">
+                  <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Buscar gerente..." />
                       <CommandList>
@@ -465,7 +558,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 p-0" align="start">
+                  <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Buscar mediador..." />
                       <CommandList>
@@ -516,7 +609,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 p-0" align="start">
+                  <PopoverContent className="w-[calc(100vw-2rem)] sm:w-64 p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Buscar líder..." />
                       <CommandList>
@@ -568,6 +661,100 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
                 </Select>
               </div>
             </div>
+            
+            {/* Botões de ação */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={handleExportClients}
+                disabled={loadingExport || filteredClients.length === 0}
+                aria-label="Exportar clientes para CSV"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {loadingExport ? 'Exportando...' : 'Exportar CSV'}
+              </Button>
+              <Dialog open={saveFilterDialogOpen} onOpenChange={setSaveFilterDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    aria-label="Salvar filtros atuais"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Filtros
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Salvar Filtros</DialogTitle>
+                    <DialogDescription>
+                      Digite um nome para salvar os filtros atuais
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Input
+                    placeholder="Ex: Meus Clientes Críticos"
+                    value={filterName}
+                    onChange={(e) => setFilterName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && filterName.trim()) {
+                        handleSaveFilters();
+                      }
+                    }}
+                  />
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSaveFilterDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleSaveFilters} disabled={!filterName.trim()}>
+                      Salvar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
+              {/* Lista de filtros salvos */}
+              {savedFiltersList.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" aria-label="Aplicar filtros salvos">
+                      <Bookmark className="h-4 w-4 mr-2" />
+                      Filtros Salvos ({savedFiltersList.length})
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm mb-2">Filtros Salvos</h4>
+                      {savedFiltersList.map((savedFilter, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 rounded border hover:bg-accent cursor-pointer"
+                          onClick={() => handleApplySavedFilters(savedFilter)}
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{savedFilter.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {savedFilter.planner && `Planejador: ${savedFilter.planner} `}
+                              {savedFilter.category && `Categoria: ${savedFilter.category}`}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSavedFilter(savedFilter.name);
+                              setSavedFiltersList(getSavedFilters());
+                            }}
+                            aria-label={`Deletar filtro ${savedFilter.name}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -584,22 +771,83 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {filteredClients.map((client) => {
-                const healthScore = clientHealthScores.get(client.id) || calculateHealthScore(client);
+            <>
+              <div className="space-y-4">
+                {paginatedClients.map((client) => {
+                  const healthScore = clientHealthScores.get(client.id) || calculateHealthScore(client);
+                
+                return (
+                    <ClientCard
+                      key={client.id}
+                      client={client}
+                      healthScore={healthScore}
+                      onViewDetails={setViewingClient}
+                      themeClasses={themeClasses}
+                      getHealthScoreColor={getHealthScoreColor}
+                    />
+                  );
+                })}
+              </div>
               
-              return (
-                  <ClientCard
-                    key={client.id}
-                    client={client}
-                    healthScore={healthScore}
-                    onViewDetails={setViewingClient}
-                    themeClasses={themeClasses}
-                    getHealthScoreColor={getHealthScoreColor}
-                  />
-                );
-              })}
+              {/* Controles de Paginação */}
+              {totalPages > 1 && (
+                <Card className={themeClasses.card}>
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="text-sm text-muted-foreground">
+                      Mostrando {startIndex + 1} a {Math.min(endIndex, filteredClients.length)} de {filteredClients.length} clientes
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        aria-label="Página anterior"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Anterior
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum: number;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(pageNum)}
+                              aria-label={`Ir para página ${pageNum}`}
+                              aria-current={currentPage === pageNum ? "page" : undefined}
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        aria-label="Próxima página"
+                      >
+                        Próxima
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </div>
       </div>

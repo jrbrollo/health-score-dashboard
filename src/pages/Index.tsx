@@ -9,6 +9,16 @@ import { toast } from "@/hooks/use-toast";
 import { getAuthFilters } from "@/lib/authFilters";
 import { HierarchyFilters } from "@/lib/filters";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -18,8 +28,20 @@ const Index = () => {
   const [showClientManager, setShowClientManager] = useState(false);
   const [selectedPlanner, setSelectedPlanner] = useState<Planner | "all">("all");
   const [loading, setLoading] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(true); // Tema escuro como padrão
+  // Dark mode persistente - carregar do localStorage
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('healthScoreDarkMode');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return true; // Padrão: tema escuro
+  });
   const [isThemeTransitioning, setIsThemeTransitioning] = useState(false);
+  
+  // Persistir dark mode no localStorage
+  useEffect(() => {
+    localStorage.setItem('healthScoreDarkMode', String(isDarkMode));
+  }, [isDarkMode]);
   const [authFilters, setAuthFilters] = useState<HierarchyFilters | null>(null);
   const [showProfileError, setShowProfileError] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
@@ -35,6 +57,11 @@ const Index = () => {
   useEffect(() => {
     if (profile) {
       getAuthFilters(profile, getHierarchyCascade).then(filters => {
+        console.log('🔐 Filtros de autenticação carregados:', {
+          role: profile.role,
+          hierarchyName: profile.hierarchyName,
+          filters
+        });
         setAuthFilters(filters);
       }).catch(error => {
         console.error('Erro ao carregar filtros de autenticação:', error);
@@ -226,25 +253,43 @@ const Index = () => {
     }
   };
 
-  const handleDeleteClient = async (clientId: string) => {
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const handleDeleteClick = (clientId: string, clientName: string) => {
+    setClientToDelete({ id: clientId, name: clientName });
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!clientToDelete) return;
+    
     try {
-      const success = await clientService.deleteClient(clientId);
+      const success = await clientService.deleteClient(clientToDelete.id);
       if (success) {
-        setClients(prev => prev.filter(client => client.id !== clientId));
+        setClients(prev => prev.filter(client => client.id !== clientToDelete.id));
         toast({
           title: "Cliente excluído!",
-          description: "O cliente foi removido da carteira.",
+          description: `${clientToDelete.name} foi removido da carteira.`,
         });
       } else {
         throw new Error('Falha ao excluir cliente');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir cliente:', error);
+      const errorMessage = error?.message || error?.error?.message || 'Erro desconhecido';
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o cliente. Tente novamente.",
+        title: "Erro ao excluir cliente",
+        description: errorMessage.includes('permission') || errorMessage.includes('permissão')
+          ? "Você não tem permissão para excluir este cliente."
+          : errorMessage.includes('constraint') || errorMessage.includes('violação')
+          ? "Não é possível excluir este cliente pois possui dados relacionados."
+          : "Não foi possível excluir o cliente. Tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setClientToDelete(null);
     }
   };
 
@@ -434,12 +479,37 @@ const Index = () => {
       <Dashboard
         clients={clients}
         onBulkImport={handleBulkImport}
+        onDeleteClient={handleDeleteClick}
         onManageClients={() => handleManageClients()}
         isDarkMode={isDarkMode}
         onToggleDarkMode={handleToggleDarkMode}
         authFilters={authFilters}
         importProgress={importProgress}
       />
+      
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o cliente <strong>{clientToDelete?.name}</strong>?
+              Esta ação não pode ser desfeita e todos os dados relacionados serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClientToDelete(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {/* Overlay de loading durante troca de tema */}
       {isThemeTransitioning && (

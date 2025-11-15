@@ -230,13 +230,23 @@ export const clientService = {
 
       if (error) {
         console.error('Erro ao atualizar cliente:', error)
-        throw error
+        // Melhorar mensagem de erro
+        const errorMessage = error.message || 'Erro desconhecido ao atualizar cliente';
+        if (error.code === 'PGRST116') {
+          throw new Error('Cliente não encontrado ou você não tem permissão para editá-lo.');
+        } else if (error.code === '23505') {
+          throw new Error('Já existe um cliente com esses dados.');
+        } else if (error.code === '23503') {
+          throw new Error('Dados inválidos: referência a registro inexistente.');
+        }
+        throw new Error(errorMessage);
       }
 
       return data ? databaseToClient(data) : null
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro no updateClient:', error)
-      return null
+      // Re-throw para que o chamador possa tratar
+      throw error;
     }
   },
 
@@ -253,13 +263,23 @@ export const clientService = {
 
       if (error) {
         console.error('Erro ao deletar cliente:', error)
-        throw error
+        // Melhorar mensagem de erro
+        const errorMessage = error.message || 'Erro desconhecido ao deletar cliente';
+        if (error.code === 'PGRST116') {
+          throw new Error('Cliente não encontrado ou você não tem permissão para excluí-lo.');
+        } else if (error.code === '23503') {
+          throw new Error('Não é possível excluir este cliente pois possui dados relacionados (histórico, etc).');
+        } else if (error.code === '42P17' || error.message?.includes('recursion')) {
+          throw new Error('Erro de permissão: verifique suas políticas de acesso.');
+        }
+        throw new Error(errorMessage);
       }
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro no deleteClient:', error)
-      return false
+      // Re-throw para que o chamador possa tratar
+      throw error;
     }
   },
 

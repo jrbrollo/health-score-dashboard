@@ -14,7 +14,7 @@ BEGIN
 
   INSERT INTO clients (
     name, planner, phone, email, leader, mediator, manager,
-    is_spouse, months_since_closing, nps_score_v3, has_nps_referral,
+    is_spouse, spouse_partner_name, months_since_closing, nps_score_v3, has_nps_referral,
     overdue_installments, overdue_days, cross_sell_count, meetings_enabled,
     last_meeting, has_scheduled_meeting, app_usage, payment_status,
     has_referrals, nps_score, ecosystem_usage,
@@ -57,6 +57,7 @@ BEGIN
       END,
       false
     ),
+    NULLIF(trim((payload->>'spouse_partner_name')::TEXT), ''), -- CORREÇÃO: Adicionar spouse_partner_name
     CASE 
       WHEN regexp_replace((payload->>'months_since_closing')::text, '[^0-9]+', '', 'g') ~ '^[0-9]+$' 
       THEN regexp_replace((payload->>'months_since_closing')::text, '[^0-9]+', '', 'g')::INTEGER 
@@ -114,7 +115,8 @@ BEGIN
         END
       , ''), '0'),
       NULLIF(NULLIF(lower(trim((payload->>'email')::text)), ''), '0'),
-      md5(lower(trim((payload->>'name')::text)) || '|' || lower(trim((payload->>'planner')::text)))
+      -- CORREÇÃO: Usar texto normalizado ao invés de MD5 para facilitar debug e queries
+      lower(trim((payload->>'name')::text)) || '|' || lower(trim((payload->>'planner')::text))
     ),
     TRUE,
     p_seen_at
@@ -127,6 +129,7 @@ BEGIN
     mediator = EXCLUDED.mediator,
     manager = EXCLUDED.manager,
     is_spouse = EXCLUDED.is_spouse,
+    spouse_partner_name = EXCLUDED.spouse_partner_name, -- CORREÇÃO: Atualizar spouse_partner_name
     months_since_closing = EXCLUDED.months_since_closing,
     nps_score_v3 = EXCLUDED.nps_score_v3,
     has_nps_referral = EXCLUDED.has_nps_referral,

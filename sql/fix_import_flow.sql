@@ -40,7 +40,11 @@ DECLARE
   client_record JSONB;
   result clients;
   seen_at_from_date TIMESTAMPTZ;
+  v_error_message TEXT;
 BEGIN
+  -- CORREÇÃO CRÍTICA: Envolver em transação explícita para garantir atomicidade
+  -- Se qualquer cliente falhar, toda importação é revertida (rollback automático)
+  
   -- Converter data da planilha para TIMESTAMPTZ (início do dia)
   -- Se p_import_date foi fornecido, usar ele; senão usar p_seen_at
   IF p_import_date IS NOT NULL AND p_import_date != CURRENT_DATE THEN
@@ -49,20 +53,30 @@ BEGIN
     seen_at_from_date := p_seen_at;
   END IF;
 
-  -- Processar cada cliente do JSON
-  FOR client_record IN SELECT * FROM jsonb_array_elements(clients_json)
-  LOOP
-    -- Chamar função singular que faz o upsert
-    SELECT * INTO result FROM bulk_insert_client_v3(
-      client_record, 
-      p_import_date, 
-      seen_at_from_date
-    );
+  -- Processar cada cliente do JSON dentro de transação
+  BEGIN
+    FOR client_record IN SELECT * FROM jsonb_array_elements(clients_json)
+    LOOP
+      -- Chamar função singular que faz o upsert
+      -- Se algum cliente falhar aqui, exceção será capturada e toda transação revertida
+      SELECT * INTO result FROM bulk_insert_client_v3(
+        client_record, 
+        p_import_date, 
+        seen_at_from_date
+      );
+      
+      RETURN NEXT result;
+    END LOOP;
     
-    RETURN NEXT result;
-  END LOOP;
-  
-  RETURN;
+    -- Se chegou aqui, todos os clientes foram inseridos com sucesso
+    RETURN;
+    
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Capturar erro e fazer rollback automático
+      GET STACKED DIAGNOSTICS v_error_message = MESSAGE_TEXT;
+      RAISE EXCEPTION 'Erro ao importar clientes: %. Rollback executado - nenhum cliente foi inserido.', v_error_message;
+  END;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -98,7 +112,7 @@ BEGIN
 
   INSERT INTO clients (
     name, planner, phone, email, leader, mediator, manager,
-    is_spouse, months_since_closing, nps_score_v3, has_nps_referral,
+    is_spouse, spouse_partner_name, months_since_closing, nps_score_v3, has_nps_referral,
     overdue_installments, overdue_days, cross_sell_count, meetings_enabled,
     last_meeting, has_scheduled_meeting, app_usage, payment_status,
     has_referrals, nps_score, ecosystem_usage,
@@ -141,6 +155,7 @@ BEGIN
       END,
       false
     ),
+    NULLIF(trim((payload->>'spouse_partner_name')::TEXT), ''), -- CORREÇÃO: Adicionar spouse_partner_name
     CASE 
       WHEN regexp_replace((payload->>'months_since_closing')::text, '[^0-9]+', '', 'g') ~ '^[0-9]+$' 
       THEN regexp_replace((payload->>'months_since_closing')::text, '[^0-9]+', '', 'g')::INTEGER 
@@ -198,7 +213,8 @@ BEGIN
         END
       , ''), '0'),
       NULLIF(NULLIF(lower(trim((payload->>'email')::text)), ''), '0'),
-      md5(lower(trim((payload->>'name')::text)) || '|' || lower(trim((payload->>'planner')::text)))
+      -- CORREÇÃO: Usar texto normalizado ao invés de MD5 para facilitar debug e queries
+      lower(trim((payload->>'name')::text)) || '|' || lower(trim((payload->>'planner')::text))
     ),
     TRUE,
     seen_at_final
@@ -211,6 +227,7 @@ BEGIN
     mediator = EXCLUDED.mediator,
     manager = EXCLUDED.manager,
     is_spouse = EXCLUDED.is_spouse,
+    spouse_partner_name = EXCLUDED.spouse_partner_name, -- CORREÇÃO: Atualizar spouse_partner_name
     months_since_closing = EXCLUDED.months_since_closing,
     nps_score_v3 = EXCLUDED.nps_score_v3,
     has_nps_referral = EXCLUDED.has_nps_referral,

@@ -199,9 +199,9 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
           }
         : undefined;
 
-      // Timeout de segurança: 30 segundos
+      // Timeout de segurança: 90 segundos (aumentado de 30s para dar margem ao RPC que pode demorar até 60s)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout ao carregar análise temporal')), 30000);
+        setTimeout(() => reject(new Error('Timeout ao carregar análise temporal')), 90000);
       });
 
       const dataPromise = !selectedPlanner

@@ -15,28 +15,75 @@ DECLARE
   v_tenure_pillar INTEGER;
   v_health_score INTEGER;
   v_health_category TEXT;
+  v_nps_value INTEGER; -- NPS a ser usado (próprio ou herdado)
+  v_payer_nps INTEGER; -- NPS do pagante (para herança)
 BEGIN
+  -- Validar que recorded_date não é futura
+  IF p_recorded_date > CURRENT_DATE THEN
+    RAISE EXCEPTION 'recorded_date não pode ser data futura: %. Use CURRENT_DATE ou uma data passada.', p_recorded_date;
+  END IF;
+
   -- Buscar dados do cliente
   SELECT * INTO v_client
   FROM clients
   WHERE id = p_client_id;
 
-  -- Ignorar cônjuges
-  IF v_client.is_spouse = TRUE THEN
+  -- Validar que cliente foi importado (tem last_seen_at)
+  IF v_client.last_seen_at IS NULL THEN
+    RAISE WARNING 'Cliente % (nome: %) não tem last_seen_at, pulando criação de histórico', p_client_id, v_client.name;
     RETURN;
+  END IF;
+
+  -- Validar que last_seen_at não é futura
+  IF v_client.last_seen_at > CURRENT_TIMESTAMP THEN
+    RAISE WARNING 'Cliente % (nome: %) tem last_seen_at futura (%), pulando criação de histórico', 
+      p_client_id, v_client.name, v_client.last_seen_at;
+    RETURN;
+  END IF;
+
+  -- CORREÇÃO CRÍTICA: Cônjuges agora têm histórico criado
+  -- Removido: IF v_client.is_spouse = TRUE THEN RETURN; END IF;
+
+  -- Determinar NPS a ser usado (próprio ou herdado do pagante)
+  v_nps_value := v_client.nps_score_v3;
+  
+  -- Se for cônjuge sem NPS próprio, buscar do pagante
+  IF v_client.is_spouse = TRUE 
+     AND v_client.nps_score_v3 IS NULL 
+     AND v_client.spouse_partner_name IS NOT NULL 
+     AND v_client.planner IS NOT NULL THEN
+    -- Buscar NPS do pagante usando spouse_partner_name + planner
+    -- Normalizar nome para busca (lowercase, trim)
+    SELECT nps_score_v3 INTO v_payer_nps
+    FROM clients
+    WHERE lower(trim(name)) = lower(trim(v_client.spouse_partner_name))
+      AND planner = v_client.planner
+      AND (is_spouse = FALSE OR is_spouse IS NULL)
+    LIMIT 1;
+    
+    -- Se encontrou NPS do pagante, usar ele
+    IF v_payer_nps IS NOT NULL THEN
+      v_nps_value := v_payer_nps;
+    END IF;
   END IF;
 
   -- Calcular NPS Pillar (-10 a 20 pontos)
   -- NOVA LÓGICA: Detrator = -10, Neutro = 10, Promotor = 20, Null = 10
-  v_nps_pillar := 10; -- Default para null (neutro)
-  IF v_client.nps_score_v3 IS NOT NULL THEN
-    IF v_client.nps_score_v3 >= 9 THEN
+  -- CORREÇÃO: Se cônjuge sem NPS (próprio nem do pagante) = 0 pontos
+  IF v_nps_value IS NOT NULL THEN
+    IF v_nps_value >= 9 THEN
       v_nps_pillar := 20; -- Promotor
-    ELSIF v_client.nps_score_v3 >= 7 THEN
+    ELSIF v_nps_value >= 7 THEN
       v_nps_pillar := 10; -- Neutro
     ELSE
-      v_nps_pillar := -10; -- Detrator (MUDANÇA: era 0, agora -10)
+      v_nps_pillar := -10; -- Detrator
     END IF;
+  ELSIF v_client.is_spouse = TRUE THEN
+    -- Cônjuge sem NPS próprio nem do pagante = 0 pontos
+    v_nps_pillar := 0;
+  ELSE
+    -- Cliente não-cônjuge sem NPS = 10 pontos (neutro padrão)
+    v_nps_pillar := 10;
   END IF;
 
   -- Calcular Referral Pillar (10 pontos)
@@ -187,7 +234,7 @@ BEGIN
     v_client.mediator,
     v_client.manager,
     v_client.months_since_closing,
-    v_client.nps_score_v3,
+    v_nps_value, -- Usar NPS próprio ou herdado (não v_client.nps_score_v3)
     v_client.has_nps_referral,
     v_client.overdue_installments,
     v_client.overdue_days,

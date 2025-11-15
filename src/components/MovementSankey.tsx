@@ -171,11 +171,12 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       // OTIMIZAÇÃO: Usar query mais eficiente - buscar apenas o registro mais recente por cliente
       // Em vez de buscar tudo e filtrar, usar DISTINCT ON ou subquery
       const allRecords: any[] = [];
-      const batchSize = 500;
+      // Aumentado batch size para reduzir número de queries (otimização)
+      const batchSize = 1000;
       const totalBatches = Math.ceil(clientIdsStr.length / batchSize);
       
-      // Processar em lotes paralelos (limitado a 3 simultâneos para não sobrecarregar)
-      const maxConcurrent = 3;
+      // Processar em lotes paralelos (aumentado para 5 simultâneos para melhor performance)
+      const maxConcurrent = 5;
       for (let i = 0; i < clientIdsStr.length; i += batchSize * maxConcurrent) {
         const batches: Promise<any>[] = [];
         
@@ -197,7 +198,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
                 .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
           .lte('recorded_date', dateStr)
           .order('recorded_date', { ascending: false })
-                .limit(10000); // Limite de segurança
+                .limit(5000); // Limite otimizado (reduzido de 10000 para melhor performance)
         
         if (error) {
                 console.error(`Erro ao buscar histórico do lote ${batchStart}-${batchStart + batch.length}:`, error);

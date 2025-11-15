@@ -672,15 +672,15 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="w-full min-w-[600px] sm:min-w-0">
               <thead>
                 <tr className="border-b">
                   <th 
-                    className="text-left p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-left p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('planner')}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
                       Planejador
                       {sortColumn === 'planner' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -691,10 +691,10 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                     </div>
                   </th>
                   <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-center p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('total')}
                   >
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2">
                       Total
                       {sortColumn === 'total' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -705,10 +705,10 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                     </div>
                   </th>
                   <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-center p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('excellent')}
                   >
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2">
                       Ótimo
                       {sortColumn === 'excellent' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -719,10 +719,10 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                     </div>
                   </th>
                   <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-center p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('stable')}
                   >
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2">
                       Estável
                       {sortColumn === 'stable' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -733,10 +733,10 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                     </div>
                   </th>
                   <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-center p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('warning')}
                   >
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2">
                       Atenção
                       {sortColumn === 'warning' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -747,10 +747,10 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                     </div>
                   </th>
                   <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-center p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('critical')}
                   >
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2">
                       Crítico
                       {sortColumn === 'critical' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -761,10 +761,10 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                     </div>
                   </th>
                   <th 
-                    className="text-center p-2 cursor-pointer hover:bg-background/50 transition-colors"
+                    className="text-center p-2 sm:p-3 text-xs sm:text-sm cursor-pointer hover:bg-background/50 transition-colors"
                     onClick={() => handleSort('risk')}
                   >
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2">
                       % Risco
                       {sortColumn === 'risk' ? (
                         sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> :
@@ -781,29 +781,29 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
                   const riskPercentage = Math.round(((data.critical + data.warning) / data.total) * 100);
                   return (
                     <tr key={data.planner} className="border-b hover:bg-background/50">
-                      <td className="p-2 font-medium">{data.planner}</td>
-                      <td className="p-2 text-center">{data.total}</td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 sm:p-3 font-medium text-xs sm:text-sm">{data.planner}</td>
+                      <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">{data.total}</td>
+                      <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">
                         <Badge variant="outline" className="text-green-600 border-green-600">
                           {data.excellent}
                         </Badge>
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">
                         <Badge variant="outline" className="text-blue-600 border-blue-600">
                           {data.stable}
                         </Badge>
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">
                         <Badge variant="outline" className="text-yellow-600 border-yellow-600">
                           {data.warning}
                         </Badge>
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">
                         <Badge variant="outline" className="text-red-600 border-red-600">
                           {data.critical}
                         </Badge>
                       </td>
-                      <td className="p-2 text-center">
+                      <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">
                         <Badge 
                           variant={riskPercentage > 40 ? "destructive" : riskPercentage > 20 ? "secondary" : "outline"}
                         >

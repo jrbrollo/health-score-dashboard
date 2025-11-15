@@ -31,10 +31,25 @@ export async function getAuthFilters(
     case 'mediator':
       // Mediador vê sua estrutura + cascata abaixo
       const mediatorCascade = await getHierarchyCascade();
+      // Sempre incluir o próprio nome do mediador, mesmo se cascade retornar vazio
+      const mediatorNames = mediatorCascade?.mediatorNames || [];
+      // Garantir que o próprio nome está incluído (normalizado para comparação)
+      const normalizedOwnName = profile.hierarchyName.toLowerCase().trim();
+      const hasOwnName = mediatorNames.some(name => 
+        name.toLowerCase().trim() === normalizedOwnName
+      );
+      if (!hasOwnName) {
+        mediatorNames.push(profile.hierarchyName);
+      }
+      console.log('🔐 Mediador - Cascade:', {
+        cascade: mediatorCascade,
+        mediatorNames,
+        ownName: profile.hierarchyName
+      });
       return {
         selectedPlanner: null,
         managers: [],
-        mediators: mediatorCascade?.mediatorNames || [profile.hierarchyName],
+        mediators: mediatorNames,
         leaders: mediatorCascade?.leaderNames || [],
       };
 
