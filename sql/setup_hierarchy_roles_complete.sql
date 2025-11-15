@@ -94,6 +94,7 @@ BEGIN
     WHEN 'planner' THEN
       -- Planejadores: buscar todos os nomes DISTINTOS da coluna planner
       -- que NÃO estão na tabela hierarchy_roles com outro cargo
+      -- E que NÃO são apenas números
       RETURN QUERY
       SELECT DISTINCT c.planner::TEXT
       FROM clients c
@@ -102,6 +103,8 @@ BEGIN
         AND trim(c.planner) != ''
         AND trim(c.planner) != '#n/d'
         AND trim(c.planner) != '#REF!'
+        -- Excluir valores que são apenas números
+        AND trim(c.planner) !~ '^[0-9]+$'
         -- Excluir nomes que são Gerentes, Mediadores ou Líderes
         AND c.planner NOT IN (
           SELECT hr.name

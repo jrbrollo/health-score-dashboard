@@ -6,11 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Logo } from '@/components/Logo';
+import { cn } from '@/lib/utils';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -41,6 +44,7 @@ export default function Login() {
   const [availableNames, setAvailableNames] = useState<string[]>([]);
   const [loadingNames, setLoadingNames] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
+  const [hierarchyNameSearchOpen, setHierarchyNameSearchOpen] = useState(false);
 
   // Carregar nomes quando role mudar
   const handleRoleChange = async (role: string) => {
@@ -356,7 +360,53 @@ export default function Login() {
                       <p className="text-sm text-muted-foreground p-2">
                         Nenhum {getRoleLabel(signupRole).toLowerCase()} encontrado na base de dados.
                       </p>
+                    ) : signupRole === 'planner' ? (
+                      // Para planejadores, usar componente com busca
+                      <Popover open={hierarchyNameSearchOpen} onOpenChange={setHierarchyNameSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={hierarchyNameSearchOpen}
+                            className="w-full justify-between"
+                          >
+                            {signupHierarchyName
+                              ? availableNames.find((name) => name === signupHierarchyName)
+                              : `Selecione seu nome como ${getRoleLabel(signupRole)}`}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder={`Buscar ${getRoleLabel(signupRole).toLowerCase()}...`} />
+                            <CommandList className="max-h-[300px] overflow-y-auto">
+                              <CommandEmpty>Nenhum {getRoleLabel(signupRole).toLowerCase()} encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                {availableNames.map((name) => (
+                                  <CommandItem
+                                    key={name}
+                                    value={name}
+                                    onSelect={() => {
+                                      setSignupHierarchyName(name);
+                                      setHierarchyNameSearchOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        signupHierarchyName === name ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <span className="truncate">{name}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     ) : (
+                      // Para outros cargos, usar Select simples
                       <Select 
                         value={signupHierarchyName} 
                         onValueChange={setSignupHierarchyName}

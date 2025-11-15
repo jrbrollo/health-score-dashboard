@@ -1,0 +1,2232 @@
+{
+  "mediator": "Gustavo Machado",
+  "csv": {
+    "totalClients": 115,
+    "nonSpouseCount": 94,
+    "spouseCount": 21,
+    "avgScore": 56.7,
+    "minScore": 5,
+    "maxScore": 85,
+    "medianScore": 55,
+    "categoryCounts": {
+      "Ótimo": 9,
+      "Estável": 83,
+      "Atenção": 22,
+      "Crítico": 1
+    },
+    "avgBreakdown": {
+      "nps": 8.87,
+      "referral": 0.09,
+      "payment": 39.04,
+      "crossSell": 2.13,
+      "tenure": 6.57
+    }
+  },
+  "tool": {
+    "totalClients": 115,
+    "avgScore": 61,
+    "categoryCounts": {
+      "Ótimo": 15,
+      "Estável": 92,
+      "Atenção": 7,
+      "Crítico": 1
+    }
+  },
+  "differences": {
+    "totalClients": 0,
+    "avgScore": -4.3,
+    "categoryCounts": {
+      "Ótimo": -6,
+      "Estável": -9,
+      "Atenção": 15,
+      "Crítico": 0
+    }
+  },
+  "clients": [
+    {
+      "name": "Abner Lucio Aires Schimidt",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 1
+    },
+    {
+      "name": "Alessandra Christiane Barboza Santos",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 85,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 20,
+        "referral": 10,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 10
+    },
+    {
+      "name": "Alex Renan Almeida Godoy",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Alexandre Rodrigo Soares",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 5,
+      "category": "Crítico",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": -10,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 2,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Amanda Rezende Gimenes",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 1
+    },
+    {
+      "name": "Ana Paula Martins das Chagas",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 6
+    },
+    {
+      "name": "Andréia Marques Costa",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 80,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": 9,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Anna Carolina Zamperlini",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 6
+    },
+    {
+      "name": "Anna Vitória Pinto Camargo",
+      "planner": "Lara Assunção",
+      "isSpouse": false,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Augusto Romano Tinfre",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Barbara Bueno Silva",
+      "planner": "Gustavo Machado",
+      "isSpouse": true,
+      "healthScore": 45,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Barbara Stephanie Soares de São Joaquim",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 6
+    },
+    {
+      "name": "Beatriz Corrêa",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Bianca Gomes Barbosa de Oliveira",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 25,
+        "crossSell": 5,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 1,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 8
+    },
+    {
+      "name": "Brisa Albuquerque",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Bruna Alvite Nogueira Gomes",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Bruno Lopes",
+      "planner": "11",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Bárbara Miranda",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Carla Dias de Borba",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Carlos Henrique Cabral Viana",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 4
+    },
+    {
+      "name": "Carolina Rocha Figueiredo da Silva",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "Carolina Vecchi",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Caroline Zaia de Assis",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 45,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Cirenio José da Gama",
+      "planner": "5",
+      "isSpouse": false,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Claudia Brandão Onaga",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Claudia Regina de Souza Brandão",
+      "planner": "6",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Cláudia de Carvalho Palma",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Danylo Vaz Francisquini",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Diandra",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Edilson da Conceição Moura Junior",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Elizeu Victor Gomes de Melo",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Emilly Caroliny Rodrigues de Sousa Paes Landim",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 25,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 1,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Erika Danielle Gonçalves",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Fabio Macedo da Costa",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 5
+    },
+    {
+      "name": "Fabrício Lopes",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 1
+    },
+    {
+      "name": "Felipe de Jesus Gonçalves",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Fernanda Muniz de Sousa",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 16
+    },
+    {
+      "name": "Fhilipi Matheus Junqueira Campos Carvalho",
+      "planner": "Fabrício Viana",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "GABRIELE PAOLI DALLA POZZA",
+      "planner": "Fabrício Viana",
+      "isSpouse": true,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Gabriel Dominato Silva",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Gabriel Luiz Salomão",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 10
+      },
+      "npsScoreV3": 8,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "Gabriela Maria Cursino da Silva",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Gabriela Ramos Guimarães Lage",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Gisele Alvarenga Sanches",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "Gleice Santos Meneses",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Guilherme Henrique Ikeda",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Gustavo Vicente de Brito Catelani",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "Henrique Barros Lopes",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 23
+    },
+    {
+      "name": "Igor Storck da Silva",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Italo Antonio Rodrigues Nascimento de Azeredo",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 4
+    },
+    {
+      "name": "Izabel Campos Mesquita",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 80,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 15,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 3,
+      "monthsSinceClosing": 14
+    },
+    {
+      "name": "Jessica de Bosi e Araujo",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 10
+    },
+    {
+      "name": "John Victor Ferreira Alves",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "João Pedro Carvalho Silva",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": 8
+    },
+    {
+      "name": "João Pedro Quaranta de Almeida",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 12
+    },
+    {
+      "name": "João Pedro Ronconi",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Julia Duarte Melo",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Juliana de Pieri Coelho",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 4
+    },
+    {
+      "name": "Jéssica Lemes Siqueira",
+      "planner": "Gustavo Machado",
+      "isSpouse": true,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "KEYLLA AGUIAR DOS SANTOS",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Kamile Danielle de Souza Machado",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 8
+    },
+    {
+      "name": "Karina Muniz Viana",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 80,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 15,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 4,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Kirley Farias",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Laura de Oliveira Ferreira Guedelha Coutinho",
+      "planner": "5",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Laís Valeria de Oliveira Santana",
+      "planner": "Lara Assunção",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Leonardo Brunheroto Redondano",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Leonardo Leite Moura de Matos",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": 6
+    },
+    {
+      "name": "Lucas Calegari Borelli",
+      "planner": "9",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Lucas Paulino Comparini",
+      "planner": "9",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Lucas dos Santos da Silva",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 75,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": 14
+    },
+    {
+      "name": "Luiz de Oliveira Araújo",
+      "planner": "Lara Assunção",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Luiza de Almeida Soares",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 4
+    },
+    {
+      "name": "Léo Kortz Vilas Boas",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "MARIA CLAUDIA ARAUJO FERREIRA",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Marcela Oliveira de Assunção",
+      "planner": "Lara Assunção",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Marcia Moussallem",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 75,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 10
+    },
+    {
+      "name": "Marcos Gimenes",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Maria Eduarda Fernandes de Oliveira",
+      "planner": "Lara Assunção",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Maria auxiliadora taveira lopes",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Mariana Gonçalves Las Casas",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Mariana Scatolin Rossafa Garcia",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Mariel Carvalho Gavioli Vidal",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Marilene Silva Martins",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Mayara Flores",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 45,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Monica Olinda de Magalhaes Barros",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 80,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Monique Fernandes de Sousa yamaoka",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Naiara Gomes de Melo",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 50,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Nara Froes de Aguilar Giocondo",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 75,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Nathan Silva Badu dos Santos",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 1
+    },
+    {
+      "name": "Nicole Ross de Santiago",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 25,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 1,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Paulo Roberto Ignacio Cardoso",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Pedro Henrique Naressi Machado",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 4
+    },
+    {
+      "name": "Priscila Pires",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Raquel Satie Yamaki Kourroski",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Ravena Seida Tavares de Melo",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "Regina Costa Silva",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 70,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": 7
+    },
+    {
+      "name": "Reinaldo Francisco da Silva",
+      "planner": "Vinicius Quinteiro",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Renata França Marangone",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 3
+    },
+    {
+      "name": "Renata Rocha Santos",
+      "planner": "0",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Renato Munhoz",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Roberto Savio Ragazini",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 19
+    },
+    {
+      "name": "Salatiel Costa Farias",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 5
+    },
+    {
+      "name": "Sergio Lopes",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 45,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Silvio Matheus de Medeiros Siuta",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 10,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 2,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Suellen Silvia machado",
+      "planner": "12",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Tatiana Soares da Silva Skiavine",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 8
+    },
+    {
+      "name": "Thais Kwiatkowski da Silva",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 65,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 15
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 11
+    },
+    {
+      "name": "Thais Santos Rossi",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 25,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 1,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Thaynara de Jesus da Luz Santos",
+      "planner": "Fabrício Viana",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 2
+    },
+    {
+      "name": "Victor Alexandre Moro Valentim",
+      "planner": "Gustavo Machado",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "Victor Hugo Buffon",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 80,
+      "category": "Ótimo",
+      "breakdown": {
+        "nps": 20,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 5,
+        "tenure": 15
+      },
+      "npsScoreV3": 10,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 1,
+      "monthsSinceClosing": 9
+    },
+    {
+      "name": "Vitória dos Santos Carvalho Junqueira",
+      "planner": "12",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    },
+    {
+      "name": "Yasmin Trioni Machado Ganzaroli",
+      "planner": "Bianca Sara Garcia Onaga",
+      "isSpouse": false,
+      "healthScore": 60,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 10
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 8
+    },
+    {
+      "name": "Ingra Cristina de Oliveira Morais",
+      "planner": "Elisa Cardoso",
+      "isSpouse": false,
+      "healthScore": 55,
+      "category": "Estável",
+      "breakdown": {
+        "nps": 10,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 5
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": 0
+    },
+    {
+      "name": "EDUARDO LOPES",
+      "planner": "Elisa Cardoso",
+      "isSpouse": true,
+      "healthScore": 40,
+      "category": "Atenção",
+      "breakdown": {
+        "nps": 0,
+        "referral": 0,
+        "payment": 40,
+        "crossSell": 0,
+        "tenure": 0
+      },
+      "npsScoreV3": null,
+      "overdueInstallments": 0,
+      "overdueDays": 0,
+      "crossSellCount": 0,
+      "monthsSinceClosing": null
+    }
+  ]
+}

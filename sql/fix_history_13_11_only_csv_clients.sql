@@ -1,6 +1,7 @@
--- Script para recriar históricos do dia 13/11/2025 com nova lógica de NPS herdado
--- Execute este script APÓS atualizar a função record_health_score_history_v3
--- Data: 2025-01-XX
+-- Script para CORRIGIR o histórico do dia 13/11/2025
+-- Problema: O histórico atual inclui 1.813 clientes, mas a planilha do 13/11 tem apenas 1.176
+-- Solução: Deletar o histórico atual e recriar APENAS para clientes que estavam na planilha do 13/11
+-- (clientes com last_seen_at = '2025-11-13')
 
 -- ============================================
 -- 1. DELETAR HISTÓRICOS EXISTENTES DO DIA 13/11
@@ -9,23 +10,24 @@ DELETE FROM health_score_history
 WHERE recorded_date = '2025-11-13';
 
 -- ============================================
--- 2. RECRIAR HISTÓRICOS COM NOVA LÓGICA
+-- 2. RECRIAR HISTÓRICOS APENAS PARA CLIENTES DA PLANILHA DO 13/11
 -- ============================================
--- A função record_health_score_history_v3 já foi atualizada para herdar NPS do pagante
--- Vamos chamá-la para todos os clientes que existiam no dia 13/11
+-- IMPORTANTE: Apenas clientes com last_seen_at = '2025-11-13' devem estar no histórico
+-- Esses são os clientes que estavam na planilha do dia 13/11
 
 DO $$
 DECLARE
   v_client RECORD;
   v_count INTEGER := 0;
 BEGIN
-  -- Buscar todos os clientes que existiam no dia 13/11
-  -- (clientes com last_seen_at <= 13/11 ou que foram criados antes de 14/11)
+  -- Buscar APENAS clientes que estavam na planilha do 13/11
+  -- Critério: last_seen_at = '2025-11-13' (data exata da planilha)
+  -- IMPORTANTE: Este script deve ser executado APÓS importar a planilha do 13/11
   FOR v_client IN 
     SELECT DISTINCT id
     FROM clients
-    WHERE (last_seen_at IS NULL OR last_seen_at <= '2025-11-13 23:59:59'::TIMESTAMPTZ)
-      AND created_at <= '2025-11-14 00:00:00'::TIMESTAMPTZ
+    WHERE last_seen_at IS NOT NULL
+      AND DATE(last_seen_at) = '2025-11-13'::DATE
       AND name != '0'
       AND planner != '0'
     ORDER BY id
@@ -46,30 +48,21 @@ END $$;
 -- ============================================
 -- 3. VERIFICAÇÃO
 -- ============================================
--- Verificar quantos históricos foram criados
+-- Verificar quantos históricos foram criados (deve ser ~1.176)
 SELECT 
   COUNT(*) as total_historicos,
   COUNT(*) FILTER (WHERE is_spouse = true) as conjuges,
   COUNT(*) FILTER (WHERE is_spouse = false OR is_spouse IS NULL) as nao_conjuges,
-  AVG(health_score) as media_score,
-  AVG(nps_score_v3_pillar) as media_nps_pillar
+  ROUND(AVG(health_score), 2) as media_score,
+  ROUND(AVG(nps_score_v3_pillar), 2) as media_nps_pillar
 FROM health_score_history
 WHERE recorded_date = '2025-11-13';
 
--- Verificar alguns exemplos de cônjuges com NPS herdado
+-- Verificar se há clientes com last_seen_at diferente de 13/11 (não deveria ter)
 SELECT 
-  h.client_name,
-  h.planner,
-  h.is_spouse,
-  h.nps_score_v3,
-  h.nps_score_v3_pillar,
-  h.health_score,
-  c.spouse_partner_name
+  COUNT(*) as clientes_com_last_seen_diferente,
+  COUNT(*) FILTER (WHERE DATE(c.last_seen_at) != '2025-11-13'::DATE) as diferentes_de_13_11
 FROM health_score_history h
 LEFT JOIN clients c ON h.client_id = c.id
-WHERE h.recorded_date = '2025-11-13'
-  AND h.is_spouse = true
-LIMIT 10;
-
-
+WHERE h.recorded_date = '2025-11-13';
 

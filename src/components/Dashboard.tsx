@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { Client, Planner, HealthScore, BulkImportPayload } from "@/types/client";
 import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
 import { buildUniqueList, applyHierarchyFilters, uniqueById, HierarchyFilters } from "@/lib/filters";
+import { getHierarchyNames } from "@/services/hierarchyService";
 import { HealthScoreBadge } from "./HealthScoreBadge";
 import { AnalyticsView } from "./AnalyticsView";
 import { BulkImportV3 } from "./BulkImportV3";
@@ -78,12 +79,37 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   const [clientHistory, setClientHistory] = useState<HealthScoreHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Hierarquia persistente da tabela hierarchy_roles
+  const [managers, setManagers] = useState<string[]>([]);
+  const [mediators, setMediators] = useState<string[]>([]);
+  const [leaders, setLeaders] = useState<string[]>([]);
+  
+  // Carregar hierarquia da tabela hierarchy_roles
+  useEffect(() => {
+    const loadHierarchy = async () => {
+      try {
+        const hierarchy = await getHierarchyNames();
+        setManagers(hierarchy.managers);
+        setMediators(hierarchy.mediators);
+        setLeaders(hierarchy.leaders);
+      } catch (error) {
+        console.error('Erro ao carregar hierarquia:', error);
+      }
+    };
+    loadHierarchy();
+  }, []);
 
-  // Unique planners & hierarchy lists (normalizados)
-  const planners = useMemo(() => buildUniqueList(clients, 'planner'), [clients]);
-  const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
-  const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
-  const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
+  // Unique planners (ainda vem dos clientes, mas filtra valores numéricos)
+  const planners = useMemo(() => {
+    const allPlanners = buildUniqueList(clients, 'planner');
+    // Filtrar valores numéricos e nomes que são Gerentes/Mediadores/Líderes
+    return allPlanners.filter(p => {
+      // Excluir valores que são apenas números
+      if (/^[0-9]+$/.test(p.trim())) return false;
+      // Excluir nomes que são Gerentes, Mediadores ou Líderes
+      return !managers.includes(p) && !mediators.includes(p) && !leaders.includes(p);
+    });
+  }, [clients, managers, mediators, leaders]);
 
   // Memoizar classes CSS baseadas no tema para evitar recálculo
   const themeClasses = useMemo(() => ({

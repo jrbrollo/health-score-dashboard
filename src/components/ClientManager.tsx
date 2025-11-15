@@ -25,6 +25,7 @@ import { HealthScoreBadge } from "./HealthScoreBadge";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { Logo } from "./Logo";
 import { buildUniqueList, applyHierarchyFilters, HierarchyFilters } from "@/lib/filters";
+import { getHierarchyNames } from "@/services/hierarchyService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { temporalService } from "@/services/temporalService";
@@ -82,10 +83,37 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
     }
   }, [viewingClient]);
 
-  const planners = useMemo(() => buildUniqueList(clients, 'planner') as Planner[], [clients]);
-  const managers = useMemo(() => buildUniqueList(clients, 'manager'), [clients]);
-  const mediators = useMemo(() => buildUniqueList(clients, 'mediator'), [clients]);
-  const leaders = useMemo(() => buildUniqueList(clients, 'leader'), [clients]);
+  // Hierarquia persistente da tabela hierarchy_roles
+  const [managers, setManagers] = useState<string[]>([]);
+  const [mediators, setMediators] = useState<string[]>([]);
+  const [leaders, setLeaders] = useState<string[]>([]);
+  
+  // Carregar hierarquia da tabela hierarchy_roles
+  useEffect(() => {
+    const loadHierarchy = async () => {
+      try {
+        const hierarchy = await getHierarchyNames();
+        setManagers(hierarchy.managers);
+        setMediators(hierarchy.mediators);
+        setLeaders(hierarchy.leaders);
+      } catch (error) {
+        console.error('Erro ao carregar hierarquia:', error);
+      }
+    };
+    loadHierarchy();
+  }, []);
+
+  // Unique planners (ainda vem dos clientes, mas filtra valores numéricos)
+  const planners = useMemo(() => {
+    const allPlanners = buildUniqueList(clients, 'planner') as Planner[];
+    // Filtrar valores numéricos e nomes que são Gerentes/Mediadores/Líderes
+    return allPlanners.filter(p => {
+      // Excluir valores que são apenas números
+      if (/^[0-9]+$/.test(p.trim())) return false;
+      // Excluir nomes que são Gerentes, Mediadores ou Líderes
+      return !managers.includes(p) && !mediators.includes(p) && !leaders.includes(p);
+    });
+  }, [clients, managers, mediators, leaders]);
   
   // Labels para os filtros
   const plannerLabel = filterPlanner === "all" ? "Todos os Planejadores" : filterPlanner;

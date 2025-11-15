@@ -179,3 +179,5 @@ WHERE recorded_date = '2025-11-13';
 
 **Última atualização:** 2025-01-XX
 
+
+

@@ -1,0 +1,45 @@
+{
+  "date": "2025-11-13",
+  "csv": {
+    "totalClients": 1176,
+    "nonSpouseCount": 963,
+    "spouseCount": 213,
+    "avgScore": 56,
+    "minScore": 5,
+    "maxScore": 95,
+    "medianScore": 55,
+    "categoryCounts": {
+      "Ótimo": 121,
+      "Estável": 803,
+      "Atenção": 235,
+      "Crítico": 17
+    },
+    "avgBreakdown": {
+      "nps": 9.2,
+      "referral": 0.31,
+      "payment": 38.73,
+      "crossSell": 2.16,
+      "tenure": 5.6
+    }
+  },
+  "database": {
+    "totalClients": 1813,
+    "avgScore": 57.05,
+    "categoryCounts": {
+      "Ótimo": 210,
+      "Estável": 1472,
+      "Atenção": 94,
+      "Crítico": 37
+    }
+  },
+  "differences": {
+    "totalClients": -637,
+    "avgScore": -1.05,
+    "categoryCounts": {
+      "Ótimo": -89,
+      "Estável": -669,
+      "Atenção": 141,
+      "Crítico": -20
+    }
+  }
+}
