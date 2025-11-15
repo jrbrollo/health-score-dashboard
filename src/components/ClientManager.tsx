@@ -17,7 +17,12 @@ import {
   Eye,
   TrendingUp,
   ChevronsUpDown,
-  Check
+  Check,
+  Download,
+  Save,
+  Bookmark,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
