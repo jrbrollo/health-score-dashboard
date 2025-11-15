@@ -231,33 +231,56 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       // OTIMIZAÇÃO: Processar mais eficientemente - usar Map direto
       const latestByClient = new Map<string, HealthScoreHistory>();
       const recordsByClient = new Map<string, any>();
+      const exactDateRecords = new Map<string, any>(); // Registros com data exata
       
       // Agrupar e pegar apenas o mais recente de cada cliente em uma única passada
+      const targetDateNormalized = new Date(targetDate);
+      targetDateNormalized.setHours(0, 0, 0, 0);
+      
       allRecords.forEach((record: any) => {
         const clientId = String(record.client_id);
         const recordDate = new Date(record.recorded_date);
         recordDate.setHours(0, 0, 0, 0);
         
-        // Filtrar apenas registros até a data alvo
-        if (recordDate > targetDate) return;
+        // Filtrar apenas registros até a data alvo (inclusive)
+        if (recordDate.getTime() > targetDateNormalized.getTime()) return;
+        
+        // Se é a data exata, marcar separadamente
+        if (recordDate.getTime() === targetDateNormalized.getTime()) {
+          exactDateRecords.set(clientId, record);
+        }
         
         const existing = recordsByClient.get(clientId);
         if (!existing) {
           recordsByClient.set(clientId, record);
         } else {
           // Comparar datas e manter apenas o mais recente
-          const existingDate = new Date(existing.recorded_date).getTime();
-          const currentDate = recordDate.getTime();
-          if (currentDate > existingDate) {
+          const existingDate = new Date(existing.recorded_date);
+          existingDate.setHours(0, 0, 0, 0);
+          const existingTime = existingDate.getTime();
+          const currentTime = recordDate.getTime();
+          if (currentTime > existingTime) {
             recordsByClient.set(clientId, record);
           }
         }
       });
       
       // Converter para HealthScoreHistory
+      // Priorizar registros com data exata, senão usar o mais recente
       recordsByClient.forEach((record, clientId) => {
-        latestByClient.set(clientId, databaseToHealthScoreHistory(record));
+        // Se há registro com data exata, usar ele; senão usar o mais recente
+        const finalRecord = exactDateRecords.has(clientId) 
+          ? exactDateRecords.get(clientId)! 
+          : record;
+        latestByClient.set(clientId, databaseToHealthScoreHistory(finalRecord));
       });
+      
+      // Log para debug
+      const exactCount = exactDateRecords.size;
+      const totalCount = latestByClient.size;
+      if (exactCount < totalCount) {
+        console.log(`⚠️ Atenção: ${totalCount - exactCount} clientes sem histórico exato para ${dateStr}, usando registro mais recente`);
+      }
 
       // Salvar no cache
       historyCache.current.set(cacheKey, latestByClient);
@@ -332,31 +355,25 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     
     const clientIds = filteredClients.map(c => String(c.id));
     
-    // Verificar se a data inicial é o primeiro dia do histórico (13/11/2025)
-    // Se for, todos os clientes devem ser considerados "Novos"
     const startDate = new Date(dateRange.from);
     startDate.setHours(0, 0, 0, 0);
-    const minHistoryDate = new Date(MIN_HISTORY_DATE);
-    minHistoryDate.setHours(0, 0, 0, 0);
-    const isFirstDayOfHistory = startDate.getTime() === minHistoryDate.getTime();
-    
-    // Verificar se estamos comparando a mesma data
     const endDate = new Date(dateRange.to);
     endDate.setHours(0, 0, 0, 0);
+    
+    // Verificar se estamos comparando a mesma data
     const isSameDate = startDate.getTime() === endDate.getTime();
     
-    // Se é o primeiro dia do histórico OU estamos comparando a mesma data,
-    // todos os clientes devem ser "Novos" (primeira aparição no histórico)
-    const forceAllAsNew = isFirstDayOfHistory || isSameDate;
-    
+    // SEMPRE buscar histórico na data inicial, mesmo que seja o primeiro dia
+    // No dia 13/11, os clientes já tinham categorias (Ótimo, Estável, Atenção, Crítico)
     let startHistory: Map<string, HealthScoreHistory>;
-    if (forceAllAsNew) {
-      // Não buscar histórico inicial - forçar todos como "Novos"
+    if (isSameDate) {
+      // Se as datas forem iguais, não há movimento para comparar
       startHistory = new Map();
-      console.log('📅 Primeiro dia do histórico ou mesma data - todos os clientes serão considerados "Novos"');
+      console.log('📅 Mesma data selecionada - não há movimento para comparar');
     } else {
-      // Buscar histórico na data inicial normalmente
+      // Buscar histórico na data inicial (sempre, mesmo que seja 13/11)
       startHistory = await loadClientHistoryForDate(dateRange.from, clientIds);
+      console.log(`📅 Histórico inicial (${format(startDate, 'dd/MM/yyyy')}): ${startHistory.size} clientes encontrados`);
     }
     setStartDateHistory(startHistory);
     
@@ -398,28 +415,34 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     }
     
     setEndDateHistory(endHistory);
+    
+    console.log(`📊 Comparando histórico:`);
+    console.log(`   - Data inicial (${format(startDate, 'dd/MM/yyyy')}): ${startHistory.size} clientes`);
+    console.log(`   - Data final (${format(endDate, 'dd/MM/yyyy')}): ${endHistory.size} clientes`);
+    console.log(`   - Total de clientes filtrados: ${filteredClients.length}`);
 
     // Comparar estados e calcular movimentos reais
     const movementMap = new Map<string, { from: string; to: string; clients: Client[] }>();
+    
+    // Se as datas forem iguais, não há movimento para comparar
+    if (isSameDate) {
+      console.log('⚠️ Mesma data selecionada - não há movimento para comparar');
+      return [];
+    }
     
     filteredClients.forEach(client => {
       const clientIdStr = String(client.id);
       const startState = startHistory.get(clientIdStr);
       const endState = endHistory.get(clientIdStr);
       
-      // Se forçamos todos como "Novos" (primeiro dia ou mesma data), tratar como novo
-      if (forceAllAsNew) {
-        if (endState) {
-          const key = `Novo → ${endState.healthCategory}`;
-          if (!movementMap.has(key)) {
-            movementMap.set(key, { from: 'Novo', to: endState.healthCategory, clients: [] });
-          }
-          movementMap.get(key)!.clients.push(client);
-        }
-        return;
-      }
+      // Verificar se os históricos são da data exata ou do mais recente até aquela data
+      const startDateExact = startState ? 
+        (new Date(startState.recordedDate).setHours(0, 0, 0, 0) === startDate.getTime()) : false;
+      const endDateExact = endState ? 
+        (new Date(endState.recordedDate).setHours(0, 0, 0, 0) === endDate.getTime()) : false;
       
       // Se não tem estado inicial, considerar como novo cliente
+      // (só acontece se o cliente não estava na data inicial)
       if (!startState) {
         if (endState) {
           const key = `Novo → ${endState.healthCategory}`;
@@ -432,6 +455,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       }
       
       // Se não tem estado final, considerar como cliente perdido
+      // (só acontece se o cliente não estava na data final)
       if (!endState) {
         const key = `${startState.healthCategory} → Perdido`;
         if (!movementMap.has(key)) {
@@ -441,8 +465,30 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         return;
       }
       
+      // IMPORTANTE: Se o estado final não é da data exata, pode ser que não haja histórico para aquela data
+      // Nesse caso, usar o estado mais recente disponível, mas logar para debug
+      if (!endDateExact && endState) {
+        const endRecordDate = new Date(endState.recordedDate);
+        endRecordDate.setHours(0, 0, 0, 0);
+        if (endRecordDate.getTime() < endDate.getTime()) {
+          // O histórico é de uma data anterior à data final
+          // Isso significa que não há histórico exato para a data final
+          // Usar o histórico mais recente disponível, mas pode não ser preciso
+          console.log(`⚠️ Cliente ${client.name} (${clientIdStr}) não tem histórico exato para ${format(endDate, 'dd/MM/yyyy')}, usando histórico de ${format(endRecordDate, 'dd/MM/yyyy')}`);
+        }
+      }
+      
+      // Comparar categorias e registrar movimento
       // Se mudou de categoria, registrar movimento
+      // Se ficou na mesma categoria, registrar como estável
       if (startState.healthCategory !== endState.healthCategory) {
+        const key = `${startState.healthCategory} → ${endState.healthCategory}`;
+        if (!movementMap.has(key)) {
+          movementMap.set(key, { from: startState.healthCategory, to: endState.healthCategory, clients: [] });
+        }
+        movementMap.get(key)!.clients.push(client);
+      } else {
+        // Cliente ficou na mesma categoria (estável)
         const key = `${startState.healthCategory} → ${endState.healthCategory}`;
         if (!movementMap.has(key)) {
           movementMap.set(key, { from: startState.healthCategory, to: endState.healthCategory, clients: [] });
@@ -462,6 +508,11 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         clientObjects: movement.clients
       }))
       .filter(m => m.value > 0);
+    
+    console.log(`✅ Movimentos calculados: ${movementsData.length} tipos diferentes`);
+    movementsData.forEach(m => {
+      console.log(`   - ${m.from} → ${m.to}: ${m.value} clientes`);
+    });
 
     return movementsData;
   };
@@ -526,6 +577,10 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     // Clientes melhorando: mudaram de categoria pior para melhor
     const improvingClients: Client[] = [];
     movements.forEach(movement => {
+      // Ignorar movimentos de "Novo" e movimentos estáveis (from === to)
+      if (movement.from === 'Novo' || movement.from === movement.to) {
+        return;
+      }
       const fromRank = categoryRank[movement.from as keyof typeof categoryRank] || 0;
       const toRank = categoryRank[movement.to as keyof typeof categoryRank] || 0;
       if (toRank > fromRank) {
@@ -536,6 +591,10 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     // Clientes piorando: mudaram de categoria melhor para pior
     const decliningClients: Client[] = [];
     movements.forEach(movement => {
+      // Ignorar movimentos de "Novo" e movimentos estáveis (from === to)
+      if (movement.from === 'Novo' || movement.from === movement.to) {
+        return;
+      }
       const fromRank = categoryRank[movement.from as keyof typeof categoryRank] || 0;
       const toRank = categoryRank[movement.to as keyof typeof categoryRank] || 0;
       if (toRank < fromRank) {
@@ -543,21 +602,16 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       }
     });
     
-    // Clientes estáveis: não mudaram de categoria (não aparecem em movements)
+    // Clientes estáveis: ficaram na mesma categoria (from === to)
     const stableClients: Client[] = [];
-    const movedClientIds = new Set(movements.flatMap(m => m.clientObjects.map(c => c.id)));
-    
-    // OTIMIZAÇÃO: Usar cache de Health Scores
-    clients.forEach(client => {
-      if (!movedClientIds.has(client.id)) {
-        const cacheKey = String(client.id);
-        if (!healthScoreCache.current.has(cacheKey)) {
-          healthScoreCache.current.set(cacheKey, calculateHealthScore(client));
-        }
-        const score = healthScoreCache.current.get(cacheKey)!;
-        if (score.category === 'Estável') {
-          stableClients.push(client);
-        }
+    movements.forEach(movement => {
+      // Ignorar movimentos de "Novo"
+      if (movement.from === 'Novo') {
+        return;
+      }
+      // Se from === to, o cliente ficou estável
+      if (movement.from === movement.to) {
+        stableClients.push(...movement.clientObjects);
       }
     });
     

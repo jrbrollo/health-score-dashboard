@@ -99,6 +99,30 @@ function databaseToHealthScoreHistory(dbData: any): HealthScoreHistory {
 }
 
 export const temporalService = {
+  // Obter a última data com histórico real
+  async getMaxHistoryDate(): Promise<Date | null> {
+    try {
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase
+          .from('health_score_history')
+          .select('recorded_date')
+          .order('recorded_date', { ascending: false })
+          .limit(1)
+          .single(),
+        10000
+      );
+
+      if (error || !data) {
+        return null;
+      }
+
+      return new Date(data.recorded_date);
+    } catch (error) {
+      console.error('Erro ao buscar última data do histórico:', error);
+      return null;
+    }
+  },
+
   // Obter análise temporal para um período específico (AS-OF)
   async getTemporalAnalysis(
     startDate: Date,
@@ -108,24 +132,72 @@ export const temporalService = {
   ): Promise<TemporalAnalysis[]> {
     try {
       // Garantir que datas não sejam anteriores à data mínima confiável
-      const safeStartDate = clampToMinHistoryDate(startDate);
-      const safeEndDate = clampToMinHistoryDate(endDate);
+      let safeStartDate = clampToMinHistoryDate(startDate);
+      let safeEndDate = clampToMinHistoryDate(endDate);
+      
+      // Normalizar datas (remover horas) - criar novas instâncias para não modificar as originais
+      safeStartDate = new Date(safeStartDate);
+      safeStartDate.setHours(0, 0, 0, 0);
+      safeEndDate = new Date(safeEndDate);
+      safeEndDate.setHours(0, 0, 0, 0);
+      
+      // Validar que start_date <= end_date
+      if (safeStartDate.getTime() > safeEndDate.getTime()) {
+        console.warn('⚠️ Data inicial maior que data final, invertendo...');
+        const temp = new Date(safeStartDate);
+        safeStartDate = new Date(safeEndDate);
+        safeEndDate = temp;
+      }
+      
+      // Validar que as datas são válidas
+      if (isNaN(safeStartDate.getTime()) || isNaN(safeEndDate.getTime())) {
+        console.error('❌ Datas inválidas:', { safeStartDate, safeEndDate });
+        return [];
+      }
+      
+      const startDateStr = safeStartDate.toISOString().split('T')[0];
+      const endDateStr = safeEndDate.toISOString().split('T')[0];
+      
+      console.log(`📊 Buscando análise temporal: ${startDateStr} até ${endDateStr}`);
       
       // Tenta RPC as-of; se não existir (404), volta para view antiga
+      // Garantir que arrays vazios sejam null (não [])
+      const managersParam = hierarchyFilters?.managers && hierarchyFilters.managers.length > 0 
+        ? hierarchyFilters.managers 
+        : null;
+      const mediatorsParam = hierarchyFilters?.mediators && hierarchyFilters.mediators.length > 0 
+        ? hierarchyFilters.mediators 
+        : null;
+      const leadersParam = hierarchyFilters?.leaders && hierarchyFilters.leaders.length > 0 
+        ? hierarchyFilters.leaders 
+        : null;
+      
       const { data, error } = await executeQueryWithTimeout(
         () => supabase.rpc('get_temporal_analysis_asof', {
-          start_date: safeStartDate.toISOString().split('T')[0],
-          end_date: safeEndDate.toISOString().split('T')[0],
+          start_date: startDateStr,
+          end_date: endDateStr,
           planner_filter: planner ?? 'all',
-          managers: hierarchyFilters?.managers ?? null,
-          mediators: hierarchyFilters?.mediators ?? null,
-          leaders: hierarchyFilters?.leaders ?? null,
+          managers: managersParam,
+          mediators: mediatorsParam,
+          leaders: leadersParam,
           include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
           include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
           include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
         }),
         60000 // 60 segundos para análise temporal
       );
+      
+      if (error) {
+        console.error('❌ Erro na chamada RPC get_temporal_analysis_asof:', error);
+        console.error('Parâmetros:', {
+          start_date: startDateStr,
+          end_date: endDateStr,
+          planner_filter: planner ?? 'all',
+          managers: hierarchyFilters?.managers ?? null,
+          mediators: hierarchyFilters?.mediators ?? null,
+          leaders: hierarchyFilters?.leaders ?? null,
+        });
+      }
 
       if (error || !data) {
         return this.calculatePlannerAnalysis(safeStartDate, safeEndDate, planner ?? 'all', hierarchyFilters);
@@ -148,8 +220,28 @@ export const temporalService = {
   ): Promise<TemporalAnalysis[]> {
     try {
       // Garantir que datas não sejam anteriores à data mínima confiável
-      const safeStartDate = clampToMinHistoryDate(startDate);
-      const safeEndDate = clampToMinHistoryDate(endDate);
+      let safeStartDate = clampToMinHistoryDate(startDate);
+      let safeEndDate = clampToMinHistoryDate(endDate);
+      
+      // Normalizar datas (remover horas) - criar novas instâncias para não modificar as originais
+      safeStartDate = new Date(safeStartDate);
+      safeStartDate.setHours(0, 0, 0, 0);
+      safeEndDate = new Date(safeEndDate);
+      safeEndDate.setHours(0, 0, 0, 0);
+      
+      // Validar que start_date <= end_date
+      if (safeStartDate.getTime() > safeEndDate.getTime()) {
+        console.warn('⚠️ Data inicial maior que data final, invertendo...');
+        const temp = new Date(safeStartDate);
+        safeStartDate = new Date(safeEndDate);
+        safeEndDate = temp;
+      }
+      
+      // Validar que as datas são válidas
+      if (isNaN(safeStartDate.getTime()) || isNaN(safeEndDate.getTime())) {
+        console.error('❌ Datas inválidas:', { safeStartDate, safeEndDate });
+        return [];
+      }
       
       // Se houver filtros hierárquicos, calcular manualmente a partir do histórico
       if (hierarchyFilters && (
@@ -159,20 +251,49 @@ export const temporalService = {
       )) {
         return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
       }
+      
+      const startDateStr = safeStartDate.toISOString().split('T')[0];
+      const endDateStr = safeEndDate.toISOString().split('T')[0];
+      
+      console.log(`📊 Buscando análise temporal agregada: ${startDateStr} até ${endDateStr}`);
+      
+      // Garantir que arrays vazios sejam null (não [])
+      const managersParam = hierarchyFilters?.managers && hierarchyFilters.managers.length > 0 
+        ? hierarchyFilters.managers 
+        : null;
+      const mediatorsParam = hierarchyFilters?.mediators && hierarchyFilters.mediators.length > 0 
+        ? hierarchyFilters.mediators 
+        : null;
+      const leadersParam = hierarchyFilters?.leaders && hierarchyFilters.leaders.length > 0 
+        ? hierarchyFilters.leaders 
+        : null;
+      
       const { data, error } = await executeQueryWithTimeout(
         () => supabase.rpc('get_temporal_analysis_asof', {
-          start_date: safeStartDate.toISOString().split('T')[0],
-          end_date: safeEndDate.toISOString().split('T')[0],
+          start_date: startDateStr,
+          end_date: endDateStr,
           planner_filter: 'all',
-          managers: hierarchyFilters?.managers ?? null,
-          mediators: hierarchyFilters?.mediators ?? null,
-          leaders: hierarchyFilters?.leaders ?? null,
+          managers: managersParam,
+          mediators: mediatorsParam,
+          leaders: leadersParam,
           include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
           include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
           include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
         }),
         60000 // 60 segundos para análise temporal agregada
       );
+      
+      if (error) {
+        console.error('❌ Erro na chamada RPC get_temporal_analysis_asof (agregada):', error);
+        console.error('Parâmetros:', {
+          start_date: startDateStr,
+          end_date: endDateStr,
+          planner_filter: 'all',
+          managers: hierarchyFilters?.managers ?? null,
+          mediators: hierarchyFilters?.mediators ?? null,
+          leaders: hierarchyFilters?.leaders ?? null,
+        });
+      }
 
       if (error || !data) {
         return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
@@ -558,9 +679,10 @@ export const temporalService = {
 
       const history = (data || []).map(databaseToHealthScoreHistory);
       
-      // Se não há histórico e estamos após a data mínima, tentar criar um registro com os dados atuais
+      // Se não há histórico, tentar criar um registro APENAS se houver last_seen_at
+      // IMPORTANTE: Não criar histórico para datas futuras ou sem dados importados
       if (history.length === 0) {
-        console.log(`[temporalService] Cliente ${clientId} sem histórico. Tentando criar automaticamente...`);
+        console.log(`[temporalService] Cliente ${clientId} sem histórico. Verificando se pode criar automaticamente...`);
         try {
           // Buscar dados atuais do cliente para pegar a data do último snapshot
           const { data: clientData, error: clientError } = await executeQueryWithTimeout(
@@ -582,37 +704,33 @@ export const temporalService = {
             return history;
           }
           
-          // Usar a data do último snapshot (last_seen_at) ou data atual, o que for maior
-          let recordDate = new Date();
-          if (clientData.last_seen_at) {
-            const lastSeen = new Date(clientData.last_seen_at);
-            lastSeen.setHours(0, 0, 0, 0);
-            // Usar a data do snapshot se for >= data mínima, senão usar data atual
-            if (lastSeen >= MIN_HISTORY_DATE) {
-              recordDate = lastSeen;
-              console.log(`[temporalService] Usando data do snapshot: ${recordDate.toLocaleDateString('pt-BR')}`);
-            } else {
-              recordDate.setHours(0, 0, 0, 0);
-              // Só criar se data atual for >= data mínima
-              if (recordDate < MIN_HISTORY_DATE) {
-                console.warn(`[temporalService] Data do snapshot (${lastSeen.toLocaleDateString('pt-BR')}) e data atual (${recordDate.toLocaleDateString('pt-BR')}) são anteriores à data mínima (${MIN_HISTORY_DATE.toLocaleDateString('pt-BR')})`);
-                return history; // Não criar histórico antes da data mínima
-              }
-              console.log(`[temporalService] Usando data atual: ${recordDate.toLocaleDateString('pt-BR')}`);
-            }
-          } else {
-            recordDate.setHours(0, 0, 0, 0);
-            // Só criar se data atual for >= data mínima
-            if (recordDate < MIN_HISTORY_DATE) {
-              console.warn(`[temporalService] Data atual (${recordDate.toLocaleDateString('pt-BR')}) é anterior à data mínima (${MIN_HISTORY_DATE.toLocaleDateString('pt-BR')})`);
-              return history; // Não criar histórico antes da data mínima
-            }
-            console.log(`[temporalService] Cliente sem last_seen_at, usando data atual: ${recordDate.toLocaleDateString('pt-BR')}`);
+          // IMPORTANTE: Só criar histórico se houver last_seen_at (dados importados)
+          // Não criar para datas futuras ou sem dados
+          if (!clientData.last_seen_at) {
+            console.log(`[temporalService] Cliente ${clientId} sem last_seen_at, não criando histórico automático`);
+            return history;
           }
           
-          // Criar histórico usando a função RPC (agora funciona para cônjuges também)
-          const recordDateStr = recordDate.toISOString().split('T')[0];
-          console.log(`[temporalService] Chamando RPC record_health_score_history_v3 para cliente ${clientId} (cônjuge: ${clientData.is_spouse ? 'sim' : 'não'}) com data ${recordDateStr}`);
+          const lastSeen = new Date(clientData.last_seen_at);
+          lastSeen.setHours(0, 0, 0, 0);
+          
+          // Só criar se a data do snapshot for >= data mínima
+          if (lastSeen < MIN_HISTORY_DATE) {
+            console.warn(`[temporalService] Data do snapshot (${lastSeen.toLocaleDateString('pt-BR')}) é anterior à data mínima (${MIN_HISTORY_DATE.toLocaleDateString('pt-BR')})`);
+            return history;
+          }
+          
+          // Verificar se a data do snapshot não é futura
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (lastSeen > today) {
+            console.warn(`[temporalService] Data do snapshot (${lastSeen.toLocaleDateString('pt-BR')}) é futura, não criando histórico`);
+            return history;
+          }
+          
+          // Criar histórico usando a função RPC com a data do snapshot (não data atual)
+          const recordDateStr = lastSeen.toISOString().split('T')[0];
+          console.log(`[temporalService] Chamando RPC record_health_score_history_v3 para cliente ${clientId} (cônjuge: ${clientData.is_spouse ? 'sim' : 'não'}) com data ${recordDateStr} (do snapshot)`);
           
           const { error: createError } = await executeQueryWithTimeout(
             () => supabase.rpc('record_health_score_history_v3', {

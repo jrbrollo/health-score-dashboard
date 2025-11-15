@@ -43,6 +43,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   const [analysisData, setAnalysisData] = useState<TemporalAnalysis[]>([]);
   const [trendData, setTrendData] = useState<TrendAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [maxHistoryDate, setMaxHistoryDate] = useState<Date | null>(null);
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -51,7 +52,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     const safeFromDate = clampToMinHistoryDate(fromDate);
     return {
       from: safeFromDate,
-      to: today // Usar apenas a data de hoje, sem hora
+      to: today // Será ajustado quando maxHistoryDate for carregado
     };
   });
   const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('line');
@@ -67,28 +68,65 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   }, [periodLength]);
 
   const handleQuickRange = (days: number) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const fromDate = startOfDay(subDays(today, days));
+    const endDate = maxHistoryDate || new Date();
+    endDate.setHours(0, 0, 0, 0);
+    const fromDate = startOfDay(subDays(endDate, days));
     // Garantir que data inicial não seja anterior à data mínima confiável
     const safeFromDate = clampToMinHistoryDate(fromDate);
     setDateRange({
       from: safeFromDate,
-      to: today // Não usar endOfDay para evitar incluir horas futuras
+      to: endDate // Usar última data com histórico, não data atual
     });
   };
 
   const handleDateChange = (range: { from?: Date; to?: Date }) => {
-    if (!range?.from) return;
+    if (!range?.from) {
+      console.warn('⚠️ handleDateChange chamado sem data inicial');
+      return;
+    }
+    
+    // Validar que a data inicial é válida
+    if (isNaN(range.from.getTime())) {
+      console.error('❌ Data inicial inválida:', range.from);
+      return;
+    }
+    
     const from = startOfDay(range.from);
     // Garantir que data não seja anterior à data mínima confiável
     const safeFrom = clampToMinHistoryDate(from);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    // Garantir que a data final não seja futura
-    const to = range?.to 
-      ? startOfDay(range.to.getTime() > today.getTime() ? today : range.to)
-      : startOfDay(safeFrom.getTime() > today.getTime() ? today : safeFrom);
+    
+    // Permitir seleção de datas futuras - a validação será feita na busca de dados
+    let to: Date;
+    if (range?.to) {
+      // Validar que a data final é válida
+      if (isNaN(range.to.getTime())) {
+        console.error('❌ Data final inválida:', range.to);
+        to = startOfDay(safeFrom);
+      } else {
+        to = startOfDay(range.to);
+      }
+    } else {
+      to = startOfDay(safeFrom);
+    }
+    
+    // Garantir que from <= to
+    if (safeFrom.getTime() > to.getTime()) {
+      console.warn('⚠️ Data inicial maior que data final, ajustando...');
+      to = new Date(safeFrom);
+    }
+    
+    // Verificar se as datas realmente mudaram para evitar atualizações desnecessárias
+    const currentFrom = dateRange.from.getTime();
+    const currentTo = dateRange.to.getTime();
+    const newFrom = safeFrom.getTime();
+    const newTo = to.getTime();
+    
+    if (currentFrom === newFrom && currentTo === newTo) {
+      console.log('📅 Período não mudou, ignorando atualização');
+      return;
+    }
+    
+    console.log(`📅 Atualizando período: ${format(safeFrom, 'dd/MM/yyyy')} até ${format(to, 'dd/MM/yyyy')}`);
     setDateRange({ from: safeFrom, to });
   };
 
@@ -104,6 +142,19 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     nps: isDarkMode ? '#6366f1' : '#4f46e5'
   };
 
+  // Carregar última data com histórico (apenas para informação, não limita seleção)
+  useEffect(() => {
+    const loadMaxHistoryDate = async () => {
+      const maxDate = await temporalService.getMaxHistoryDate();
+      if (maxDate) {
+        setMaxHistoryDate(maxDate);
+        // Não ajustar automaticamente a data final - permitir seleção de datas futuras
+        // A validação será feita na busca de dados
+      }
+    };
+    loadMaxHistoryDate();
+  }, []);
+
   // Carregar dados
   useEffect(() => {
     loadAnalysisData();
@@ -117,6 +168,25 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   const loadAnalysisData = async () => {
     setLoading(true);
     try {
+      // Validar que as datas são válidas antes de fazer a chamada
+      if (!dateRange.from || !dateRange.to || isNaN(dateRange.from.getTime()) || isNaN(dateRange.to.getTime())) {
+        console.error('❌ Datas inválidas no dateRange:', dateRange);
+        setAnalysisData([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Validar que from <= to
+      if (dateRange.from.getTime() > dateRange.to.getTime()) {
+        console.error('❌ Data inicial maior que data final:', {
+          from: format(dateRange.from, 'dd/MM/yyyy'),
+          to: format(dateRange.to, 'dd/MM/yyyy')
+        });
+        setAnalysisData([]);
+        setLoading(false);
+        return;
+      }
+      
       const managerFilter = selectedManager !== 'all' ? [selectedManager] : undefined;
       const mediatorFilter = selectedMediator !== 'all' ? [selectedMediator] : undefined;
       const leaderFilter = selectedLeader !== 'all' ? [selectedLeader] : undefined;
@@ -142,7 +212,15 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       
       setAnalysisData(data);
     } catch (error: any) {
-      console.error('Erro ao carregar dados temporais:', error);
+      console.error('❌ Erro ao carregar dados temporais:', error);
+      console.error('Parâmetros da chamada:', {
+        from: dateRange.from ? format(dateRange.from, 'dd/MM/yyyy') : 'inválido',
+        to: dateRange.to ? format(dateRange.to, 'dd/MM/yyyy') : 'inválido',
+        planner: selectedPlanner,
+        manager: selectedManager,
+        mediator: selectedMediator,
+        leader: selectedLeader
+      });
       // Em caso de erro ou timeout, definir dados vazios para não travar a aplicação
       setAnalysisData([]);
     } finally {
@@ -494,6 +572,8 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 onDateChange={handleDateChange}
                 className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}
                 minDate={MIN_HISTORY_DATE}
+                // Não limitar maxDate - permitir seleção de datas futuras
+                // A validação será feita na busca de dados
               />
             </div>
 
