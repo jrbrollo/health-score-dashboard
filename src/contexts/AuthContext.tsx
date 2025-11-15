@@ -445,13 +445,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getAvailableNames = async (role: string): Promise<string[]> => {
     try {
+      console.log('🔍 Buscando nomes para role:', role);
       const { data, error } = await supabase.rpc('get_available_names_by_role', {
         p_role: role,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro na RPC get_available_names_by_role:', error);
+        throw error;
+      }
 
-      return (data || []).map((row: any) => row.name);
+      console.log('✅ Dados retornados da RPC:', data);
+      const names = (data || []).map((row: any) => {
+        // A função SQL retorna { name: "..." }, mas pode retornar diretamente string em alguns casos
+        return typeof row === 'string' ? row : (row?.name || row);
+      });
+      console.log('📋 Nomes processados:', names);
+      return names;
     } catch (error) {
       console.error('Erro ao buscar nomes disponíveis:', error);
       return [];
