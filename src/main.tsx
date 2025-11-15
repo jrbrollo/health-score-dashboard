@@ -8,26 +8,28 @@ if (savedTheme === 'true' || (!savedTheme && window.matchMedia('(prefers-color-s
   document.documentElement.classList.add('dark');
 }
 
-// Registrar Service Worker para cache offline
+// Desabilitar Service Worker temporariamente para evitar problemas de cache
+// TODO: Reativar quando o problema de cache for resolvido
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered: ', registration);
-        // Verificar atualizações periodicamente e forçar atualização após logout/login
-        registration.update();
-      })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-      });
-    
-    // Limpar cache ao fazer logout/login
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((registration) => {
-        registration.update();
+  // Desregistrar todos os service workers existentes
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister().then(() => {
+        console.log('Service Worker desregistrado:', registration.scope);
       });
     });
   });
+  
+  // Limpar todos os caches
+  if ('caches' in window) {
+    caches.keys().then((cacheNames) => {
+      cacheNames.forEach((cacheName) => {
+        caches.delete(cacheName).then(() => {
+          console.log('Cache deletado:', cacheName);
+        });
+      });
+    });
+  }
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

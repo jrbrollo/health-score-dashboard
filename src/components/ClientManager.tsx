@@ -29,7 +29,8 @@ import {
 
 // Garantir que os ícones sejam sempre referenciados (evitar tree-shaking)
 // Esta referência garante que os ícones sejam incluídos mesmo após logout/login
-const ICONS_REF = {
+// Usar uma função que retorna os ícones para garantir que não sejam removidos
+const getIcons = () => ({
   Search, 
   Users, 
   X,
@@ -43,9 +44,13 @@ const ICONS_REF = {
   Bookmark,
   ChevronLeft,
   ChevronRight
-};
-// Usar void para evitar warnings de variável não usada, mas garantir que seja incluída
-void ICONS_REF;
+});
+
+// Chamar a função para garantir que os ícones sejam incluídos no bundle
+// Isso evita que o tree-shaking remova os ícones não usados diretamente
+if (process.env.NODE_ENV === 'development') {
+  console.log('Ícones carregados:', Object.keys(getIcons()));
+}
 import { Client, Planner } from "@/types/client";
 import { calculateHealthScore } from "@/utils/healthScore";
 import { HealthScoreBadge } from "./HealthScoreBadge";
