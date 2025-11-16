@@ -11,6 +11,122 @@ const averageFromRecords = (records: any[], selector: (record: any) => number | 
   return sum / records.length;
 };
 
+/**
+ * Preenche lacunas temporais usando Forward Filling (último valor conhecido)
+ * Garante que todos os dias do período tenham dados, mesmo quando não há upload (ex: fins de semana)
+ * 
+ * IMPORTANTE: Aplica forward filling por planejador separadamente para garantir consistência
+ * 
+ * @param data Array de dados temporais com lacunas
+ * @param startDate Data inicial do período
+ * @param endDate Data final do período
+ * @returns Array completo com todos os dias preenchidos
+ */
+function fillGapsWithForwardFill(
+  data: TemporalAnalysis[],
+  startDate: Date,
+  endDate: Date
+): TemporalAnalysis[] {
+  if (!data || data.length === 0) {
+    // Se não há dados, retornar array vazio (não criar dados fictícios)
+    return [];
+  }
+
+  // Normalizar datas (remover horas)
+  const normalizedStart = new Date(startDate);
+  normalizedStart.setHours(0, 0, 0, 0);
+  const normalizedEnd = new Date(endDate);
+  normalizedEnd.setHours(0, 0, 0, 0);
+
+  // Agrupar dados por planejador para aplicar forward filling separadamente
+  const dataByPlanner = new Map<string | Planner, TemporalAnalysis[]>();
+  data.forEach(item => {
+    const plannerKey = item.planner || 'all';
+    if (!dataByPlanner.has(plannerKey)) {
+      dataByPlanner.set(plannerKey, []);
+    }
+    dataByPlanner.get(plannerKey)!.push(item);
+  });
+
+  // Aplicar forward filling para cada planejador separadamente
+  const result: TemporalAnalysis[] = [];
+  
+  for (const [planner, plannerData] of dataByPlanner.entries()) {
+    // Criar mapa de dados por data para este planejador (chave: YYYY-MM-DD)
+    const dataMap = new Map<string, TemporalAnalysis>();
+    plannerData.forEach(item => {
+      const itemDate = new Date(item.recordedDate);
+      itemDate.setHours(0, 0, 0, 0);
+      const dateKey = itemDate.toISOString().split('T')[0];
+      dataMap.set(dateKey, item);
+    });
+
+    // Ordenar dados existentes por data
+    const sortedData = Array.from(dataMap.values()).sort(
+      (a, b) => a.recordedDate.getTime() - b.recordedDate.getTime()
+    );
+
+    if (sortedData.length === 0) {
+      continue; // Pular se não há dados para este planejador
+    }
+
+    // Gerar sequência completa de datas do período para este planejador
+    const currentDate = new Date(normalizedStart);
+    let lastKnownValue: TemporalAnalysis | null = null;
+
+    // Encontrar o primeiro valor conhecido (pode ser antes de startDate)
+    for (const item of sortedData) {
+      const itemDate = new Date(item.recordedDate);
+      itemDate.setHours(0, 0, 0, 0);
+      
+      if (itemDate <= normalizedStart) {
+        lastKnownValue = item;
+      } else {
+        break;
+      }
+    }
+
+    // Se não há valor antes de startDate, usar o primeiro disponível
+    if (!lastKnownValue && sortedData.length > 0) {
+      lastKnownValue = sortedData[0];
+    }
+
+    // Iterar por cada dia do período
+    const plannerStartDate = new Date(normalizedStart);
+    while (plannerStartDate <= normalizedEnd) {
+      const dateKey = plannerStartDate.toISOString().split('T')[0];
+      const existingData = dataMap.get(dateKey);
+
+      if (existingData) {
+        // Há dados reais para esta data: usar e atualizar último valor conhecido
+        result.push(existingData);
+        lastKnownValue = existingData;
+      } else if (lastKnownValue) {
+        // Não há dados: usar forward fill (último valor conhecido)
+        // Criar cópia do último valor conhecido com a data atual
+        result.push({
+          ...lastKnownValue,
+          recordedDate: new Date(plannerStartDate), // Usar data atual, não a data do último valor
+        });
+      }
+      // Se não há lastKnownValue e não há dados, não adicionar nada (mas isso não deve acontecer)
+
+      // Avançar para o próximo dia
+      plannerStartDate.setDate(plannerStartDate.getDate() + 1);
+    }
+  }
+
+  // Ordenar resultado final por data e planejador
+  return result.sort((a, b) => {
+    const dateDiff = a.recordedDate.getTime() - b.recordedDate.getTime();
+    if (dateDiff !== 0) return dateDiff;
+    // Se mesma data, ordenar por planejador
+    const plannerA = String(a.planner || '');
+    const plannerB = String(b.planner || '');
+    return plannerA.localeCompare(plannerB);
+  });
+}
+
 const parseDateFromDb = (value: string | Date | null | undefined): Date => {
   if (!value) return new Date();
   if (value instanceof Date) {
@@ -203,7 +319,9 @@ export const temporalService = {
         return this.calculatePlannerAnalysis(safeStartDate, safeEndDate, planner ?? 'all', hierarchyFilters);
       }
 
-      return data.map(databaseToTemporalAnalysis);
+      const rawData = data.map(databaseToTemporalAnalysis);
+      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
+      return fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
     } catch (error) {
       console.error('Erro no getTemporalAnalysis:', error);
       const safeStartDate = clampToMinHistoryDate(startDate);
@@ -299,10 +417,12 @@ export const temporalService = {
         return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
       }
 
-      return data.map((item: any) => ({
+      const rawData = data.map((item: any) => ({
         ...databaseToTemporalAnalysis(item),
         planner: 'all' as const
       }));
+      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
+      return fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
     } catch (error) {
       console.error('Erro no getAggregatedTemporalAnalysis:', error);
       // Fallback: agregar manualmente
@@ -407,7 +527,9 @@ export const temporalService = {
         };
       });
 
-      return aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
+      const sortedAggregated = aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
+      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
+      return fillGapsWithForwardFill(sortedAggregated, safeStartDate, safeEndDate);
     } catch (error) {
       console.error('Erro no calculateAggregatedAnalysis:', error);
       return [];
@@ -511,7 +633,9 @@ export const temporalService = {
         };
       });
 
-      return aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
+      const sortedAggregated = aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
+      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
+      return fillGapsWithForwardFill(sortedAggregated, safeStartDate, safeEndDate);
     } catch (error) {
       console.error('Erro no calculatePlannerAnalysis:', error);
       return [];

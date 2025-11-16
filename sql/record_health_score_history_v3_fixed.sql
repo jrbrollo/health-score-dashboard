@@ -176,132 +176,175 @@ BEGIN
   END IF;
 
   -- Inserir ou atualizar no histórico
-  INSERT INTO health_score_history (
-    client_id,
-    recorded_date,
-    client_name,
-    planner,
-    health_score,
-    health_category,
-    -- Campos v2 (deprecated, valores padrão)
-    meeting_engagement,
-    app_usage,
-    payment_status,
-    ecosystem_engagement,
-    nps_score,
-    last_meeting,
-    has_scheduled_meeting,
-    app_usage_status,
-    payment_status_detail,
-    has_referrals,
-    nps_score_detail,
-    ecosystem_usage,
-    -- Campos v3
-    email,
-    phone,
-    is_spouse,
-    leader,
-    mediator,
-    manager,
-    months_since_closing,
-    nps_score_v3,
-    has_nps_referral,
-    overdue_installments,
-    overdue_days,
-    cross_sell_count,
-    -- Pilares v3
-    nps_score_v3_pillar,
-    referral_pillar,
-    payment_pillar,
-    cross_sell_pillar,
-    tenure_pillar
-  )
-  VALUES (
-    v_client.id,
-    p_recorded_date,
-    v_client.name,
-    v_client.planner,
-    v_health_score,
-    v_health_category,
-    -- Campos v2 (deprecated)
-    0, 0, 0, 0, 0,
-    'Nunca', FALSE, 'Nunca usou', 'Em dia', FALSE, 'Não avaliado', 'Não usa',
-    -- Campos v3
-    v_client.email,
-    v_client.phone,
-    v_client.is_spouse,
-    v_client.leader,
-    v_client.mediator,
-    v_client.manager,
-    v_client.months_since_closing,
-    v_nps_value, -- Usar NPS próprio ou herdado (não v_client.nps_score_v3)
-    v_client.has_nps_referral,
-    v_client.overdue_installments,
-    v_client.overdue_days,
-    v_client.cross_sell_count,
-    -- Pilares v3
-    v_nps_pillar,
-    v_referral_pillar,
-    v_payment_pillar,
-    v_cross_sell_pillar,
-    v_tenure_pillar
-  )
-  ON CONFLICT (client_id, recorded_date)
-  DO UPDATE SET
-    -- IMPORTANTE: Só atualizar se a data for hoje ou futura
-    -- Não atualizar históricos antigos para preservar dados históricos
-    health_score = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.health_score 
-      ELSE health_score 
-    END,
-    health_category = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.health_category 
-      ELSE health_category 
-    END,
-    nps_score_v3_pillar = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.nps_score_v3_pillar 
-      ELSE nps_score_v3_pillar 
-    END,
-    referral_pillar = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.referral_pillar 
-      ELSE referral_pillar 
-    END,
-    payment_pillar = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.payment_pillar 
-      ELSE payment_pillar 
-    END,
-    cross_sell_pillar = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.cross_sell_pillar 
-      ELSE cross_sell_pillar 
-    END,
-    tenure_pillar = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.tenure_pillar 
-      ELSE tenure_pillar 
-    END,
-    months_since_closing = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.months_since_closing 
-      ELSE months_since_closing 
-    END,
-    nps_score_v3 = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.nps_score_v3 
-      ELSE nps_score_v3 
-    END,
-    has_nps_referral = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.has_nps_referral 
-      ELSE has_nps_referral 
-    END,
-    overdue_installments = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.overdue_installments 
-      ELSE overdue_installments 
-    END,
-    overdue_days = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.overdue_days 
-      ELSE overdue_days 
-    END,
-    cross_sell_count = CASE 
-      WHEN p_recorded_date >= CURRENT_DATE THEN EXCLUDED.cross_sell_count 
-      ELSE cross_sell_count 
-    END;
+  -- PROTEÇÃO TOTAL DO PASSADO: Se p_recorded_date < CURRENT_DATE, DO NOTHING em caso de conflito
+  -- PERMITIR CORREÇÕES DO DIA: Se p_recorded_date >= CURRENT_DATE, DO UPDATE em caso de conflito
+  
+  -- Verificar se já existe registro histórico para data passada
+  -- Se existir, não fazer nada (proteção total do passado)
+  IF p_recorded_date < CURRENT_DATE THEN
+    IF EXISTS (
+      SELECT 1 FROM health_score_history 
+      WHERE client_id = v_client.id 
+        AND recorded_date = p_recorded_date
+    ) THEN
+      -- Já existe registro histórico para data passada: NÃO ATUALIZAR (DO NOTHING)
+      RAISE NOTICE 'Registro histórico já existe para cliente % na data passada %. Não atualizando para preservar histórico.', 
+        v_client.id, p_recorded_date;
+      RETURN;
+    END IF;
+    
+    -- Data passada mas não existe registro: permitir INSERT (primeira vez criando histórico retroativo)
+    -- Usar DO NOTHING para garantir que se houver conflito (race condition), não atualiza
+    INSERT INTO health_score_history (
+      client_id,
+      recorded_date,
+      client_name,
+      planner,
+      health_score,
+      health_category,
+      meeting_engagement,
+      app_usage,
+      payment_status,
+      ecosystem_engagement,
+      nps_score,
+      last_meeting,
+      has_scheduled_meeting,
+      app_usage_status,
+      payment_status_detail,
+      has_referrals,
+      nps_score_detail,
+      ecosystem_usage,
+      email,
+      phone,
+      is_spouse,
+      leader,
+      mediator,
+      manager,
+      months_since_closing,
+      nps_score_v3,
+      has_nps_referral,
+      overdue_installments,
+      overdue_days,
+      cross_sell_count,
+      nps_score_v3_pillar,
+      referral_pillar,
+      payment_pillar,
+      cross_sell_pillar,
+      tenure_pillar
+    )
+    VALUES (
+      v_client.id,
+      p_recorded_date,
+      v_client.name,
+      v_client.planner,
+      v_health_score,
+      v_health_category,
+      0, 0, 0, 0, 0,
+      'Nunca', FALSE, 'Nunca usou', 'Em dia', FALSE, 'Não avaliado', 'Não usa',
+      v_client.email,
+      v_client.phone,
+      v_client.is_spouse,
+      v_client.leader,
+      v_client.mediator,
+      v_client.manager,
+      v_client.months_since_closing,
+      v_nps_value,
+      v_client.has_nps_referral,
+      v_client.overdue_installments,
+      v_client.overdue_days,
+      v_client.cross_sell_count,
+      v_nps_pillar,
+      v_referral_pillar,
+      v_payment_pillar,
+      v_cross_sell_pillar,
+      v_tenure_pillar
+    )
+    ON CONFLICT (client_id, recorded_date)
+    DO NOTHING;  -- PROTEÇÃO TOTAL: Nunca atualizar histórico passado
+    
+  ELSE
+    -- Data atual ou futura: permitir UPDATE em caso de conflito (correções do dia)
+    INSERT INTO health_score_history (
+      client_id,
+      recorded_date,
+      client_name,
+      planner,
+      health_score,
+      health_category,
+      meeting_engagement,
+      app_usage,
+      payment_status,
+      ecosystem_engagement,
+      nps_score,
+      last_meeting,
+      has_scheduled_meeting,
+      app_usage_status,
+      payment_status_detail,
+      has_referrals,
+      nps_score_detail,
+      ecosystem_usage,
+      email,
+      phone,
+      is_spouse,
+      leader,
+      mediator,
+      manager,
+      months_since_closing,
+      nps_score_v3,
+      has_nps_referral,
+      overdue_installments,
+      overdue_days,
+      cross_sell_count,
+      nps_score_v3_pillar,
+      referral_pillar,
+      payment_pillar,
+      cross_sell_pillar,
+      tenure_pillar
+    )
+    VALUES (
+      v_client.id,
+      p_recorded_date,
+      v_client.name,
+      v_client.planner,
+      v_health_score,
+      v_health_category,
+      0, 0, 0, 0, 0,
+      'Nunca', FALSE, 'Nunca usou', 'Em dia', FALSE, 'Não avaliado', 'Não usa',
+      v_client.email,
+      v_client.phone,
+      v_client.is_spouse,
+      v_client.leader,
+      v_client.mediator,
+      v_client.manager,
+      v_client.months_since_closing,
+      v_nps_value,
+      v_client.has_nps_referral,
+      v_client.overdue_installments,
+      v_client.overdue_days,
+      v_client.cross_sell_count,
+      v_nps_pillar,
+      v_referral_pillar,
+      v_payment_pillar,
+      v_cross_sell_pillar,
+      v_tenure_pillar
+    )
+    ON CONFLICT (client_id, recorded_date)
+    DO UPDATE SET
+      -- PERMITIR CORREÇÕES: Atualizar histórico do dia atual/futuro
+      health_score = EXCLUDED.health_score,
+      health_category = EXCLUDED.health_category,
+      nps_score_v3_pillar = EXCLUDED.nps_score_v3_pillar,
+      referral_pillar = EXCLUDED.referral_pillar,
+      payment_pillar = EXCLUDED.payment_pillar,
+      cross_sell_pillar = EXCLUDED.cross_sell_pillar,
+      tenure_pillar = EXCLUDED.tenure_pillar,
+      months_since_closing = EXCLUDED.months_since_closing,
+      nps_score_v3 = EXCLUDED.nps_score_v3,
+      has_nps_referral = EXCLUDED.has_nps_referral,
+      overdue_installments = EXCLUDED.overdue_installments,
+      overdue_days = EXCLUDED.overdue_days,
+      cross_sell_count = EXCLUDED.cross_sell_count;
+  END IF;
 
 END;
 $$ LANGUAGE plpgsql;
