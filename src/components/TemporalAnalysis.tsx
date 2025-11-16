@@ -396,6 +396,58 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       );
     }
 
+    // ========== DEBUG: Dados Finais para Gráfico ==========
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log(`[Render Debug] Dados Finais para Gráfico (${chartData.length} pontos)`);
+    console.log('═══════════════════════════════════════════════════════════');
+    
+    // Mostrar todos os dados com foco nos últimos pontos
+    if (chartData.length > 0) {
+      // Mostrar primeiros 3 pontos
+      if (chartData.length > 3) {
+        console.log('📊 Primeiros 3 pontos:');
+        chartData.slice(0, 3).forEach((item, idx) => {
+          const dateStr = format(item.fullDate, 'yyyy-MM-dd');
+          console.log(`   [${idx}] ${dateStr} - Score: ${item.avgScore}, Clientes: ${item.totalClients}`);
+        });
+        console.log('   ...');
+      }
+      
+      // Mostrar últimos 5 pontos (onde devem estar 15/11 e 16/11)
+      const lastPoints = chartData.slice(-5);
+      console.log('📊 Últimos 5 pontos (onde devem estar 15/11 e 16/11):');
+      lastPoints.forEach((item, idx) => {
+        const dateStr = format(item.fullDate, 'yyyy-MM-dd');
+        const isTargetDate = dateStr === '2025-11-15' || dateStr === '2025-11-16';
+        const marker = isTargetDate ? '🎯' : '   ';
+        console.log(`${marker} [${chartData.length - lastPoints.length + idx}] ${dateStr} - Score: ${item.avgScore}, Clientes: ${item.totalClients}`);
+      });
+      
+      // Verificar especificamente se 15/11 e 16/11 estão presentes
+      const hasNov15 = chartData.some(item => format(item.fullDate, 'yyyy-MM-dd') === '2025-11-15');
+      const hasNov16 = chartData.some(item => format(item.fullDate, 'yyyy-MM-dd') === '2025-11-16');
+      
+      console.log('\n🔍 Verificação Específica:');
+      console.log(`   ✅ 15/11/2025 presente: ${hasNov15 ? 'SIM' : 'NÃO'}`);
+      console.log(`   ✅ 16/11/2025 presente: ${hasNov16 ? 'SIM' : 'NÃO'}`);
+      
+      if (!hasNov15 || !hasNov16) {
+        console.log('   ⚠️ PROBLEMA IDENTIFICADO: Datas 15/11 ou 16/11 estão faltando no array final!');
+        console.log('   📋 Todas as datas no array:');
+        chartData.forEach((item, idx) => {
+          const dateStr = format(item.fullDate, 'yyyy-MM-dd');
+          console.log(`      [${idx}] ${dateStr}`);
+        });
+      } else {
+        console.log('   ✅ Todas as datas esperadas estão presentes no array final!');
+      }
+    } else {
+      console.log('⚠️ Array chartData está vazio!');
+    }
+    
+    console.log('═══════════════════════════════════════════════════════════\n');
+    // ========== FIM DEBUG ==========
+
     const commonProps = {
       data: chartData,
       margin: { top: 5, right: 30, left: 20, bottom: 5 }
