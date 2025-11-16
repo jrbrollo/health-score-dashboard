@@ -27,9 +27,15 @@ function fillGapsWithForwardFill(
   startDate: Date,
   endDate: Date
 ): TemporalAnalysis[] {
+  // ========== CONFIRMAÇÃO DO INPUT ==========
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('🔍 [Forward Filling] CONFIRMAÇÃO DO INPUT');
+  console.log('═══════════════════════════════════════════════════════════');
+  
   if (!data || data.length === 0) {
     // Se não há dados, retornar array vazio (não criar dados fictícios)
     console.log('⚠️ Forward Filling: Sem dados para preencher');
+    console.log('═══════════════════════════════════════════════════════════');
     return [];
   }
 
@@ -39,7 +45,25 @@ function fillGapsWithForwardFill(
   const normalizedEnd = new Date(endDate);
   normalizedEnd.setHours(0, 0, 0, 0);
   
-  console.log(`🔄 Forward Filling: Preenchendo de ${normalizedStart.toISOString().split('T')[0]} até ${normalizedEnd.toISOString().split('T')[0]} (${data.length} registros iniciais)`);
+  // Calcular período esperado
+  const expectedDays = Math.floor((normalizedEnd.getTime() - normalizedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  
+  // Extrair datas únicas dos dados recebidos
+  const datesInData = new Set<string>();
+  data.forEach(item => {
+    const itemDate = new Date(item.recordedDate);
+    itemDate.setHours(0, 0, 0, 0);
+    datesInData.add(itemDate.toISOString().split('T')[0]);
+  });
+  const sortedDatesInData = Array.from(datesInData).sort();
+  
+  console.log(`📅 Data de início recebida: ${normalizedStart.toISOString().split('T')[0]}`);
+  console.log(`📅 Data de fim recebida: ${normalizedEnd.toISOString().split('T')[0]}`);
+  console.log(`📊 Quantidade de registros brutos recebidos: ${data.length}`);
+  console.log(`📊 Período esperado: ${expectedDays} dias`);
+  console.log(`📋 Datas presentes nos dados recebidos (${datesInData.size} datas únicas):`);
+  sortedDatesInData.forEach(date => console.log(`   - ${date}`));
+  console.log('═══════════════════════════════════════════════════════════');
 
   // Agrupar dados por planejador para aplicar forward filling separadamente
   const dataByPlanner = new Map<string | Planner, TemporalAnalysis[]>();
@@ -53,8 +77,13 @@ function fillGapsWithForwardFill(
 
   // Aplicar forward filling para cada planejador separadamente
   const result: TemporalAnalysis[] = [];
+  let totalFilledDays = 0; // Contador de dias preenchidos pelo Forward Filling
+  let totalRealDays = 0; // Contador de dias com dados reais
+  
+  console.log(`🔄 Processando ${dataByPlanner.size} planejador(es)...`);
   
   for (const [planner, plannerData] of dataByPlanner.entries()) {
+    console.log(`\n📌 Processando planejador: ${planner} (${plannerData.length} registros)`);
     // Criar mapa de dados por data para este planejador (chave: YYYY-MM-DD)
     const dataMap = new Map<string, TemporalAnalysis>();
     plannerData.forEach(item => {
@@ -96,6 +125,11 @@ function fillGapsWithForwardFill(
 
     // Iterar por cada dia do período
     const plannerStartDate = new Date(normalizedStart);
+    let plannerFilledDays = 0;
+    let plannerRealDays = 0;
+    const filledDates: string[] = [];
+    const realDates: string[] = [];
+    
     while (plannerStartDate <= normalizedEnd) {
       const dateKey = plannerStartDate.toISOString().split('T')[0];
       const existingData = dataMap.get(dateKey);
@@ -104,6 +138,8 @@ function fillGapsWithForwardFill(
         // Há dados reais para esta data: usar e atualizar último valor conhecido
         result.push(existingData);
         lastKnownValue = existingData;
+        plannerRealDays++;
+        realDates.push(dateKey);
       } else if (lastKnownValue) {
         // Não há dados: usar forward fill (último valor conhecido)
         // Criar cópia do último valor conhecido com a data atual
@@ -111,11 +147,25 @@ function fillGapsWithForwardFill(
           ...lastKnownValue,
           recordedDate: new Date(plannerStartDate), // Usar data atual, não a data do último valor
         });
+        plannerFilledDays++;
+        filledDates.push(dateKey);
+      } else {
+        // Se não há lastKnownValue e não há dados, não adicionar nada
+        console.log(`   ⚠️ Sem dados e sem lastKnownValue para ${dateKey} - pulando`);
       }
-      // Se não há lastKnownValue e não há dados, não adicionar nada (mas isso não deve acontecer)
 
       // Avançar para o próximo dia
       plannerStartDate.setDate(plannerStartDate.getDate() + 1);
+    }
+    
+    totalFilledDays += plannerFilledDays;
+    totalRealDays += plannerRealDays;
+    
+    console.log(`   ✅ Planejador ${planner}:`);
+    console.log(`      - Dias com dados reais: ${plannerRealDays}`);
+    console.log(`      - Dias preenchidos pelo Forward Filling: ${plannerFilledDays}`);
+    if (filledDates.length > 0) {
+      console.log(`      - Datas preenchidas: ${filledDates.join(', ')}`);
     }
   }
 
@@ -129,8 +179,51 @@ function fillGapsWithForwardFill(
     return plannerA.localeCompare(plannerB);
   });
   
-  const expectedDays = Math.floor((normalizedEnd.getTime() - normalizedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  console.log(`✅ Forward Filling: ${sortedResult.length} registros finais (esperado: ${expectedDays} dias)`);
+  // ========== CONFIRMAÇÃO DO OUTPUT ==========
+  console.log('\n═══════════════════════════════════════════════════════════');
+  console.log('✅ [Forward Filling] CONFIRMAÇÃO DO OUTPUT');
+  console.log('═══════════════════════════════════════════════════════════');
+  
+  // Extrair datas únicas do resultado final
+  const datesInResult = new Set<string>();
+  sortedResult.forEach(item => {
+    const itemDate = new Date(item.recordedDate);
+    itemDate.setHours(0, 0, 0, 0);
+    datesInResult.add(itemDate.toISOString().split('T')[0]);
+  });
+  const sortedDatesInResult = Array.from(datesInResult).sort();
+  
+  console.log(`📊 Total de registros após Forward Filling: ${sortedResult.length}`);
+  console.log(`📊 Dias com dados reais: ${totalRealDays}`);
+  console.log(`📊 Dias preenchidos pelo Forward Filling: ${totalFilledDays}`);
+  console.log(`📊 Período esperado: ${expectedDays} dias`);
+  console.log(`📊 Total de dias únicos no resultado: ${datesInResult.size}`);
+  
+  if (datesInResult.size !== expectedDays) {
+    console.log(`⚠️ ATENÇÃO: Esperado ${expectedDays} dias, mas resultado tem ${datesInResult.size} dias únicos!`);
+    
+    // Identificar dias faltantes
+    const missingDates: string[] = [];
+    const currentCheck = new Date(normalizedStart);
+    while (currentCheck <= normalizedEnd) {
+      const dateKey = currentCheck.toISOString().split('T')[0];
+      if (!datesInResult.has(dateKey)) {
+        missingDates.push(dateKey);
+      }
+      currentCheck.setDate(currentCheck.getDate() + 1);
+    }
+    
+    if (missingDates.length > 0) {
+      console.log(`❌ Datas faltantes no resultado:`);
+      missingDates.forEach(date => console.log(`   - ${date}`));
+    }
+  } else {
+    console.log(`✅ Todos os ${expectedDays} dias esperados estão presentes no resultado!`);
+  }
+  
+  console.log(`📋 Todas as datas no resultado final (${sortedDatesInResult.length} datas):`);
+  sortedDatesInResult.forEach(date => console.log(`   - ${date}`));
+  console.log('═══════════════════════════════════════════════════════════\n');
   
   return sortedResult;
 }
