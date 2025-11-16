@@ -29,6 +29,7 @@ function fillGapsWithForwardFill(
 ): TemporalAnalysis[] {
   if (!data || data.length === 0) {
     // Se não há dados, retornar array vazio (não criar dados fictícios)
+    console.log('⚠️ Forward Filling: Sem dados para preencher');
     return [];
   }
 
@@ -37,6 +38,8 @@ function fillGapsWithForwardFill(
   normalizedStart.setHours(0, 0, 0, 0);
   const normalizedEnd = new Date(endDate);
   normalizedEnd.setHours(0, 0, 0, 0);
+  
+  console.log(`🔄 Forward Filling: Preenchendo de ${normalizedStart.toISOString().split('T')[0]} até ${normalizedEnd.toISOString().split('T')[0]} (${data.length} registros iniciais)`);
 
   // Agrupar dados por planejador para aplicar forward filling separadamente
   const dataByPlanner = new Map<string | Planner, TemporalAnalysis[]>();
@@ -117,7 +120,7 @@ function fillGapsWithForwardFill(
   }
 
   // Ordenar resultado final por data e planejador
-  return result.sort((a, b) => {
+  const sortedResult = result.sort((a, b) => {
     const dateDiff = a.recordedDate.getTime() - b.recordedDate.getTime();
     if (dateDiff !== 0) return dateDiff;
     // Se mesma data, ordenar por planejador
@@ -125,6 +128,11 @@ function fillGapsWithForwardFill(
     const plannerB = String(b.planner || '');
     return plannerA.localeCompare(plannerB);
   });
+  
+  const expectedDays = Math.floor((normalizedEnd.getTime() - normalizedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  console.log(`✅ Forward Filling: ${sortedResult.length} registros finais (esperado: ${expectedDays} dias)`);
+  
+  return sortedResult;
 }
 
 const parseDateFromDb = (value: string | Date | null | undefined): Date => {
@@ -320,8 +328,12 @@ export const temporalService = {
       }
 
       const rawData = data.map(databaseToTemporalAnalysis);
+      console.log(`📊 Dados recebidos da RPC: ${rawData.length} registros de ${startDateStr} até ${endDateStr}`);
+      console.log(`📅 Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
       // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      return fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
+      const filledData = fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
+      console.log(`✅ Dados após Forward Filling: ${filledData.length} registros`);
+      return filledData;
     } catch (error) {
       console.error('Erro no getTemporalAnalysis:', error);
       const safeStartDate = clampToMinHistoryDate(startDate);
@@ -421,8 +433,12 @@ export const temporalService = {
         ...databaseToTemporalAnalysis(item),
         planner: 'all' as const
       }));
+      console.log(`📊 Dados agregados recebidos da RPC: ${rawData.length} registros de ${startDateStr} até ${endDateStr}`);
+      console.log(`📅 Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
       // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      return fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
+      const filledData = fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
+      console.log(`✅ Dados agregados após Forward Filling: ${filledData.length} registros`);
+      return filledData;
     } catch (error) {
       console.error('Erro no getAggregatedTemporalAnalysis:', error);
       // Fallback: agregar manualmente

@@ -68,14 +68,14 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   }, [periodLength]);
 
   const handleQuickRange = (days: number) => {
-    const endDate = maxHistoryDate || new Date();
-    endDate.setHours(0, 0, 0, 0);
-    const fromDate = startOfDay(subDays(endDate, days));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const fromDate = startOfDay(subDays(today, days));
     // Garantir que data inicial não seja anterior à data mínima confiável
     const safeFromDate = clampToMinHistoryDate(fromDate);
     setDateRange({
       from: safeFromDate,
-      to: endDate // Usar última data com histórico, não data atual
+      to: today // Usar data atual para permitir Forward Filling até hoje (incluindo fins de semana)
     });
   };
 
