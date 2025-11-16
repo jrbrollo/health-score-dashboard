@@ -491,6 +491,11 @@ export const temporalService = {
         ? hierarchyFilters.leaders 
         : null;
       
+      console.log(`🔍 [getAggregatedTemporalAnalysis] Chamando RPC com:`);
+      console.log(`   - start_date: ${startDateStr}`);
+      console.log(`   - end_date: ${endDateStr}`);
+      console.log(`   - planner_filter: 'all'`);
+      
       const { data, error } = await executeQueryWithTimeout(
         () => supabase.rpc('get_temporal_analysis_asof', {
           start_date: startDateStr,
@@ -506,6 +511,10 @@ export const temporalService = {
         60000 // 60 segundos para análise temporal agregada
       );
       
+      console.log(`🔍 [getAggregatedTemporalAnalysis] Resposta da RPC:`);
+      console.log(`   - error:`, error);
+      console.log(`   - data:`, data ? `${Array.isArray(data) ? data.length : 'não é array'} registros` : 'null/undefined');
+      
       if (error) {
         console.error('❌ Erro na chamada RPC get_temporal_analysis_asof (agregada):', error);
         console.error('Parâmetros:', {
@@ -519,9 +528,12 @@ export const temporalService = {
       }
 
       if (error || !data) {
+        console.log(`⚠️ [getAggregatedTemporalAnalysis] RPC retornou erro ou dados vazios, usando fallback calculateAggregatedAnalysis`);
         return this.calculateAggregatedAnalysis(safeStartDate, safeEndDate, hierarchyFilters);
       }
 
+      console.log(`✅ [getAggregatedTemporalAnalysis] RPC retornou ${data.length} registros, processando...`);
+      
       const rawData = data.map((item: any) => ({
         ...databaseToTemporalAnalysis(item),
         planner: 'all' as const
@@ -547,10 +559,15 @@ export const temporalService = {
     endDate: Date,
     hierarchyFilters?: { managers?: string[]; mediators?: string[]; leaders?: string[]; includeNulls?: { manager?: boolean; mediator?: boolean; leader?: boolean } }
   ): Promise<TemporalAnalysis[]> {
+    console.log(`🔄 [calculateAggregatedAnalysis] Método de fallback chamado`);
+    console.log(`   - startDate recebido: ${startDate.toISOString().split('T')[0]}`);
+    console.log(`   - endDate recebido: ${endDate.toISOString().split('T')[0]}`);
     try {
       // Garantir que datas não sejam anteriores à data mínima confiável
       const safeStartDate = clampToMinHistoryDate(startDate);
       const safeEndDate = clampToMinHistoryDate(endDate);
+      console.log(`   - safeStartDate: ${safeStartDate.toISOString().split('T')[0]}`);
+      console.log(`   - safeEndDate: ${safeEndDate.toISOString().split('T')[0]}`);
       
       // Buscar dados com paginação para evitar timeout
       let allData: any[] = [];
@@ -637,8 +654,12 @@ export const temporalService = {
       });
 
       const sortedAggregated = aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
+      console.log(`📊 [calculateAggregatedAnalysis] Dados agregados antes do Forward Filling: ${sortedAggregated.length} registros`);
+      console.log(`📅 [calculateAggregatedAnalysis] Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
       // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      return fillGapsWithForwardFill(sortedAggregated, safeStartDate, safeEndDate);
+      const filledData = fillGapsWithForwardFill(sortedAggregated, safeStartDate, safeEndDate);
+      console.log(`✅ [calculateAggregatedAnalysis] Dados após Forward Filling: ${filledData.length} registros`);
+      return filledData;
     } catch (error) {
       console.error('Erro no calculateAggregatedAnalysis:', error);
       return [];
