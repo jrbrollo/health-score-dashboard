@@ -414,29 +414,44 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       }
       
       // Mostrar últimos 5 pontos (onde devem estar 15/11 e 16/11)
+      // CORREÇÃO: Normalizar data antes de formatar para lidar com timezone
+      const normalizeDateForComparison = (date: Date): string => {
+        const normalized = new Date(date);
+        normalized.setHours(0, 0, 0, 0);
+        return normalized.toISOString().split('T')[0];
+      };
+      
       const lastPoints = chartData.slice(-5);
       console.log('📊 Últimos 5 pontos (onde devem estar 15/11 e 16/11):');
       lastPoints.forEach((item, idx) => {
-        const dateStr = format(item.fullDate, 'yyyy-MM-dd');
+        const dateStr = normalizeDateForComparison(item.fullDate);
         const isTargetDate = dateStr === '2025-11-15' || dateStr === '2025-11-16';
         const marker = isTargetDate ? '🎯' : '   ';
         console.log(`${marker} [${chartData.length - lastPoints.length + idx}] ${dateStr} - Score: ${item.avgScore}, Clientes: ${item.totalClients}`);
       });
       
       // Verificar especificamente se 15/11 e 16/11 estão presentes
-      const hasNov15 = chartData.some(item => format(item.fullDate, 'yyyy-MM-dd') === '2025-11-15');
-      const hasNov16 = chartData.some(item => format(item.fullDate, 'yyyy-MM-dd') === '2025-11-16');
+      // Usar a função normalizeDateForComparison já definida acima
+      const hasNov15 = chartData.some(item => {
+        const normalized = normalizeDateForComparison(item.fullDate);
+        return normalized === '2025-11-15';
+      });
+      const hasNov16 = chartData.some(item => {
+        const normalized = normalizeDateForComparison(item.fullDate);
+        return normalized === '2025-11-16';
+      });
       
-      console.log('\n🔍 Verificação Específica:');
+      console.log('\n🔍 Verificação Específica (com normalização de timezone):');
       console.log(`   ✅ 15/11/2025 presente: ${hasNov15 ? 'SIM' : 'NÃO'}`);
       console.log(`   ✅ 16/11/2025 presente: ${hasNov16 ? 'SIM' : 'NÃO'}`);
       
       if (!hasNov15 || !hasNov16) {
         console.log('   ⚠️ PROBLEMA IDENTIFICADO: Datas 15/11 ou 16/11 estão faltando no array final!');
-        console.log('   📋 Todas as datas no array:');
+        console.log('   📋 Todas as datas no array (com normalização):');
         chartData.forEach((item, idx) => {
-          const dateStr = format(item.fullDate, 'yyyy-MM-dd');
-          console.log(`      [${idx}] ${dateStr}`);
+          const dateStr = normalizeDateForComparison(item.fullDate);
+          const rawDate = item.fullDate.toISOString();
+          console.log(`      [${idx}] ${dateStr} (raw: ${rawDate})`);
         });
       } else {
         console.log('   ✅ Todas as datas esperadas estão presentes no array final!');
@@ -462,9 +477,14 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
           <ChartComponent {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
             <XAxis 
-              dataKey="date" 
+              dataKey="fullDate" 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
               fontSize={12}
+              tickFormatter={(date) => {
+                // Garantir que date seja um objeto Date válido
+                const dateObj = date instanceof Date ? date : new Date(date);
+                return format(dateObj, 'dd/MM', { locale: ptBR });
+              }}
             />
             <YAxis 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
@@ -483,7 +503,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 const formattedValue = typeof value === 'number' ? value.toFixed(2) : value || 0;
                 return [`${formattedValue}`, 'Score Médio'];
               }}
-              labelFormatter={(label) => `Data: ${label}`}
+              labelFormatter={(label) => {
+                // Formatar label corretamente se for Date
+                const dateObj = label instanceof Date ? label : new Date(label);
+                return `Data: ${format(dateObj, 'dd/MM/yyyy', { locale: ptBR })}`;
+              }}
             />
             {chartType === 'area' ? (
               <Area
@@ -519,9 +543,14 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
           <AreaChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
             <XAxis 
-              dataKey="date" 
+              dataKey="fullDate" 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
               fontSize={12}
+              tickFormatter={(date) => {
+                // Garantir que date seja um objeto Date válido
+                const dateObj = date instanceof Date ? date : new Date(date);
+                return format(dateObj, 'dd/MM', { locale: ptBR });
+              }}
             />
             <YAxis 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
@@ -543,7 +572,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 };
                 return [`${value}`, labels[name] || name];
               }}
-              labelFormatter={(label) => `Data: ${label}`}
+              labelFormatter={(label) => {
+                // Formatar label corretamente se for Date
+                const dateObj = label instanceof Date ? label : new Date(label);
+                return `Data: ${format(dateObj, 'dd/MM/yyyy', { locale: ptBR })}`;
+              }}
             />
             <Area type="monotone" dataKey="excellent" stackId="1" stroke={colors.excellent} fill={colors.excellent} name="Ótimo" />
             <Area type="monotone" dataKey="stable" stackId="1" stroke={colors.stable} fill={colors.stable} name="Estável" />
@@ -560,9 +593,14 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
           <RechartsLineChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} />
             <XAxis 
-              dataKey="date" 
+              dataKey="fullDate" 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
               fontSize={12}
+              tickFormatter={(date) => {
+                // Garantir que date seja um objeto Date válido
+                const dateObj = date instanceof Date ? date : new Date(date);
+                return format(dateObj, 'dd/MM', { locale: ptBR });
+              }}
             />
             <YAxis 
               stroke={isDarkMode ? '#9ca3af' : '#6b7280'}
@@ -574,6 +612,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
                 border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
                 borderRadius: '8px',
                 color: isDarkMode ? '#f9fafb' : '#111827'
+              }}
+              labelFormatter={(label) => {
+                // Formatar label corretamente se for Date
+                const dateObj = label instanceof Date ? label : new Date(label);
+                return `Data: ${format(dateObj, 'dd/MM/yyyy', { locale: ptBR })}`;
               }}
             />
             <Line type="monotone" dataKey="payment" stroke={colors.payment} strokeWidth={2} name="Pagamentos" />
