@@ -111,7 +111,7 @@ function fillGapsWithForwardFill(
       const itemDate = new Date(item.recordedDate);
       itemDate.setHours(0, 0, 0, 0);
       
-      if (itemDate <= normalizedStart) {
+      if (itemDate.getTime() <= normalizedStart.getTime()) {
         lastKnownValue = item;
       } else {
         break;
@@ -130,7 +130,8 @@ function fillGapsWithForwardFill(
     const filledDates: string[] = [];
     const realDates: string[] = [];
     
-    while (plannerStartDate <= normalizedEnd) {
+    // CORREÇÃO: Usar .getTime() para uma comparação de limite mais estável
+    while (plannerStartDate.getTime() <= normalizedEnd.getTime()) {
       const dateKey = plannerStartDate.toISOString().split('T')[0];
       const existingData = dataMap.get(dateKey);
 
@@ -205,7 +206,8 @@ function fillGapsWithForwardFill(
     // Identificar dias faltantes
     const missingDates: string[] = [];
     const currentCheck = new Date(normalizedStart);
-    while (currentCheck <= normalizedEnd) {
+    // CORREÇÃO: Usar .getTime() para uma comparação de limite mais estável
+    while (currentCheck.getTime() <= normalizedEnd.getTime()) {
       const dateKey = currentCheck.toISOString().split('T')[0];
       if (!datesInResult.has(dateKey)) {
         missingDates.push(dateKey);
