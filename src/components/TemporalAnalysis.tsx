@@ -277,13 +277,27 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    console.log(`📊 [prepareChartData] Recebidos ${analysisData.length} registros de analysisData`);
+    if (analysisData.length > 0) {
+      const datesInAnalysis = analysisData.map(item => {
+        const itemDate = new Date(item.recordedDate);
+        itemDate.setHours(0, 0, 0, 0);
+        return itemDate.toISOString().split('T')[0];
+      }).sort();
+      console.log(`📋 [prepareChartData] Datas em analysisData: ${datesInAnalysis.join(', ')}`);
+    }
+    
     // Filtrar apenas dados históricos válidos (não futuros)
     const historicalData = analysisData
       .filter(item => {
         const itemDate = new Date(item.recordedDate);
         itemDate.setHours(0, 0, 0, 0);
         // Não incluir datas futuras
-        return itemDate.getTime() <= today.getTime();
+        const isValid = itemDate.getTime() <= today.getTime();
+        if (!isValid) {
+          console.log(`⚠️ [prepareChartData] Filtrando data futura: ${itemDate.toISOString().split('T')[0]}`);
+        }
+        return isValid;
       })
       .map(item => ({
         date: format(item.recordedDate, 'dd/MM', { locale: ptBR }),
@@ -313,6 +327,12 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     });
 
     const sortedData = Array.from(uniqueByDate.values()).sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
+    
+    console.log(`📊 [prepareChartData] Após filtros e deduplicação: ${sortedData.length} registros`);
+    if (sortedData.length > 0) {
+      const datesInChart = sortedData.map(item => format(item.fullDate, 'yyyy-MM-dd')).sort();
+      console.log(`📋 [prepareChartData] Datas que serão exibidas no gráfico: ${datesInChart.join(', ')}`);
+    }
     
     // Se houver dados e o último ponto for do dia mais recente, atualizar com score atual
     if (sortedData.length > 0 && filteredClients && filteredClients.length > 0 && currentScore > 0) {
