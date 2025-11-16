@@ -501,7 +501,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
 
     // Converter para formato MovementData
     const movementsData: MovementData[] = Array.from(movementMap.entries())
-      .filter(([_, movement]) => movement.from !== 'Perdido' && movement.to !== 'Perdido') // Filtrar movimentos para "Perdido" por enquanto
+      .filter(([_, movement]) => movement.from !== 'Perdido') // Manter filtro: não permitir movimentos DE 'Perdido' (cliente já perdido não pode partir de estado perdido)
+      // Removido filtro movement.to !== 'Perdido': movimentos PARA 'Perdido' são dados críticos de negócio e devem ser exibidos
       .map(([_, movement]) => ({
         from: movement.from,
         to: movement.to,
@@ -579,8 +580,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     // Clientes melhorando: mudaram de categoria pior para melhor
     const improvingClients: Client[] = [];
     movements.forEach(movement => {
-      // Ignorar movimentos de "Novo" e movimentos estáveis (from === to)
-      if (movement.from === 'Novo' || movement.from === movement.to) {
+      // Ignorar movimentos de "Novo", "Perdido" e movimentos estáveis (from === to)
+      if (movement.from === 'Novo' || movement.to === 'Perdido' || movement.from === movement.to) {
         return;
       }
       const fromRank = categoryRank[movement.from as keyof typeof categoryRank] || 0;
@@ -593,8 +594,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     // Clientes piorando: mudaram de categoria melhor para pior
     const decliningClients: Client[] = [];
     movements.forEach(movement => {
-      // Ignorar movimentos de "Novo" e movimentos estáveis (from === to)
-      if (movement.from === 'Novo' || movement.from === movement.to) {
+      // Ignorar movimentos de "Novo", "Perdido" e movimentos estáveis (from === to)
+      if (movement.from === 'Novo' || movement.to === 'Perdido' || movement.from === movement.to) {
         return;
       }
       const fromRank = categoryRank[movement.from as keyof typeof categoryRank] || 0;
@@ -607,8 +608,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     // Clientes estáveis: ficaram na mesma categoria (from === to)
     const stableClients: Client[] = [];
     movements.forEach(movement => {
-      // Ignorar movimentos de "Novo"
-      if (movement.from === 'Novo') {
+      // Ignorar movimentos de "Novo" e "Perdido"
+      if (movement.from === 'Novo' || movement.to === 'Perdido') {
         return;
       }
       // Se from === to, o cliente ficou estável
@@ -625,8 +626,13 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       }
     });
     
-    // Clientes perdidos: não têm estado final (já filtrado em generateMovementData)
+    // Clientes perdidos: movimentos para "Perdido" (agora exibidos após correção do filtro)
     const lostClientsList: Client[] = [];
+    movements.forEach(movement => {
+      if (movement.to === 'Perdido') {
+        lostClientsList.push(...movement.clientObjects);
+      }
+    });
     
     return {
       improving: improvingClients.length,
@@ -834,6 +840,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         return isDarkMode ? '#f59e0b' : '#fbbf24';
       case 'Crítico':
         return isDarkMode ? '#ef4444' : '#f87171';
+      case 'Perdido':
+        return isDarkMode ? '#991b1b' : '#dc2626'; // Vermelho escuro para destacar clientes perdidos
       default:
         return isDarkMode ? '#6b7280' : '#9ca3af';
     }
@@ -1240,7 +1248,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-green-500"></div>
               <span className="text-sm">Ótimo</span>
@@ -1256,6 +1264,10 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-red-500"></div>
               <span className="text-sm">Crítico</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: getCategoryColor('Perdido') }}></div>
+              <span className="text-sm">Perdido</span>
             </div>
           </div>
         </CardContent>
