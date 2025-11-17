@@ -179,15 +179,12 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
 
       // Query direta na tabela health_score_history
       // Mesma lógica da correção temporal: WHERE recorded_date = date (não <=)
+      // NOTA: Não filtramos por client_id aqui para evitar URLs muito longas (>1000 UUIDs)
+      // Os filtros de hierarquia (planner, manager, mediator, leader) já são suficientes
       let query = supabase
         .from('health_score_history')
         .select('*')
         .eq('recorded_date', dateStr);
-
-      // Filtrar por IDs de clientes se fornecido
-      if (clientIdsUuid.length > 0) {
-        query = query.in('client_id', clientIdsUuid);
-      }
 
       // Aplicar filtros de hierarquia
       if (selectedPlanner !== 'all') {
