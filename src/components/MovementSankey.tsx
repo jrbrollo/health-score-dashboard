@@ -378,15 +378,20 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       console.log(`📅 Histórico inicial (${format(startDate, 'dd/MM/yyyy')}): ${startHistory.size} clientes encontrados`);
     }
     setStartDateHistory(startHistory);
-    
-    // Para a data final, usar estado atual se for hoje, senão buscar histórico
+
+    // ✅ CORREÇÃO DE BUG: SEMPRE buscar histórico do banco primeiro, mesmo para hoje
+    // Só usar estado atual como fallback se não houver histórico
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     let endHistory: Map<string, HealthScoreHistory>;
-    
-    if (endDate.getTime() === today.getTime()) {
-      // Se a data final for hoje, usar estado atual dos clientes
+
+    // SEMPRE buscar histórico do banco primeiro
+    endHistory = await loadClientHistoryForDate(endDate, clientIds);
+
+    // Se não houver histórico para a data final (dia sem importação), usar estado atual como fallback
+    if (endHistory.size === 0 && endDate.getTime() === today.getTime()) {
+      console.log('⚠️ Sem histórico para hoje no banco - usando estado atual dos clientes como fallback');
       endHistory = new Map();
       filteredClients.forEach(client => {
         const score = calculateHealthScore(client);
@@ -411,9 +416,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
           createdAt: new Date(),
         });
       });
-    } else {
-      // Buscar histórico na data final
-      endHistory = await loadClientHistoryForDate(endDate, clientIds);
+    } else if (endHistory.size > 0) {
+      console.log(`✅ Usando histórico do banco para ${format(endDate, 'dd/MM/yyyy')}: ${endHistory.size} clientes encontrados`);
     }
     
     setEndDateHistory(endHistory);
