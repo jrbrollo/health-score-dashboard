@@ -194,7 +194,13 @@ const Index = () => {
 
   const handleBulkImport = async ({ clients: importedClients, sheetDate }: BulkImportPayload) => {
     try {
-      console.log('📤 Iniciando importação de', importedClients.length, 'clientes', sheetDate ? `para a data ${sheetDate}` : '');
+      console.log('📤 [Index] handleBulkImport recebeu:', {
+        quantidade_clientes: importedClients.length,
+        sheetDate_recebido: sheetDate,
+        sheetDate_tipo: typeof sheetDate,
+        sheetDate_valido: sheetDate ? /^\d{4}-\d{2}-\d{2}$/.test(sheetDate) : false,
+        sheetDate_sera_passado_para_createMultipleClients: sheetDate
+      });
       setImportProgress({ current: 0, total: importedClients.length });
       
       const newClients = await clientService.createMultipleClients(importedClients, { 

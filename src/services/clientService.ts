@@ -353,6 +353,16 @@ export const clientService = {
           options.onProgress(i + batch.length, clientsData.length);
         }
 
+        console.log(`🔍 [clientService] Chamando RPC bulk_insert_clients_v3 com:`, {
+          lote: Math.floor(i / BATCH_SIZE) + 1,
+          quantidade_clientes: dbBatch.length,
+          p_import_date: importDate,
+          p_seen_at: seenAt,
+          importDate_tipo: typeof importDate,
+          importDate_formato_valido: /^\d{4}-\d{2}-\d{2}$/.test(importDate),
+          importDate_valor_exato: importDate
+        });
+        
         const { data, error } = await executeQueryWithTimeout(
           () => supabase.rpc('bulk_insert_clients_v3', {
           clients_json: dbBatch,
@@ -361,6 +371,13 @@ export const clientService = {
           } as any),
           120000 // 120 segundos para bulk insert (pode demorar mais)
         );
+        
+        console.log(`✅ [clientService] RPC bulk_insert_clients_v3 retornou:`, {
+          lote: Math.floor(i / BATCH_SIZE) + 1,
+          sucesso: !error,
+          erro: error?.message,
+          dados_retornados: data ? `${Array.isArray(data) ? data.length : 'não é array'} registros` : 'null'
+        });
 
       if (error) {
           console.error('❌ Erro ao inserir lote (bulk_insert_clients):', error)

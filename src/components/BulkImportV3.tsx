@@ -124,15 +124,61 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
     return undefined;
   }
 
-  function parseSheetDate(fields?: string[]): { raw: string | null; iso: string | null } {
-    if (!fields || fields.length === 0) return { raw: null, iso: null };
-    const candidate = fields
-      .map(f => (f ?? '').trim())
-      .find(f => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(f));
-    if (!candidate) return { raw: null, iso: null };
-    const [day, month, year] = candidate.split('/');
-    const iso = `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    return { raw: candidate, iso };
+  function parseSheetDate(fields?: string[], rows?: any[]): { raw: string | null; iso: string | null } {
+    // CORREÇÃO CRÍTICA: A data da planilha está na coluna R (linhas de dados), não no header
+    // Estratégia 1: Procurar coluna "Data" ou similar nas linhas de dados
+    if (rows && rows.length > 0) {
+      // Procurar por coluna que contenha "data" no nome (case-insensitive)
+      const dateColumnKey = Object.keys(rows[0] || {}).find(key => {
+        const normalizedKey = norm(key);
+        return normalizedKey.includes('data') || normalizedKey === 'r';
+      });
+      
+      if (dateColumnKey) {
+        // Extrair data da primeira linha não vazia dessa coluna
+        for (const row of rows) {
+          const dateValue = row[dateColumnKey];
+          if (dateValue && typeof dateValue === 'string') {
+            const trimmed = dateValue.trim();
+            // Tentar formato DD/MM/YYYY
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+              const [day, month, year] = trimmed.split('/');
+              const iso = `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              console.log('✅ [parseSheetDate] Data encontrada na coluna de dados:', {
+                coluna: dateColumnKey,
+                valor_raw: trimmed,
+                valor_iso: iso
+              });
+              return { raw: trimmed, iso };
+            }
+            // Tentar formato YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+              console.log('✅ [parseSheetDate] Data encontrada na coluna de dados (formato ISO):', {
+                coluna: dateColumnKey,
+                valor: trimmed
+              });
+              return { raw: trimmed, iso: trimmed };
+            }
+          }
+        }
+      }
+    }
+    
+    // Estratégia 2: Fallback - procurar nos headers (comportamento antigo)
+    if (fields && fields.length > 0) {
+      const candidate = fields
+        .map(f => (f ?? '').trim())
+        .find(f => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(f));
+      if (candidate) {
+        const [day, month, year] = candidate.split('/');
+        const iso = `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        console.log('✅ [parseSheetDate] Data encontrada no header:', { raw: candidate, iso });
+        return { raw: candidate, iso };
+      }
+    }
+    
+    console.warn('⚠️ [parseSheetDate] Data não encontrada nem nos dados nem no header');
+    return { raw: null, iso: null };
   }
 
   const parseCsvV3 = async (text: string) => {
@@ -186,7 +232,14 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
         return;
       }
 
-      const { raw: parsedSheetDateRaw, iso: parsedSheetDateIso } = parseSheetDate(parsed.meta?.fields);
+      // CORREÇÃO CRÍTICA: Passar rows para parseSheetDate para extrair data da coluna R
+      const { raw: parsedSheetDateRaw, iso: parsedSheetDateIso } = parseSheetDate(parsed.meta?.fields, rows);
+      console.log('🔍 [BulkImportV3] Extração de data do CSV:', {
+        campos_do_csv: parsed.meta?.fields,
+        data_raw_encontrada: parsedSheetDateRaw,
+        data_iso_convertida: parsedSheetDateIso,
+        formato_valido: parsedSheetDateIso ? /^\d{4}-\d{2}-\d{2}$/.test(parsedSheetDateIso) : false
+      });
       setSheetDateRaw(parsedSheetDateRaw);
       setSheetDateIso(parsedSheetDateIso);
 
@@ -458,6 +511,13 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
     }
 
     const allData = parsedClients.map(client => ({ ...client }));
+    console.log('📤 [BulkImportV3] Chamando onImport com:', {
+      quantidade_clientes: allData.length,
+      sheetDate_iso: sheetDateIso,
+      sheetDate_raw: sheetDateRaw,
+      sheetDate_sera_passado: sheetDateIso ?? undefined,
+      formato_valido: sheetDateIso ? /^\d{4}-\d{2}-\d{2}$/.test(sheetDateIso) : false
+    });
     onImport({
       clients: allData,
       sheetDate: sheetDateIso ?? undefined,
