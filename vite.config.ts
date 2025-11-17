@@ -25,14 +25,15 @@ export default defineConfig(({ mode }) => ({
             return 'index'; // Incluir no bundle principal
           }
           if (id.includes('node_modules')) {
+            // Incluir recharts no bundle principal para evitar problemas de inicialização
+            if (id.includes('recharts')) {
+              return 'index'; // Incluir no bundle principal junto com lucide-react
+            }
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
               return 'react-vendor';
             }
             if (id.includes('@radix-ui')) {
               return 'ui-vendor';
-            }
-            if (id.includes('recharts')) {
-              return 'charts-vendor';
             }
             if (id.includes('@supabase')) {
               return 'supabase-vendor';
