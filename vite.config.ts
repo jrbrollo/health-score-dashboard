@@ -19,17 +19,22 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Garantir que lucide-react seja sempre incluído no bundle principal
-          // para evitar problemas de carregamento após logout/login
-          if (id.includes('lucide-react')) {
-            return 'index'; // Incluir no bundle principal
-          }
           if (id.includes('node_modules')) {
-            // Incluir recharts no bundle principal para evitar problemas de inicialização
-            if (id.includes('recharts')) {
-              return 'index'; // Incluir no bundle principal junto com lucide-react
+            // Garantir que React e React-DOM sejam carregados primeiro no bundle principal
+            // para que Recharts e outras bibliotecas possam usar React.forwardRef
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'index'; // Incluir no bundle principal
             }
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+            // Incluir recharts no bundle principal DEPOIS do React
+            if (id.includes('recharts')) {
+              return 'index'; // Incluir no bundle principal junto com React
+            }
+            // Garantir que lucide-react seja sempre incluído no bundle principal
+            // para evitar problemas de carregamento após logout/login
+            if (id.includes('lucide-react')) {
+              return 'index'; // Incluir no bundle principal
+            }
+            if (id.includes('react-router-dom')) {
               return 'react-vendor';
             }
             if (id.includes('@radix-ui')) {
