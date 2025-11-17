@@ -141,7 +141,10 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     });
   }, [clients, selectedPlanner, manager, mediator, leader]);
 
-  // Buscar histórico de clientes em uma data específica (OTIMIZADO)
+  // Buscar histórico de clientes em uma data específica (CORRIGIDO - usa função SQL get_sankey_snapshot)
+  // CORREÇÃO CRÍTICA: Agora usa a mesma lógica da análise temporal corrigida
+  // - Para dias com dados exatos: calcula scores em tempo real da tabela clients com filtro last_seen_at = max_last_seen_at
+  // - Para dias sem dados exatos: usa lógica AS-OF do histórico com mesmo filtro
   const loadClientHistoryForDate = useCallback(async (targetDate: Date, clientIds: (string | number)[]): Promise<Map<string, HealthScoreHistory>> => {
     const historyMap = new Map<string, HealthScoreHistory>();
     
@@ -162,127 +165,86 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         }
       }
       
-      // Converter IDs para string para garantir compatibilidade
-      const clientIdsStr = clientIds.map(id => String(id));
-      
-      console.log(`🔍 Buscando histórico para ${clientIdsStr.length} clientes até ${dateStr}...`);
-      setLoadingProgress(`Buscando histórico para ${clientIdsStr.length} clientes...`);
-      
-      // OTIMIZAÇÃO: Usar query mais eficiente - buscar apenas o registro mais recente por cliente
-      // Em vez de buscar tudo e filtrar, usar DISTINCT ON ou subquery
-      const allRecords: any[] = [];
-      // Reduzido batch size para evitar URLs muito longas (erro 400 do Supabase)
-      // O limite seguro é ~500 IDs por query para evitar problemas de URL length
-      const batchSize = 500;
-      const totalBatches = Math.ceil(clientIdsStr.length / batchSize);
-      
-      // Processar em lotes paralelos (reduzido para 3 simultâneos para evitar sobrecarga)
-      const maxConcurrent = 3;
-      for (let i = 0; i < clientIdsStr.length; i += batchSize * maxConcurrent) {
-        const batches: Promise<any>[] = [];
-        
-        for (let j = 0; j < maxConcurrent && (i + j * batchSize) < clientIdsStr.length; j++) {
-          const batchStart = i + j * batchSize;
-          const batch = clientIdsStr.slice(batchStart, batchStart + batchSize);
-          
-          if (batch.length === 0) continue;
-          
-          const batchPromise = (async () => {
-            try {
-              // OTIMIZAÇÃO: Buscar apenas campos necessários e limitar resultados
-              // IMPORTANTE: Filtrar apenas dados a partir da data mínima confiável (13/11/2025)
-              const minDateStr = MIN_HISTORY_DATE.toISOString().split('T')[0];
-              const { data, error } = await (supabase as any)
-          .from('health_score_history')
-                .select('id, client_id, recorded_date, client_name, planner, health_score, health_category, nps_score_v3_pillar, referral_pillar, payment_pillar, cross_sell_pillar, tenure_pillar, meeting_engagement, app_usage, payment_status, ecosystem_engagement, nps_score, last_meeting, has_scheduled_meeting, app_usage_status, payment_status_detail, has_referrals, nps_score_detail, ecosystem_usage, created_at')
-                .in('client_id', batch)
-                .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
-          .lte('recorded_date', dateStr)
-          .order('recorded_date', { ascending: false })
-                .limit(1000); // Limite reduzido para evitar problemas com queries grandes
-        
-        if (error) {
-                console.error(`Erro ao buscar histórico do lote ${batchStart}-${batchStart + batch.length}:`, error);
-                return [];
-              }
-              
-              return data || [];
-            } catch (err) {
-              console.error(`Erro ao processar lote ${batchStart}-${batchStart + batch.length}:`, err);
-              return [];
-            }
-          })();
-          
-          batches.push(batchPromise);
+      // Converter IDs para UUID
+      const clientIdsUuid = clientIds.map(id => {
+        const idStr = String(id);
+        // Validar formato UUID
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr)) {
+          console.warn(`⚠️ ID inválido (não é UUID): ${idStr}`);
+          return null;
         }
-        
-        const results = await Promise.all(batches);
-        results.forEach(data => {
-        if (data && data.length > 0) {
-          allRecords.push(...data);
-        }
-        });
-        
-        // Atualizar progresso
-        const processedBatches = Math.min(Math.ceil((i + batchSize * maxConcurrent) / batchSize), totalBatches);
-        setLoadingProgress(`Processando histórico... ${processedBatches}/${totalBatches} lotes`);
+        return idStr;
+      }).filter((id): id is string => id !== null);
+      
+      console.log(`🔍 Buscando snapshot para ${clientIdsUuid.length} clientes na data ${dateStr} usando get_sankey_snapshot...`);
+      setLoadingProgress(`Buscando snapshot para ${clientIdsUuid.length} clientes...`);
+      
+      // Preparar filtros de hierarquia
+      const plannerFilter = selectedPlanner === 'all' ? 'all' : selectedPlanner;
+      const managersFilter = manager !== 'all' ? [manager] : null;
+      const mediatorsFilter = mediator !== 'all' ? [mediator] : null;
+      const leadersFilter = leader !== 'all' ? [leader] : null;
+      
+      // Chamar função SQL get_sankey_snapshot
+      const result = await (supabase as any).rpc('get_sankey_snapshot', {
+        p_snapshot_date: dateStr,
+        p_client_ids: clientIdsUuid.length > 0 ? clientIdsUuid : null,
+        p_planner_filter: plannerFilter,
+        p_managers: managersFilter,
+        p_mediators: mediatorsFilter,
+        p_leaders: leadersFilter,
+        include_null_manager: false,
+        include_null_mediator: false,
+        include_null_leader: false
+      }) as { data: any[] | null; error: any };
+      
+      const { data, error } = result;
+      
+      if (error) {
+        console.error(`❌ Erro ao buscar snapshot via get_sankey_snapshot:`, error);
+        throw error;
       }
       
-      console.log(`✅ Encontrados ${allRecords.length} registros históricos`);
-
-      // OTIMIZAÇÃO: Processar mais eficientemente - usar Map direto
+      if (!data || !Array.isArray(data)) {
+        console.warn(`⚠️ get_sankey_snapshot retornou dados inválidos:`, data);
+        return historyMap;
+      }
+      
+      console.log(`✅ get_sankey_snapshot retornou ${data.length} registros para ${dateStr}`);
+      
+      // Converter resultados para HealthScoreHistory
       const latestByClient = new Map<string, HealthScoreHistory>();
-      const recordsByClient = new Map<string, any>();
-      const exactDateRecords = new Map<string, any>(); // Registros com data exata
       
-      // Agrupar e pegar apenas o mais recente de cada cliente em uma única passada
-      const targetDateNormalized = new Date(targetDate);
-      targetDateNormalized.setHours(0, 0, 0, 0);
-      
-      allRecords.forEach((record: any) => {
+      data.forEach((record: any) => {
         const clientId = String(record.client_id);
-        const recordDate = new Date(record.recorded_date);
-        recordDate.setHours(0, 0, 0, 0);
-        
-        // Filtrar apenas registros até a data alvo (inclusive)
-        if (recordDate.getTime() > targetDateNormalized.getTime()) return;
-        
-        // Se é a data exata, marcar separadamente
-        if (recordDate.getTime() === targetDateNormalized.getTime()) {
-          exactDateRecords.set(clientId, record);
-        }
-        
-        const existing = recordsByClient.get(clientId);
-        if (!existing) {
-          recordsByClient.set(clientId, record);
-        } else {
-          // Comparar datas e manter apenas o mais recente
-          const existingDate = new Date(existing.recorded_date);
-          existingDate.setHours(0, 0, 0, 0);
-          const existingTime = existingDate.getTime();
-          const currentTime = recordDate.getTime();
-          if (currentTime > existingTime) {
-            recordsByClient.set(clientId, record);
-          }
-        }
+        latestByClient.set(clientId, databaseToHealthScoreHistory({
+          id: '',
+          client_id: record.client_id,
+          recorded_date: record.recorded_date,
+          client_name: record.client_name,
+          planner: record.planner,
+          health_score: record.health_score,
+          health_category: record.health_category,
+          nps_score_v3_pillar: record.nps_score_v3_pillar ?? 0,
+          referral_pillar: record.referral_pillar ?? 0,
+          payment_pillar: record.payment_pillar ?? 0,
+          cross_sell_pillar: record.cross_sell_pillar ?? 0,
+          tenure_pillar: record.tenure_pillar ?? 0,
+          meeting_engagement: 0,
+          app_usage: 0,
+          payment_status: 0,
+          ecosystem_engagement: 0,
+          nps_score: 0,
+          last_meeting: 'Nunca',
+          has_scheduled_meeting: false,
+          app_usage_status: 'Nunca usou',
+          payment_status_detail: 'Em dia',
+          has_referrals: false,
+          nps_score_detail: 'Não avaliado',
+          ecosystem_usage: 'Não usa',
+          created_at: record.created_at || new Date().toISOString()
+        }));
       });
-      
-      // Converter para HealthScoreHistory
-      // Priorizar registros com data exata, senão usar o mais recente
-      recordsByClient.forEach((record, clientId) => {
-        // Se há registro com data exata, usar ele; senão usar o mais recente
-        const finalRecord = exactDateRecords.has(clientId) 
-          ? exactDateRecords.get(clientId)! 
-          : record;
-        latestByClient.set(clientId, databaseToHealthScoreHistory(finalRecord));
-      });
-      
-      // Log para debug
-      const exactCount = exactDateRecords.size;
-      const totalCount = latestByClient.size;
-      if (exactCount < totalCount) {
-        console.log(`⚠️ Atenção: ${totalCount - exactCount} clientes sem histórico exato para ${dateStr}, usando registro mais recente`);
-      }
 
       // Salvar no cache
       historyCache.current.set(cacheKey, latestByClient);
@@ -293,13 +255,13 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         historyCache.current.delete(firstKey);
       }
 
-      console.log(`✅ Processados ${latestByClient.size} clientes com histórico`);
+      console.log(`✅ Processados ${latestByClient.size} clientes com snapshot corrigido`);
       return latestByClient;
     } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
+      console.error('❌ Erro ao carregar snapshot:', error);
       return historyMap;
     }
-  }, []);
+  }, [selectedPlanner, manager, mediator, leader]);
 
   // Função auxiliar para converter dados do banco
   const databaseToHealthScoreHistory = (dbData: any): HealthScoreHistory => {
@@ -907,13 +869,17 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
                 onDateChange={(range) => {
                   if (range?.from) {
                     const from = startOfDay(range.from);
+                    
                     // Garantir que data não seja anterior à data mínima confiável
+                    // Mas permitir selecionar qualquer data >= MIN_HISTORY_DATE
                     const safeFrom = clampToMinHistoryDate(from);
+                    
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const to = range?.to 
                       ? startOfDay(range.to.getTime() > today.getTime() ? today : range.to)
                       : startOfDay(safeFrom.getTime() > today.getTime() ? today : safeFrom);
+                    
                     setDateRange({ from: safeFrom, to });
                   }
                 }}

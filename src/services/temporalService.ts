@@ -22,213 +22,13 @@ const averageFromRecords = (records: any[], selector: (record: any) => number | 
  * @param endDate Data final do período
  * @returns Array completo com todos os dias preenchidos
  */
-function fillGapsWithForwardFill(
-  data: TemporalAnalysis[],
-  startDate: Date,
-  endDate: Date
-): TemporalAnalysis[] {
-  // ========== CONFIRMAÇÃO DO INPUT ==========
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('🔍 [Forward Filling] CONFIRMAÇÃO DO INPUT');
-  console.log('═══════════════════════════════════════════════════════════');
-  
-  if (!data || data.length === 0) {
-    // Se não há dados, retornar array vazio (não criar dados fictícios)
-    console.log('⚠️ Forward Filling: Sem dados para preencher');
-    console.log('═══════════════════════════════════════════════════════════');
-    return [];
-  }
-
-  // Normalizar datas (remover horas)
-  const normalizedStart = new Date(startDate);
-  normalizedStart.setHours(0, 0, 0, 0);
-  const normalizedEnd = new Date(endDate);
-  normalizedEnd.setHours(0, 0, 0, 0);
-  
-  // Calcular período esperado
-  const expectedDays = Math.floor((normalizedEnd.getTime() - normalizedStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  
-  // Extrair datas únicas dos dados recebidos
-  const datesInData = new Set<string>();
-  data.forEach(item => {
-    const itemDate = new Date(item.recordedDate);
-    itemDate.setHours(0, 0, 0, 0);
-    datesInData.add(itemDate.toISOString().split('T')[0]);
-  });
-  const sortedDatesInData = Array.from(datesInData).sort();
-  
-  console.log(`📅 Data de início recebida: ${normalizedStart.toISOString().split('T')[0]}`);
-  console.log(`📅 Data de fim recebida: ${normalizedEnd.toISOString().split('T')[0]}`);
-  console.log(`📊 Quantidade de registros brutos recebidos: ${data.length}`);
-  console.log(`📊 Período esperado: ${expectedDays} dias`);
-  console.log(`📋 Datas presentes nos dados recebidos (${datesInData.size} datas únicas):`);
-  sortedDatesInData.forEach(date => console.log(`   - ${date}`));
-  console.log('═══════════════════════════════════════════════════════════');
-
-  // Agrupar dados por planejador para aplicar forward filling separadamente
-  const dataByPlanner = new Map<string | Planner, TemporalAnalysis[]>();
-  data.forEach(item => {
-    const plannerKey = item.planner || 'all';
-    if (!dataByPlanner.has(plannerKey)) {
-      dataByPlanner.set(plannerKey, []);
-    }
-    dataByPlanner.get(plannerKey)!.push(item);
-  });
-
-  // Aplicar forward filling para cada planejador separadamente
-  const result: TemporalAnalysis[] = [];
-  let totalFilledDays = 0; // Contador de dias preenchidos pelo Forward Filling
-  let totalRealDays = 0; // Contador de dias com dados reais
-  
-  console.log(`🔄 Processando ${dataByPlanner.size} planejador(es)...`);
-  
-  for (const [planner, plannerData] of dataByPlanner.entries()) {
-    console.log(`\n📌 Processando planejador: ${planner} (${plannerData.length} registros)`);
-    // Criar mapa de dados por data para este planejador (chave: YYYY-MM-DD)
-    const dataMap = new Map<string, TemporalAnalysis>();
-    plannerData.forEach(item => {
-      const itemDate = new Date(item.recordedDate);
-      itemDate.setHours(0, 0, 0, 0);
-      const dateKey = itemDate.toISOString().split('T')[0];
-      dataMap.set(dateKey, item);
-    });
-
-    // Ordenar dados existentes por data
-    const sortedData = Array.from(dataMap.values()).sort(
-      (a, b) => a.recordedDate.getTime() - b.recordedDate.getTime()
-    );
-
-    if (sortedData.length === 0) {
-      continue; // Pular se não há dados para este planejador
-    }
-
-    // Gerar sequência completa de datas do período para este planejador
-    const currentDate = new Date(normalizedStart);
-    let lastKnownValue: TemporalAnalysis | null = null;
-
-    // Encontrar o primeiro valor conhecido (pode ser antes de startDate)
-    for (const item of sortedData) {
-      const itemDate = new Date(item.recordedDate);
-      itemDate.setHours(0, 0, 0, 0);
-      
-      if (itemDate.getTime() <= normalizedStart.getTime()) {
-        lastKnownValue = item;
-      } else {
-        break;
-      }
-    }
-
-    // Se não há valor antes de startDate, usar o primeiro disponível
-    if (!lastKnownValue && sortedData.length > 0) {
-      lastKnownValue = sortedData[0];
-    }
-
-    // Iterar por cada dia do período
-    const plannerStartDate = new Date(normalizedStart);
-    let plannerFilledDays = 0;
-    let plannerRealDays = 0;
-    const filledDates: string[] = [];
-    const realDates: string[] = [];
-    
-    // CORREÇÃO: Usar .getTime() para uma comparação de limite mais estável
-    while (plannerStartDate.getTime() <= normalizedEnd.getTime()) {
-      const dateKey = plannerStartDate.toISOString().split('T')[0];
-      const existingData = dataMap.get(dateKey);
-
-      if (existingData) {
-        // Há dados reais para esta data: usar e atualizar último valor conhecido
-        result.push(existingData);
-        lastKnownValue = existingData;
-        plannerRealDays++;
-        realDates.push(dateKey);
-      } else if (lastKnownValue) {
-        // Não há dados: usar forward fill (último valor conhecido)
-        // Criar cópia do último valor conhecido com a data atual
-        result.push({
-          ...lastKnownValue,
-          recordedDate: new Date(plannerStartDate), // Usar data atual, não a data do último valor
-        });
-        plannerFilledDays++;
-        filledDates.push(dateKey);
-      } else {
-        // Se não há lastKnownValue e não há dados, não adicionar nada
-        console.log(`   ⚠️ Sem dados e sem lastKnownValue para ${dateKey} - pulando`);
-      }
-
-      // Avançar para o próximo dia
-      plannerStartDate.setDate(plannerStartDate.getDate() + 1);
-    }
-    
-    totalFilledDays += plannerFilledDays;
-    totalRealDays += plannerRealDays;
-    
-    console.log(`   ✅ Planejador ${planner}:`);
-    console.log(`      - Dias com dados reais: ${plannerRealDays}`);
-    console.log(`      - Dias preenchidos pelo Forward Filling: ${plannerFilledDays}`);
-    if (filledDates.length > 0) {
-      console.log(`      - Datas preenchidas: ${filledDates.join(', ')}`);
-    }
-  }
-
-  // Ordenar resultado final por data e planejador
-  const sortedResult = result.sort((a, b) => {
-    const dateDiff = a.recordedDate.getTime() - b.recordedDate.getTime();
-    if (dateDiff !== 0) return dateDiff;
-    // Se mesma data, ordenar por planejador
-    const plannerA = String(a.planner || '');
-    const plannerB = String(b.planner || '');
-    return plannerA.localeCompare(plannerB);
-  });
-  
-  // ========== CONFIRMAÇÃO DO OUTPUT ==========
-  console.log('\n═══════════════════════════════════════════════════════════');
-  console.log('✅ [Forward Filling] CONFIRMAÇÃO DO OUTPUT');
-  console.log('═══════════════════════════════════════════════════════════');
-  
-  // Extrair datas únicas do resultado final
-  const datesInResult = new Set<string>();
-  sortedResult.forEach(item => {
-    const itemDate = new Date(item.recordedDate);
-    itemDate.setHours(0, 0, 0, 0);
-    datesInResult.add(itemDate.toISOString().split('T')[0]);
-  });
-  const sortedDatesInResult = Array.from(datesInResult).sort();
-  
-  console.log(`📊 Total de registros após Forward Filling: ${sortedResult.length}`);
-  console.log(`📊 Dias com dados reais: ${totalRealDays}`);
-  console.log(`📊 Dias preenchidos pelo Forward Filling: ${totalFilledDays}`);
-  console.log(`📊 Período esperado: ${expectedDays} dias`);
-  console.log(`📊 Total de dias únicos no resultado: ${datesInResult.size}`);
-  
-  if (datesInResult.size !== expectedDays) {
-    console.log(`⚠️ ATENÇÃO: Esperado ${expectedDays} dias, mas resultado tem ${datesInResult.size} dias únicos!`);
-    
-    // Identificar dias faltantes
-    const missingDates: string[] = [];
-    const currentCheck = new Date(normalizedStart);
-    // CORREÇÃO: Usar .getTime() para uma comparação de limite mais estável
-    while (currentCheck.getTime() <= normalizedEnd.getTime()) {
-      const dateKey = currentCheck.toISOString().split('T')[0];
-      if (!datesInResult.has(dateKey)) {
-        missingDates.push(dateKey);
-      }
-      currentCheck.setDate(currentCheck.getDate() + 1);
-    }
-    
-    if (missingDates.length > 0) {
-      console.log(`❌ Datas faltantes no resultado:`);
-      missingDates.forEach(date => console.log(`   - ${date}`));
-    }
-  } else {
-    console.log(`✅ Todos os ${expectedDays} dias esperados estão presentes no resultado!`);
-  }
-  
-  console.log(`📋 Todas as datas no resultado final (${sortedDatesInResult.length} datas):`);
-  sortedDatesInResult.forEach(date => console.log(`   - ${date}`));
-  console.log('═══════════════════════════════════════════════════════════\n');
-  
-  return sortedResult;
-}
+// REMOVIDO: fillGapsWithForwardFill
+// A lógica de Forward Filling foi centralizada nas funções SQL:
+// - get_temporal_analysis_asof
+// - get_client_health_score_evolution
+// - get_sankey_snapshot
+// Essas funções já aplicam Forward Filling automaticamente, então não é necessário
+// fazer isso no frontend.
 
 const parseDateFromDb = (value: string | Date | null | undefined): Date => {
   if (!value) return new Date();
@@ -424,11 +224,8 @@ export const temporalService = {
 
       const rawData = data.map(databaseToTemporalAnalysis);
       console.log(`📊 Dados recebidos da RPC: ${rawData.length} registros de ${startDateStr} até ${endDateStr}`);
-      console.log(`📅 Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
-      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      const filledData = fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
-      console.log(`✅ Dados após Forward Filling: ${filledData.length} registros`);
-      return filledData;
+      // Forward Filling já é aplicado pela função SQL get_temporal_analysis_asof
+      return rawData;
     } catch (error) {
       console.error('Erro no getTemporalAnalysis:', error);
       const safeStartDate = clampToMinHistoryDate(startDate);
@@ -437,7 +234,129 @@ export const temporalService = {
     }
   },
 
+  // ✅ NOVA FUNÇÃO: Obter série temporal com Forward Fill (usa get_temporal_series)
+  async getTemporalSeries(
+    startDate: Date,
+    endDate: Date,
+    plannerFilter: Planner | "all" = "all"
+  ): Promise<TemporalAnalysis[]> {
+    try {
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase.rpc('get_temporal_series', {
+          start_date: startDateStr,
+          end_date: endDateStr,
+          planner_filter: plannerFilter === 'all' ? 'all' : plannerFilter
+        }),
+        60000
+      );
+      
+      if (error) {
+        console.error('Erro ao buscar série temporal:', error);
+        return [];
+      }
+      
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+      
+      return data.map((item: any) => ({
+        recordedDate: new Date(item.recorded_date),
+        planner: item.planner || 'all',
+        totalClients: item.total_clients || 0,
+        avgHealthScore: item.avg_health_score || 0,
+        excellentCount: 0,
+        stableCount: 0,
+        warningCount: 0,
+        criticalCount: 0,
+        avgMeetingEngagement: 0,
+        avgAppUsage: 0,
+        avgPaymentStatus: 0,
+        avgEcosystemEngagement: 0,
+        avgNpsScore: 0
+      }));
+    } catch (error) {
+      console.error('Erro no getTemporalSeries:', error);
+      return [];
+    }
+  },
+
+  // ✅ NOVA FUNÇÃO: Obter score atual em tempo real (usa get_current_score)
+  async getCurrentScore(
+    plannerFilter: Planner | "all" = "all"
+  ): Promise<{ planner: string; totalClients: number; avgHealthScore: number } | null> {
+    try {
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase.rpc('get_current_score', {
+          planner_filter: plannerFilter === 'all' ? 'all' : plannerFilter
+        }),
+        30000
+      );
+      
+      if (error) {
+        console.error('Erro ao buscar score atual:', error);
+        return null;
+      }
+      
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        return null;
+      }
+      
+      const result = data[0];
+      return {
+        planner: result.planner || 'all',
+        totalClients: result.total_clients || 0,
+        avgHealthScore: result.avg_health_score || 0
+      };
+    } catch (error) {
+      console.error('Erro no getCurrentScore:', error);
+      return null;
+    }
+  },
+
+  // ✅ NOVA FUNÇÃO: Obter movimentos Sankey (usa get_sankey_movement)
+  async getSankeyMovement(
+    startDate: Date,
+    endDate: Date,
+    plannerFilter: Planner | "all" = "all"
+  ): Promise<Array<{ fromCategory: string; toCategory: string; clientCount: number }>> {
+    try {
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      const { data, error } = await executeQueryWithTimeout(
+        () => supabase.rpc('get_sankey_movement', {
+          start_date: startDateStr,
+          end_date: endDateStr,
+          planner_filter: plannerFilter === 'all' ? 'all' : plannerFilter
+        }),
+        60000
+      );
+      
+      if (error) {
+        console.error('Erro ao buscar movimentos Sankey:', error);
+        return [];
+      }
+      
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+      
+      return data.map((item: any) => ({
+        fromCategory: item.from_category || 'Novo',
+        toCategory: item.to_category || 'Perdido',
+        clientCount: item.client_count || 0
+      }));
+    } catch (error) {
+      console.error('Erro no getSankeyMovement:', error);
+      return [];
+    }
+  },
+
   // Obter análise temporal agregada (todos os planejadores) AS-OF
+  // ⚠️ DEPRECATED: Use getTemporalSeries em vez disso
   async getAggregatedTemporalAnalysis(
     startDate: Date,
     endDate: Date,
@@ -603,11 +522,8 @@ export const temporalService = {
         console.log(``);
       });
       console.log(`═══════════════════════════════════════════════════════════`);
-      console.log(`📅 Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
-      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      const filledData = fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
-      console.log(`✅ Dados agregados após Forward Filling: ${filledData.length} registros`);
-      return filledData;
+      // Forward Filling já é aplicado pela função SQL get_temporal_analysis_asof
+      return rawData;
     } catch (error) {
       console.error('Erro no getAggregatedTemporalAnalysis:', error);
       // Fallback: agregar manualmente
@@ -718,12 +634,10 @@ export const temporalService = {
       });
 
       const sortedAggregated = aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
-      console.log(`📊 [calculateAggregatedAnalysis] Dados agregados antes do Forward Filling: ${sortedAggregated.length} registros`);
-      console.log(`📅 [calculateAggregatedAnalysis] Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
-      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      const filledData = fillGapsWithForwardFill(sortedAggregated, safeStartDate, safeEndDate);
-      console.log(`✅ [calculateAggregatedAnalysis] Dados após Forward Filling: ${filledData.length} registros`);
-      return filledData;
+      console.log(`📊 [calculateAggregatedAnalysis] Dados agregados: ${sortedAggregated.length} registros`);
+      // NOTA: Forward Filling não é aplicado aqui pois esta é uma função de fallback.
+      // O método principal getAggregatedTemporalAnalysis usa a função SQL que já aplica Forward Filling.
+      return sortedAggregated;
     } catch (error) {
       console.error('Erro no calculateAggregatedAnalysis:', error);
       return [];
@@ -828,8 +742,9 @@ export const temporalService = {
       });
 
       const sortedAggregated = aggregated.sort((a, b) => a.recordedDate.getTime() - b.recordedDate.getTime());
-      // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
-      return fillGapsWithForwardFill(sortedAggregated, safeStartDate, safeEndDate);
+      // NOTA: Forward Filling não é aplicado aqui pois esta é uma função de fallback.
+      // O método principal getTemporalAnalysis usa a função SQL que já aplica Forward Filling.
+      return sortedAggregated;
     } catch (error) {
       console.error('Erro no calculatePlannerAnalysis:', error);
       return [];
@@ -864,6 +779,10 @@ export const temporalService = {
       const windowSize = Math.max(1, Math.floor(currentData.length / 2));
       const recent = currentData.slice(-windowSize);
       const prior = currentData.slice(-2 * windowSize, -windowSize);
+      
+      // ✅ CORREÇÃO: Se prior está vazio, usar os primeiros windowSize dias como fallback
+      // Isso garante que sempre temos dados para comparação
+      const effectivePrior = prior.length > 0 ? prior : currentData.slice(0, Math.min(windowSize, currentData.length));
 
       // Médias ponderadas por totalClients
       const weightedAvg = (arr: typeof currentData, selector: (d: any) => number) => {
@@ -874,10 +793,10 @@ export const temporalService = {
       };
 
       const avgRecent = weightedAvg(recent, d => d.avgHealthScore);
-      const avgPrior = weightedAvg(prior, d => d.avgHealthScore);
+      const avgPrior = weightedAvg(effectivePrior, d => d.avgHealthScore);
 
-      const clientRecent = Math.round(recent.reduce((s, d) => s + d.totalClients, 0) / recent.length);
-      const clientPrior = Math.round(prior.reduce((s, d) => s + d.totalClients, 0) / Math.max(1, prior.length));
+      const clientRecent = Math.round(recent.reduce((s, d) => s + d.totalClients, 0) / Math.max(1, recent.length));
+      const clientPrior = Math.round(effectivePrior.reduce((s, d) => s + d.totalClients, 0) / Math.max(1, effectivePrior.length));
 
       const scoreChange = avgRecent - avgPrior;
       const scoreChangePercent = avgPrior > 0 ? (scoreChange / avgPrior) * 100 : 0;
@@ -977,122 +896,76 @@ export const temporalService = {
     }
   },
 
-  // Obter histórico de um cliente específico
+  // Obter histórico de um cliente específico (CORRIGIDO - usa função SQL get_client_health_score_evolution com Forward Filling)
+  // CORREÇÃO CRÍTICA: Agora usa a mesma lógica temporal corrigida com Forward Filling automático
   async getClientHistory(clientId: string): Promise<HealthScoreHistory[]> {
     try {
-      // Filtrar apenas dados a partir da data mínima confiável (13/11/2025)
-      const minDateStr = MIN_HISTORY_DATE.toISOString().split('T')[0];
+      console.log(`🔍 [getClientHistory] Buscando evolução do cliente ${clientId} usando get_client_health_score_evolution...`);
       
+      // Chamar função SQL get_client_health_score_evolution que aplica Forward Filling automaticamente
       const { data, error } = await executeQueryWithTimeout(
-        () => supabase
-        .from('health_score_history')
-        .select('*')
-        .eq('client_id', clientId)
-        .gte('recorded_date', minDateStr) // Filtrar apenas a partir da data mínima
-        .order('recorded_date', { ascending: true }),
+        async () => {
+          const result = await (supabase as any).rpc('get_client_health_score_evolution', {
+            p_client_id: clientId
+          });
+          return result as { data: any[] | null; error: any };
+        },
         30000 // 30 segundos para histórico de um cliente
       );
 
-      if (error) throw error;
-
-      const history = (data || []).map(databaseToHealthScoreHistory);
-      
-      // Se não há histórico, tentar criar um registro APENAS se houver last_seen_at
-      // IMPORTANTE: Não criar histórico para datas futuras ou sem dados importados
-      if (history.length === 0) {
-        console.log(`[temporalService] Cliente ${clientId} sem histórico. Verificando se pode criar automaticamente...`);
-        try {
-          // Buscar dados atuais do cliente para pegar a data do último snapshot
-          const { data: clientData, error: clientError } = await executeQueryWithTimeout(
-            () => supabase
-              .from('clients')
-              .select('id, last_seen_at, is_spouse, name')
-              .eq('id', clientId)
-              .single(),
-            10000 // 10 segundos
-          );
-          
-          if (clientError) {
-            console.warn(`[temporalService] Erro ao buscar cliente ${clientId}:`, clientError);
-            return history;
-          }
-          
-          if (!clientData) {
-            console.warn(`[temporalService] Cliente ${clientId} não encontrado`);
-            return history;
-          }
-          
-          // IMPORTANTE: Só criar histórico se houver last_seen_at (dados importados)
-          // Não criar para datas futuras ou sem dados
-          if (!clientData.last_seen_at) {
-            console.log(`[temporalService] Cliente ${clientId} sem last_seen_at, não criando histórico automático`);
-            return history;
-          }
-          
-          const lastSeen = new Date(clientData.last_seen_at);
-          lastSeen.setHours(0, 0, 0, 0);
-          
-          // Só criar se a data do snapshot for >= data mínima
-          if (lastSeen < MIN_HISTORY_DATE) {
-            console.warn(`[temporalService] Data do snapshot (${lastSeen.toLocaleDateString('pt-BR')}) é anterior à data mínima (${MIN_HISTORY_DATE.toLocaleDateString('pt-BR')})`);
-            return history;
-          }
-          
-          // Verificar se a data do snapshot não é futura
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (lastSeen > today) {
-            console.warn(`[temporalService] Data do snapshot (${lastSeen.toLocaleDateString('pt-BR')}) é futura, não criando histórico`);
-            return history;
-          }
-          
-          // Criar histórico usando a função RPC com a data do snapshot (não data atual)
-          const recordDateStr = lastSeen.toISOString().split('T')[0];
-          console.log(`[temporalService] Chamando RPC record_health_score_history_v3 para cliente ${clientId} (cônjuge: ${clientData.is_spouse ? 'sim' : 'não'}) com data ${recordDateStr} (do snapshot)`);
-          
-          const { error: createError } = await executeQueryWithTimeout(
-            () => supabase.rpc('record_health_score_history_v3', {
-              p_client_id: clientId,
-              p_recorded_date: recordDateStr
-            }),
-            10000 // 10 segundos
-          );
-          
-          if (createError) {
-            console.error(`[temporalService] Erro ao criar histórico automático para ${clientId}:`, createError);
-            return history;
-          }
-          
-          console.log(`[temporalService] Histórico criado com sucesso. Buscando novamente...`);
-          
-          // Buscar novamente após criar
-          const { data: newData, error: newError } = await executeQueryWithTimeout(
-            () => supabase
-              .from('health_score_history')
-              .select('*')
-              .eq('client_id', clientId)
-              .gte('recorded_date', minDateStr)
-              .order('recorded_date', { ascending: true }),
-            10000
-          );
-          
-          if (newError) {
-            console.error(`[temporalService] Erro ao buscar histórico após criação:`, newError);
-            return history;
-          }
-          
-          if (newData && newData.length > 0) {
-            console.log(`[temporalService] Histórico encontrado após criação: ${newData.length} registro(s)`);
-            return newData.map(databaseToHealthScoreHistory);
-          } else {
-            console.warn(`[temporalService] Histórico criado mas não encontrado na busca (pode ser problema de filtro de data)`);
-          }
-        } catch (createErr) {
-          console.error(`[temporalService] Exceção ao criar histórico automático para ${clientId}:`, createErr);
-        }
+      if (error) {
+        console.error(`❌ Erro ao buscar evolução do cliente via get_client_health_score_evolution:`, error);
+        throw error;
       }
+
+      if (!data || !Array.isArray(data)) {
+        console.warn(`⚠️ get_client_health_score_evolution retornou dados inválidos:`, data);
+        return [];
+      }
+
+      console.log(`✅ get_client_health_score_evolution retornou ${data.length} registros (com Forward Filling aplicado)`);
+
+      // Converter resultados para HealthScoreHistory
+      const history = data.map((record: any) => {
+        return databaseToHealthScoreHistory({
+          id: '',
+          client_id: clientId, // Usar clientId do parâmetro (a função SQL não retorna client_id)
+          recorded_date: record.recorded_date,
+          client_name: record.client_name,
+          planner: record.planner,
+          health_score: record.health_score,
+          health_category: record.health_category,
+          nps_score_v3_pillar: record.nps_score_v3_pillar ?? 0,
+          referral_pillar: record.referral_pillar ?? 0,
+          payment_pillar: record.payment_pillar ?? 0,
+          cross_sell_pillar: record.cross_sell_pillar ?? 0,
+          tenure_pillar: record.tenure_pillar ?? 0,
+          meeting_engagement: 0,
+          app_usage: 0,
+          payment_status: 0,
+          ecosystem_engagement: 0,
+          nps_score: 0,
+          last_meeting: 'Nunca',
+          has_scheduled_meeting: false,
+          app_usage_status: 'Nunca usou',
+          payment_status_detail: 'Em dia',
+          has_referrals: false,
+          nps_score_detail: 'Não avaliado',
+          ecosystem_usage: 'Não usa',
+          created_at: record.created_at || new Date().toISOString()
+        });
+      });
+
+      // Filtrar novamente no frontend para garantir (já filtrado no backend, mas garantia extra)
+      const filteredHistory = history.filter(h => {
+        const recordDate = new Date(h.recordedDate);
+        recordDate.setHours(0, 0, 0, 0);
+        return recordDate >= MIN_HISTORY_DATE;
+      });
+
+      console.log(`✅ Histórico processado: ${filteredHistory.length} registros (após filtro MIN_HISTORY_DATE)`);
       
-      return history;
+      return filteredHistory;
     } catch (error) {
       console.error('Erro ao buscar histórico do cliente:', error);
       return [];

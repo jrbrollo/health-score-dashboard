@@ -42,6 +42,7 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
   const currentRange = tempRange.from ? tempRange : date;
   
   // Calcular o mês padrão do calendário, garantindo que não ultrapasse maxDate
+  // IMPORTANTE: Não forçar para minDate se a data atual já é posterior
   const getDefaultMonth = useMemo(() => {
     const baseDate = currentRange.from || new Date();
     const normalizedBaseDate = new Date(baseDate);
@@ -56,13 +57,17 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
       }
     }
     
-    // Garantir que não seja antes de minDate
+    // NÃO forçar para minDate se a data base já é >= minDate
+    // Isso permite que o usuário selecione datas posteriores a minDate
     if (minDate) {
       const normalizedMinDate = new Date(minDate);
       normalizedMinDate.setHours(0, 0, 0, 0);
+      // Só ajustar se a data for ANTERIOR a minDate
       if (normalizedBaseDate < normalizedMinDate) {
         return normalizedMinDate;
       }
+      // Se a data já é >= minDate, usar a data atual (não forçar para minDate)
+      return normalizedBaseDate;
     }
     
     return normalizedBaseDate;
@@ -206,19 +211,34 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
               
               // Se range tem from e to, completou a seleção
               if (range.from && range.to) {
-                console.log('📅 Range completo selecionado:', { from: range.from, to: range.to });
+                console.log('📅 Range completo selecionado:', { 
+                  from: range.from, 
+                  to: range.to,
+                  from_str: format(range.from, 'dd/MM/yyyy'),
+                  to_str: format(range.to, 'dd/MM/yyyy')
+                });
                 const normalizedFrom = new Date(range.from);
                 normalizedFrom.setHours(0, 0, 0, 0);
                 const normalizedTo = new Date(range.to);
                 normalizedTo.setHours(0, 0, 0, 0);
                 
-                // Validar contra minDate
+                // Log antes da validação
                 if (minDate) {
                   const normalizedMinDate = new Date(minDate);
                   normalizedMinDate.setHours(0, 0, 0, 0);
+                  console.log('📅 Validação minDate:', {
+                    from_timestamp: normalizedFrom.getTime(),
+                    min_timestamp: normalizedMinDate.getTime(),
+                    from_antes_min: normalizedFrom < normalizedMinDate,
+                    from_str: format(normalizedFrom, 'dd/MM/yyyy'),
+                    min_str: format(normalizedMinDate, 'dd/MM/yyyy')
+                  });
+                  
                   if (normalizedFrom < normalizedMinDate) {
                     console.log('⚠️ Ajustando from para minDate:', normalizedMinDate);
                     normalizedFrom.setTime(normalizedMinDate.getTime());
+                  } else {
+                    console.log('✅ From está OK, não precisa ajustar');
                   }
                 }
                 
@@ -249,7 +269,10 @@ export const DatePickerWithRange: React.FC<DatePickerWithRangeProps> = ({
             }}
             numberOfMonths={2}
             locale={ptBR}
-            fromDate={minDate}
+            // Usar fromDate apenas como referência mínima para o Calendar
+            // A função disabled já controla quais datas podem ser selecionadas
+            {...(minDate ? { fromDate: minDate } : {})}
+            {...(maxDate ? { toDate: maxDate } : {})}
             disabled={(dateToCheck) => {
               // Normalizar a data para comparação (remover horas)
               const normalizedDate = new Date(dateToCheck);

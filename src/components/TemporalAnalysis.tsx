@@ -48,10 +48,11 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const fromDate = startOfDay(subDays(today, DEFAULT_DAYS));
-    // Garantir que data inicial não seja anterior à data mínima confiável
-    const safeFromDate = clampToMinHistoryDate(fromDate);
+    // ✅ CORREÇÃO: Não forçar clampToMinHistoryDate na inicialização
+    // Permitir que o usuário selecione qualquer data dentro do histórico disponível
+    // A validação será feita na busca de dados se necessário
     return {
-      from: safeFromDate,
+      from: fromDate,
       to: today // Será ajustado quando maxHistoryDate for carregado
     };
   });
@@ -71,10 +72,10 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const fromDate = startOfDay(subDays(today, days));
-    // Garantir que data inicial não seja anterior à data mínima confiável
-    const safeFromDate = clampToMinHistoryDate(fromDate);
+    // ✅ CORREÇÃO: Não forçar clampToMinHistoryDate aqui
+    // Permitir que o usuário selecione qualquer data dentro do histórico disponível
     setDateRange({
-      from: safeFromDate,
+      from: fromDate,
       to: today // Usar data atual para permitir Forward Filling até hoje (incluindo fins de semana)
     });
   };
@@ -92,8 +93,10 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
     }
     
     const from = startOfDay(range.from);
-    // Garantir que data não seja anterior à data mínima confiável
-    const safeFrom = clampToMinHistoryDate(from);
+    // ✅ CORREÇÃO: Não forçar clampToMinHistoryDate aqui, apenas validar
+    // O usuário deve poder selecionar qualquer data dentro do histórico disponível
+    // A validação será feita na busca de dados se necessário
+    const safeFrom = from;
     
     // Permitir seleção de datas futuras - a validação será feita na busca de dados
     let to: Date;

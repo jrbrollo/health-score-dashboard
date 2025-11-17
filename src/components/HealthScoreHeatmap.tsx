@@ -13,7 +13,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { Client, Planner } from '@/types/client';
-import { calculateHealthScore } from '@/utils/healthScore';
+import { calculateHealthScore, getHealthCategory } from '@/utils/healthScore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -63,7 +63,7 @@ const HealthScoreHeatmap: React.FC<HealthScoreHeatmapProps> = ({ clients, select
         // Adicionar variação aleatória para simular evolução
         const variation = (Math.random() - 0.5) * 20;
         const score = Math.max(0, Math.min(200, baseScore + variation));
-        const category = score >= 100 ? "Ótimo" : score >= 60 ? "Estável" : score >= 35 ? "Atenção" : "Crítico";
+        const category = getHealthCategory(score);
         
         scores.push({
           date: format(day, 'yyyy-MM-dd'),
@@ -102,7 +102,7 @@ const HealthScoreHeatmap: React.FC<HealthScoreHeatmapProps> = ({ clients, select
       }
 
       const avgScore = dayScores.reduce((sum, score) => sum + score.score, 0) / dayScores.length;
-      const category = avgScore >= 100 ? "Ótimo" : avgScore >= 60 ? "Estável" : avgScore >= 35 ? "Atenção" : "Crítico";
+      const category = getHealthCategory(Math.round(avgScore));
       
       return {
         date: day,
@@ -353,19 +353,19 @@ const HealthScoreHeatmap: React.FC<HealthScoreHeatmapProps> = ({ clients, select
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded ${isDarkMode ? 'bg-green-900' : 'bg-green-100'}`}></div>
-              <span className="text-sm">Ótimo (100+)</span>
+              <span className="text-sm">Ótimo (75-100)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded ${isDarkMode ? 'bg-blue-900' : 'bg-blue-100'}`}></div>
-              <span className="text-sm">Estável (60-99)</span>
+              <span className="text-sm">Estável (50-74)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded ${isDarkMode ? 'bg-yellow-900' : 'bg-yellow-100'}`}></div>
-              <span className="text-sm">Atenção (35-59)</span>
+              <span className="text-sm">Atenção (30-49)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded ${isDarkMode ? 'bg-red-900' : 'bg-red-100'}`}></div>
-              <span className="text-sm">Crítico (0-34)</span>
+              <span className="text-sm">Crítico (0-29)</span>
             </div>
           </div>
         </CardContent>

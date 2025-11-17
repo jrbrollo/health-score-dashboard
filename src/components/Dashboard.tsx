@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Client, Planner, HealthScore, BulkImportPayload } from "@/types/client";
-import { calculateHealthScore, getHealthCategoryColor } from "@/utils/healthScore";
+import { calculateHealthScore, getHealthCategoryColor, getHealthCategory } from "@/utils/healthScore";
 import { buildUniqueList, applyHierarchyFilters, uniqueById, HierarchyFilters } from "@/lib/filters";
 import { getHierarchyNames } from "@/services/hierarchyService";
 import { HealthScoreBadge } from "./HealthScoreBadge";
@@ -361,7 +361,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
         planner,
         clientCount: plannerClients.length,
         averageScore: avgScore,
-        category: avgScore >= 100 ? "Ótimo" : avgScore >= 60 ? "Estável" : avgScore >= 35 ? "Atenção" : "Crítico"
+        category: getHealthCategory(avgScore)
       };
     }).filter(stat => stat.clientCount > 0);
   }, [filteredClients, selectedPlanner]);
@@ -767,7 +767,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardHeader>
                 <CardContent className="relative z-10">
                   <div className={`text-3xl font-black transition-colors duration-300 ${isDarkMode ? 'text-emerald-100' : 'text-emerald-800'}`}>{stats.excellent}</div>
-                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>100+ pontos</p>
+                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>75-100 pontos</p>
                 </CardContent>
               </Card>
 
@@ -784,7 +784,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardHeader>
                 <CardContent className="relative z-10">
                   <div className={`text-3xl font-black transition-colors duration-300 ${isDarkMode ? 'text-blue-100' : 'text-blue-800'}`}>{stats.stable}</div>
-                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>60-99 pontos</p>
+                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-blue-300' : 'text-blue-700'}`}>50-74 pontos</p>
                 </CardContent>
               </Card>
 
@@ -801,7 +801,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardHeader>
                 <CardContent className="relative z-10">
                   <div className={`text-3xl font-black transition-colors duration-300 ${isDarkMode ? 'text-amber-100' : 'text-amber-800'}`}>{stats.warning}</div>
-                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-amber-300' : 'text-amber-700'}`}>35-59 pontos</p>
+                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-amber-300' : 'text-amber-700'}`}>30-49 pontos</p>
                 </CardContent>
               </Card>
 
@@ -818,7 +818,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </CardHeader>
                 <CardContent className="relative z-10">
                   <div className={`text-3xl font-black transition-colors duration-300 ${isDarkMode ? 'text-red-100' : 'text-red-800'}`}>{stats.critical}</div>
-                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-red-300' : 'text-red-700'}`}>0-34 pontos</p>
+                  <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-red-300' : 'text-red-700'}`}>0-29 pontos</p>
                 </CardContent>
               </Card>
             </div>
