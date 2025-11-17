@@ -296,18 +296,30 @@ export const clientService = {
 
       // IMPORTANTE: Usar data da planilha para last_seen_at e histórico
       // Converter data da planilha para TIMESTAMPTZ (início do dia)
-      const importDate = (options?.sheetDate && /^\d{4}-\d{2}-\d{2}$/.test(options.sheetDate))
-        ? options.sheetDate
-        : new Date().toISOString().slice(0, 10)
+      // CORREÇÃO CRÍTICA: Validar formato ISO (YYYY-MM-DD) e garantir que seja usado corretamente
+      let importDate: string;
+      if (options?.sheetDate && /^\d{4}-\d{2}-\d{2}$/.test(options.sheetDate)) {
+        importDate = options.sheetDate;
+        console.log('✅ Data da planilha validada:', importDate);
+      } else {
+        // Se data não foi fornecida ou está em formato incorreto, usar data atual
+        importDate = new Date().toISOString().slice(0, 10);
+        if (options?.sheetDate) {
+          console.warn('⚠️ Data da planilha em formato inválido:', options.sheetDate, '→ usando data atual:', importDate);
+        } else {
+          console.log('⚠️ Data da planilha não informada, usando data atual como referência do import:', importDate);
+        }
+      }
       
       // seenAt deve usar a data da planilha (início do dia), não a data atual
-      const seenAt = importDate ? `${importDate}T00:00:00.000Z` : new Date().toISOString()
+      const seenAt = `${importDate}T00:00:00.000Z`;
       
-      if (!options?.sheetDate) {
-        console.log('⚠️ Data da planilha não informada, usando data atual como referência do import:', importDate)
-      } else {
-        console.log('📅 Data da planilha informada:', options.sheetDate, '→ import_date:', importDate, '→ seen_at:', seenAt)
-      }
+      console.log('📅 Parâmetros de importação:', {
+        sheetDate_recebido: options?.sheetDate,
+        import_date_usado: importDate,
+        seen_at: seenAt,
+        p_import_date_sera_passado: importDate // Confirmar que será passado para SQL
+      });
 
       for (let i = 0; i < clientsData.length; i += BATCH_SIZE) {
         const batch = clientsData.slice(i, i + BATCH_SIZE)

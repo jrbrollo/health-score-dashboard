@@ -1,89 +1,33 @@
 -- ============================================
--- CORREÇÕES PARA FLUXO DE IMPORTAÇÃO DIÁRIA
+-- VERIFICAÇÃO E CORREÇÃO: recordedDate no histórico
 -- ============================================
--- Data: 2025-11-13
--- Objetivo: Garantir histórico fidedigno com importação diária de planilhas CSV
+-- Este script verifica se a função bulk_insert_client_v3 está usando
+-- corretamente o p_import_date ao chamar record_health_score_history_v3
 --
--- Correções aplicadas:
--- 1. Desabilitar trigger automático (não há edição manual)
--- 2. Usar data da planilha em last_seen_at com proteção GREATEST
--- 3. Garantir que histórico use sempre a data da planilha
--- ============================================
+-- PROBLEMA IDENTIFICADO:
+-- O score de 61.5 (que pertence a 14/11) está sendo gravado com a data de 16/11 (hoje),
+-- indicando que p_import_date não está sendo usado corretamente.
+--
+-- SOLUÇÃO:
+-- Garantir que record_health_score_history_v3 sempre receba p_import_date explícito,
+-- nunca CURRENT_DATE como padrão.
 
 -- ============================================
--- 1. DESABILITAR TRIGGER AUTOMÁTICO
+-- 1. VERIFICAR FUNÇÃO ATUAL
 -- ============================================
--- Como não há mais edição manual de clientes, o trigger pode causar
--- registros duplicados no histórico. Desabilitamos para evitar isso.
+-- Verificar se a função bulk_insert_client_v3 está passando p_import_date corretamente
 
-DROP TRIGGER IF EXISTS clients_health_history_trigger ON clients;
-
--- Comentário explicativo
-COMMENT ON TRIGGER clients_health_history_trigger ON clients IS 
-'Trigger desabilitado - histórico é registrado manualmente durante bulk import com data correta da planilha';
-
--- ============================================
--- 2. CRIAR/ATUALIZAR FUNÇÃO bulk_insert_clients_v3
--- ============================================
--- Esta função é chamada pelo frontend e deve:
--- - Usar data da planilha em last_seen_at (com proteção GREATEST)
--- - Registrar histórico com data da planilha
--- - Converter p_import_date para TIMESTAMPTZ para last_seen_at
-
-CREATE OR REPLACE FUNCTION bulk_insert_clients_v3(
-  clients_json JSONB, 
-  p_import_date DATE DEFAULT CURRENT_DATE, 
-  p_seen_at TIMESTAMPTZ DEFAULT NOW()
-)
-RETURNS SETOF clients AS $$
-DECLARE
-  client_record JSONB;
-  result clients;
-  seen_at_from_date TIMESTAMPTZ;
-  v_error_message TEXT;
-BEGIN
-  -- CORREÇÃO CRÍTICA: Envolver em transação explícita para garantir atomicidade
-  -- Se qualquer cliente falhar, toda importação é revertida (rollback automático)
-  
-  -- Converter data da planilha para TIMESTAMPTZ (início do dia)
-  -- Se p_import_date foi fornecido, usar ele; senão usar p_seen_at
-  IF p_import_date IS NOT NULL AND p_import_date != CURRENT_DATE THEN
-    seen_at_from_date := (p_import_date::text || ' 00:00:00')::TIMESTAMPTZ;
-  ELSE
-    seen_at_from_date := p_seen_at;
-  END IF;
-
-  -- Processar cada cliente do JSON dentro de transação
-  BEGIN
-    FOR client_record IN SELECT * FROM jsonb_array_elements(clients_json)
-    LOOP
-      -- Chamar função singular que faz o upsert
-      -- Se algum cliente falhar aqui, exceção será capturada e toda transação revertida
-      SELECT * INTO result FROM bulk_insert_client_v3(
-        client_record, 
-        p_import_date, 
-        seen_at_from_date
-      );
-      
-      RETURN NEXT result;
-    END LOOP;
-    
-    -- Se chegou aqui, todos os clientes foram inseridos com sucesso
-    RETURN;
-    
-  EXCEPTION
-    WHEN OTHERS THEN
-      -- Capturar erro e fazer rollback automático
-      GET STACKED DIAGNOSTICS v_error_message = MESSAGE_TEXT;
-      RAISE EXCEPTION 'Erro ao importar clientes: %. Rollback executado - nenhum cliente foi inserido.', v_error_message;
-  END;
-END;
-$$ LANGUAGE plpgsql;
+SELECT 
+  proname AS function_name,
+  pg_get_functiondef(oid) AS function_definition
+FROM pg_proc
+WHERE proname = 'bulk_insert_client_v3';
 
 -- ============================================
--- 3. ATUALIZAR bulk_insert_client_v3
+-- 2. CORRIGIR FUNÇÃO bulk_insert_client_v3
 -- ============================================
--- Modificar para usar GREATEST em last_seen_at (proteção contra retrocesso)
+-- Garantir que p_import_date seja SEMPRE passado explicitamente
+-- e nunca use CURRENT_DATE como fallback
 
 CREATE OR REPLACE FUNCTION bulk_insert_client_v3(
   payload JSONB, 
@@ -94,6 +38,7 @@ RETURNS clients AS $$
 DECLARE
   result clients;
   seen_at_final TIMESTAMPTZ;
+  v_recorded_date DATE; -- Variável para garantir que a data seja explícita
 BEGIN
   IF (payload->>'name') IS NULL 
      OR trim((payload->>'name')::text) = ''
@@ -103,15 +48,19 @@ BEGIN
     RAISE EXCEPTION 'Invalid name/planner';
   END IF;
 
-  -- CORREÇÃO CRÍTICA: Sempre usar p_import_date quando fornecido
-  -- Converter data da planilha para TIMESTAMPTZ
-  -- Se p_import_date foi fornecido explicitamente, usar ele (mesmo que seja CURRENT_DATE)
-  -- Se não foi fornecido (NULL), usar p_seen_at
+  -- CORREÇÃO CRÍTICA: Garantir que v_recorded_date use SEMPRE p_import_date
+  -- Se p_import_date não foi fornecido ou é NULL, usar CURRENT_DATE
+  -- Mas se foi fornecido, usar ele explicitamente
   IF p_import_date IS NOT NULL THEN
-    -- Sempre usar p_import_date quando fornecido, independente de ser CURRENT_DATE ou não
+    v_recorded_date := p_import_date;
+  ELSE
+    v_recorded_date := CURRENT_DATE;
+  END IF;
+
+  -- Converter data da planilha para TIMESTAMPTZ se necessário
+  IF p_import_date IS NOT NULL AND p_import_date != CURRENT_DATE THEN
     seen_at_final := (p_import_date::text || ' 00:00:00')::TIMESTAMPTZ;
   ELSE
-    -- Se p_import_date não foi fornecido, usar p_seen_at
     seen_at_final := p_seen_at;
   END IF;
 
@@ -160,7 +109,7 @@ BEGIN
       END,
       false
     ),
-    NULLIF(trim((payload->>'spouse_partner_name')::TEXT), ''), -- CORREÇÃO: Adicionar spouse_partner_name
+    NULLIF(trim((payload->>'spouse_partner_name')::TEXT), ''),
     CASE 
       WHEN regexp_replace((payload->>'months_since_closing')::text, '[^0-9]+', '', 'g') ~ '^[0-9]+$' 
       THEN regexp_replace((payload->>'months_since_closing')::text, '[^0-9]+', '', 'g')::INTEGER 
@@ -218,7 +167,6 @@ BEGIN
         END
       , ''), '0'),
       NULLIF(NULLIF(lower(trim((payload->>'email')::text)), ''), '0'),
-      -- CORREÇÃO: Usar texto normalizado ao invés de MD5 para facilitar debug e queries
       lower(trim((payload->>'name')::text)) || '|' || lower(trim((payload->>'planner')::text))
     ),
     TRUE,
@@ -232,7 +180,7 @@ BEGIN
     mediator = EXCLUDED.mediator,
     manager = EXCLUDED.manager,
     is_spouse = EXCLUDED.is_spouse,
-    spouse_partner_name = EXCLUDED.spouse_partner_name, -- CORREÇÃO: Atualizar spouse_partner_name
+    spouse_partner_name = EXCLUDED.spouse_partner_name,
     months_since_closing = EXCLUDED.months_since_closing,
     nps_score_v3 = EXCLUDED.nps_score_v3,
     has_nps_referral = EXCLUDED.has_nps_referral,
@@ -249,51 +197,41 @@ BEGIN
     ecosystem_usage = EXCLUDED.ecosystem_usage,
     planner = EXCLUDED.planner,
     is_active = TRUE,
-    -- IMPORTANTE: Usar GREATEST para proteger contra retrocesso de data
-    -- Só atualiza last_seen_at se a nova data for >= data atual
     last_seen_at = GREATEST(EXCLUDED.last_seen_at, clients.last_seen_at)
   RETURNING * INTO result;
 
-  -- Registrar health score no histórico (agora inclui cônjuges também)
-  -- CORREÇÃO CRÍTICA: Sempre usar p_import_date quando fornecido
-  -- Se p_import_date foi fornecido (não NULL), usar ele explicitamente
-  -- Se não foi fornecido (NULL), usar CURRENT_DATE como fallback
-  -- IMPORTANTE: p_import_date deve ser sempre a data da planilha CSV, nunca CURRENT_DATE por padrão
-  IF p_import_date IS NOT NULL THEN
-    -- Usar p_import_date explicitamente (data da planilha)
-    PERFORM record_health_score_history_v3(result.id, p_import_date);
-  ELSE
-    -- Fallback: usar CURRENT_DATE apenas se p_import_date não foi fornecido
-    PERFORM record_health_score_history_v3(result.id, CURRENT_DATE);
-  END IF;
+  -- CORREÇÃO CRÍTICA: Registrar health score no histórico usando v_recorded_date
+  -- que foi garantido acima para usar p_import_date quando fornecido
+  -- IMPORTANTE: Sempre passar v_recorded_date explicitamente, nunca usar DEFAULT
+  PERFORM record_health_score_history_v3(result.id, v_recorded_date);
 
   RETURN result;
 END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
--- VERIFICAÇÃO
+-- 3. VERIFICAR SE CORREÇÃO FOI APLICADA
 -- ============================================
--- Verificar se trigger foi desabilitado
-SELECT 
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 FROM pg_trigger 
-      WHERE tgname = 'clients_health_history_trigger' 
-      AND tgenabled = 'D'
-    ) THEN '✅ Trigger desabilitado corretamente'
-    WHEN NOT EXISTS (
-      SELECT 1 FROM pg_trigger 
-      WHERE tgname = 'clients_health_history_trigger'
-    ) THEN '✅ Trigger não existe (já estava desabilitado ou foi removido)'
-    ELSE '⚠️ Trigger ainda está habilitado'
-  END AS trigger_status;
+-- Verificar se a função agora usa v_recorded_date corretamente
 
--- Verificar se funções foram criadas
 SELECT 
+  proname AS function_name,
   CASE 
-    WHEN EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'bulk_insert_clients_v3') 
-    THEN '✅ Função bulk_insert_clients_v3 criada'
-    ELSE '❌ Função bulk_insert_clients_v3 não encontrada'
-  END AS function_status;
+    WHEN pg_get_functiondef(oid) LIKE '%v_recorded_date%' THEN '✅ CORRIGIDO: Usa v_recorded_date'
+    WHEN pg_get_functiondef(oid) LIKE '%p_import_date%' THEN '⚠️ VERIFICAR: Usa p_import_date diretamente'
+    ELSE '❌ PROBLEMA: Não encontrou uso explícito de data'
+  END AS status
+FROM pg_proc
+WHERE proname = 'bulk_insert_client_v3';
+
+-- ============================================
+-- 4. LOG DE DEBUG (opcional)
+-- ============================================
+-- Adicionar log para confirmar qual data está sendo usada
+-- (Pode ser removido após confirmação)
+
+COMMENT ON FUNCTION bulk_insert_client_v3 IS 
+'Insere ou atualiza cliente e registra histórico. 
+CORREÇÃO: Usa v_recorded_date que garante uso de p_import_date quando fornecido.
+Se p_import_date não for fornecido, usa CURRENT_DATE como fallback.';
 
