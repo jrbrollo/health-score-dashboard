@@ -334,39 +334,15 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       console.log(`📋 [prepareChartData] Datas que serão exibidas no gráfico: ${datesInChart.join(', ')}`);
     }
     
-    // Se houver dados e o último ponto for do dia mais recente, atualizar com score atual
-    if (sortedData.length > 0 && filteredClients && filteredClients.length > 0 && currentScore > 0) {
-      const lastPoint = sortedData[sortedData.length - 1];
-      const lastPointDate = new Date(lastPoint.fullDate);
-      lastPointDate.setHours(0, 0, 0, 0);
-      
-      // Se o último ponto for de hoje ou do último dia disponível, atualizar com score atual
-      const daysDiff = Math.floor((today.getTime() - lastPointDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Atualizar se for hoje (0 dias) ou ontem (1 dia) - para garantir que sempre mostre o valor mais atual
-      if (daysDiff <= 1) {
-        // Calcular contagens atualizadas
-        const scores = filteredClients
-          .filter(client => client.isActive !== false)
-          .map(client => calculateHealthScore(client));
-        
-        const excellent = scores.filter(s => s.category === "Ótimo").length;
-        const stable = scores.filter(s => s.category === "Estável").length;
-        const warning = scores.filter(s => s.category === "Atenção").length;
-        const critical = scores.filter(s => s.category === "Crítico").length;
-        
-        // Substituir o último ponto com dados atualizados
-        sortedData[sortedData.length - 1] = {
-          ...lastPoint,
-          avgScore: currentScore,
-          totalClients: filteredClients.filter(c => c.isActive !== false).length,
-          excellent,
-          stable,
-          warning,
-          critical,
-        };
-      }
-    }
+    // CORREÇÃO CRÍTICA: Removida lógica que sobrescrevia o último ponto com currentScore
+    // Essa lógica estava causando inversão de dados:
+    // - Forward Filling gerava score correto (52.71) para 16/11
+    // - Mas esta lógica substituía pelo score atual (61.43) calculado em tempo real
+    // - Resultado: score de 14/11 aparecendo no dia 16/11
+    //
+    // SOLUÇÃO: Usar APENAS os dados históricos retornados pelo temporalService
+    // O Forward Filling já garante que dias sem dados sejam preenchidos corretamente
+    // Não misturar dados históricos com dados calculados em tempo real
 
     return sortedData;
   }, [analysisData, filteredClients, currentScore]);

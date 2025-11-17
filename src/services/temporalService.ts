@@ -517,6 +517,46 @@ export const temporalService = {
       console.log(`   - error:`, error);
       console.log(`   - data:`, data ? `${Array.isArray(data) ? data.length : 'não é array'} registros` : 'null/undefined');
       
+      // LOG DETALHADO: Mostrar conteúdo completo do array data recebido da RPC
+      if (data && Array.isArray(data)) {
+        console.log(`═══════════════════════════════════════════════════════════`);
+        console.log(`📊 [getAggregatedTemporalAnalysis] CONTEÚDO COMPLETO DO ARRAY DATA RECEBIDO DA RPC`);
+        console.log(`═══════════════════════════════════════════════════════════`);
+        console.log(`   Total de registros: ${data.length}`);
+        console.log(`   Período solicitado: ${startDateStr} até ${endDateStr}`);
+        console.log(``);
+        data.forEach((item: any, index: number) => {
+          console.log(`   [${index}] Registro completo:`);
+          console.log(`      - recorded_date: ${item.recorded_date}`);
+          console.log(`      - planner: ${item.planner}`);
+          console.log(`      - total_clients: ${item.total_clients}`);
+          console.log(`      - avg_health_score: ${item.avg_health_score} ⚠️ VERIFICAR ESTE VALOR`);
+          console.log(`      - excellent_count: ${item.excellent_count}`);
+          console.log(`      - stable_count: ${item.stable_count}`);
+          console.log(`      - warning_count: ${item.warning_count}`);
+          console.log(`      - critical_count: ${item.critical_count}`);
+          if (item.avg_meeting_engagement !== undefined) {
+            console.log(`      - avg_meeting_engagement: ${item.avg_meeting_engagement}`);
+          }
+          if (item.avg_app_usage !== undefined) {
+            console.log(`      - avg_app_usage: ${item.avg_app_usage}`);
+          }
+          if (item.avg_payment_status !== undefined) {
+            console.log(`      - avg_payment_status: ${item.avg_payment_status}`);
+          }
+          if (item.avg_ecosystem_engagement !== undefined) {
+            console.log(`      - avg_ecosystem_engagement: ${item.avg_ecosystem_engagement}`);
+          }
+          if (item.avg_nps_score !== undefined) {
+            console.log(`      - avg_nps_score: ${item.avg_nps_score}`);
+          }
+          console.log(``);
+        });
+        console.log(`═══════════════════════════════════════════════════════════`);
+      } else {
+        console.log(`   ⚠️ [getAggregatedTemporalAnalysis] data não é um array válido:`, data);
+      }
+      
       if (error) {
         console.error('❌ Erro na chamada RPC get_temporal_analysis_asof (agregada):', error);
         console.error('Parâmetros:', {
@@ -540,7 +580,29 @@ export const temporalService = {
         ...databaseToTemporalAnalysis(item),
         planner: 'all' as const
       }));
-      console.log(`📊 Dados agregados recebidos da RPC: ${rawData.length} registros de ${startDateStr} até ${endDateStr}`);
+      
+      // LOG DETALHADO: Mostrar conteúdo completo após conversão
+      console.log(`═══════════════════════════════════════════════════════════`);
+      console.log(`📊 [getAggregatedTemporalAnalysis] DADOS APÓS CONVERSÃO (databaseToTemporalAnalysis)`);
+      console.log(`═══════════════════════════════════════════════════════════`);
+      console.log(`   Total de registros: ${rawData.length} de ${startDateStr} até ${endDateStr}`);
+      console.log(``);
+      rawData.forEach((item: TemporalAnalysis, index: number) => {
+        const dateStr = item.recordedDate instanceof Date 
+          ? item.recordedDate.toISOString().split('T')[0] 
+          : String(item.recordedDate);
+        console.log(`   [${index}] Registro após conversão:`);
+        console.log(`      - recordedDate: ${dateStr}`);
+        console.log(`      - planner: ${item.planner}`);
+        console.log(`      - totalClients: ${item.totalClients}`);
+        console.log(`      - avgHealthScore: ${item.avgHealthScore} ⚠️ VERIFICAR ESTE VALOR`);
+        console.log(`      - excellentCount: ${item.excellentCount}`);
+        console.log(`      - stableCount: ${item.stableCount}`);
+        console.log(`      - warningCount: ${item.warningCount}`);
+        console.log(`      - criticalCount: ${item.criticalCount}`);
+        console.log(``);
+      });
+      console.log(`═══════════════════════════════════════════════════════════`);
       console.log(`📅 Aplicando Forward Filling de ${safeStartDate.toISOString().split('T')[0]} até ${safeEndDate.toISOString().split('T')[0]}`);
       // Aplicar forward filling para preencher lacunas (ex: fins de semana sem upload)
       const filledData = fillGapsWithForwardFill(rawData, safeStartDate, safeEndDate);
