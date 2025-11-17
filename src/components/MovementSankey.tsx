@@ -141,19 +141,17 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     });
   }, [clients, selectedPlanner, manager, mediator, leader]);
 
-  // Buscar histórico de clientes em uma data específica (CORRIGIDO - usa função SQL get_sankey_snapshot)
-  // CORREÇÃO CRÍTICA: Agora usa a mesma lógica da análise temporal corrigida
-  // - Para dias com dados exatos: calcula scores em tempo real da tabela clients com filtro last_seen_at = max_last_seen_at
-  // - Para dias sem dados exatos: usa lógica AS-OF do histórico com mesmo filtro
+  // Buscar histórico de clientes em uma data específica
+  // CORREÇÃO v2: Query direta em health_score_history ao invés de RPC bugado
   const loadClientHistoryForDate = useCallback(async (targetDate: Date, clientIds: (string | number)[]): Promise<Map<string, HealthScoreHistory>> => {
     const historyMap = new Map<string, HealthScoreHistory>();
-    
+
     if (clientIds.length === 0) return historyMap;
 
     try {
       const dateStr = targetDate.toISOString().split('T')[0];
       const cacheKey = `${dateStr}-${clientIds.length}`;
-      
+
       // Verificar cache primeiro
       if (historyCache.current.has(cacheKey)) {
         const cached = historyCache.current.get(cacheKey)!;
@@ -164,7 +162,7 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
           return cached;
         }
       }
-      
+
       // Converter IDs para UUID
       const clientIdsUuid = clientIds.map(id => {
         const idStr = String(id);
@@ -175,90 +173,77 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         }
         return idStr;
       }).filter((id): id is string => id !== null);
-      
-      console.log(`🔍 Buscando snapshot para ${clientIdsUuid.length} clientes na data ${dateStr} usando get_sankey_snapshot...`);
-      setLoadingProgress(`Buscando snapshot para ${clientIdsUuid.length} clientes...`);
-      
-      // Preparar filtros de hierarquia
-      const plannerFilter = selectedPlanner === 'all' ? 'all' : selectedPlanner;
-      const managersFilter = manager !== 'all' ? [manager] : null;
-      const mediatorsFilter = mediator !== 'all' ? [mediator] : null;
-      const leadersFilter = leader !== 'all' ? [leader] : null;
-      
-      // Chamar função SQL get_sankey_snapshot
-      const result = await (supabase as any).rpc('get_sankey_snapshot', {
-        p_snapshot_date: dateStr,
-        p_client_ids: clientIdsUuid.length > 0 ? clientIdsUuid : null,
-        p_planner_filter: plannerFilter,
-        p_managers: managersFilter,
-        p_mediators: mediatorsFilter,
-        p_leaders: leadersFilter,
-        include_null_manager: false,
-        include_null_mediator: false,
-        include_null_leader: false
-      }) as { data: any[] | null; error: any };
-      
-      const { data, error } = result;
-      
+
+      console.log(`🔍 Buscando histórico para ${clientIdsUuid.length} clientes na data ${dateStr} diretamente do banco...`);
+      setLoadingProgress(`Buscando histórico para ${clientIdsUuid.length} clientes...`);
+
+      // Query direta na tabela health_score_history
+      // Mesma lógica da correção temporal: WHERE recorded_date = date (não <=)
+      let query = supabase
+        .from('health_score_history')
+        .select('*')
+        .eq('recorded_date', dateStr);
+
+      // Filtrar por IDs de clientes se fornecido
+      if (clientIdsUuid.length > 0) {
+        query = query.in('client_id', clientIdsUuid);
+      }
+
+      // Aplicar filtros de hierarquia
+      if (selectedPlanner !== 'all') {
+        query = query.eq('planner', selectedPlanner);
+      }
+
+      if (manager !== 'all') {
+        query = query.eq('manager', manager);
+      }
+
+      if (mediator !== 'all') {
+        query = query.eq('mediator', mediator);
+      }
+
+      if (leader !== 'all') {
+        query = query.eq('leader', leader);
+      }
+
+      // Filtrar planner '0'
+      query = query.neq('planner', '0');
+
+      const { data, error } = await query;
+
       if (error) {
-        console.error(`❌ Erro ao buscar snapshot via get_sankey_snapshot:`, error);
+        console.error(`❌ Erro ao buscar histórico:`, error);
         throw error;
       }
-      
+
       if (!data || !Array.isArray(data)) {
-        console.warn(`⚠️ get_sankey_snapshot retornou dados inválidos:`, data);
+        console.warn(`⚠️ Query retornou dados inválidos:`, data);
         return historyMap;
       }
-      
-      console.log(`✅ get_sankey_snapshot retornou ${data.length} registros para ${dateStr}`);
-      
+
+      console.log(`✅ Query retornou ${data.length} registros para ${dateStr}`);
+
       // Converter resultados para HealthScoreHistory
       const latestByClient = new Map<string, HealthScoreHistory>();
-      
+
       data.forEach((record: any) => {
         const clientId = String(record.client_id);
-        latestByClient.set(clientId, databaseToHealthScoreHistory({
-          id: '',
-          client_id: record.client_id,
-          recorded_date: record.recorded_date,
-          client_name: record.client_name,
-          planner: record.planner,
-          health_score: record.health_score,
-          health_category: record.health_category,
-          nps_score_v3_pillar: record.nps_score_v3_pillar ?? 0,
-          referral_pillar: record.referral_pillar ?? 0,
-          payment_pillar: record.payment_pillar ?? 0,
-          cross_sell_pillar: record.cross_sell_pillar ?? 0,
-          tenure_pillar: record.tenure_pillar ?? 0,
-          meeting_engagement: 0,
-          app_usage: 0,
-          payment_status: 0,
-          ecosystem_engagement: 0,
-          nps_score: 0,
-          last_meeting: 'Nunca',
-          has_scheduled_meeting: false,
-          app_usage_status: 'Nunca usou',
-          payment_status_detail: 'Em dia',
-          has_referrals: false,
-          nps_score_detail: 'Não avaliado',
-          ecosystem_usage: 'Não usa',
-          created_at: record.created_at || new Date().toISOString()
-        }));
+        latestByClient.set(clientId, databaseToHealthScoreHistory(record));
       });
 
       // Salvar no cache
       historyCache.current.set(cacheKey, latestByClient);
-      
+
       // Limitar tamanho do cache (manter apenas últimos 10)
       if (historyCache.current.size > 10) {
         const firstKey = historyCache.current.keys().next().value;
         historyCache.current.delete(firstKey);
       }
 
-      console.log(`✅ Processados ${latestByClient.size} clientes com snapshot corrigido`);
+      console.log(`✅ Processados ${latestByClient.size} clientes do histórico`);
       return latestByClient;
     } catch (error) {
-      console.error('❌ Erro ao carregar snapshot:', error);
+      console.error('❌ Erro ao carregar histórico:', error);
       return historyMap;
     }
   }, [selectedPlanner, manager, mediator, leader]);
