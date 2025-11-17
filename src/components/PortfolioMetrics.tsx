@@ -195,7 +195,7 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
       };
     }
 
-    const healthScores = clients.map(client => calculateHealthScore(client));
+    const healthScores = clients.map(client => calculateHealthScore(client, clients));
     const totalClients = healthScores.length;
     const averageScore = healthScores.reduce((sum, score) => sum + score.score, 0) / totalClients;
 
@@ -301,7 +301,7 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
     });
 
     return Array.from(grouped.entries()).map(([plannerName, plannerClients]) => {
-      const healthScores = plannerClients.map(client => calculateHealthScore(client));
+      const healthScores = plannerClients.map(client => calculateHealthScore(client, clientsByPlanner));
       return {
         planner: plannerName,
         critical: healthScores.filter(score => score.category === "Crítico").length,

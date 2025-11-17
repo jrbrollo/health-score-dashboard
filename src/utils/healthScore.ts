@@ -4,16 +4,22 @@ import { Client, HealthScore, HealthCategory } from "@/types/client";
  * Calcula o Health Score v3 (escala 0-100)
  * Pilares: NPS (-10 a 20) + Indicação (10) + Inadimplência (-20 a 40) + Cross Sell (15) + Meses Relacionamento (15)
  * Score mínimo: 0 (sem valores negativos)
- * 
+ *
  * @param client - Cliente para calcular o score
- * @param payerNpsMap - Mapa opcional de NPS do pagante (chave: "nome|planner", valor: nps ou null)
+ * @param clientsOrMap - Array de clientes (para criar mapa de NPS automaticamente) OU mapa já criado
+ *
+ * IMPORTANTE: Para herança de NPS funcionar corretamente (cônjuges herdarem NPS do pagante),
+ * é necessário passar o segundo parâmetro. Se não passar, cônjuges sem NPS próprio terão score 0.
  */
-export function calculateHealthScore(client: Client, payerNpsMap?: Map<string, number | null>): HealthScore {
+export function calculateHealthScore(
+  client: Client,
+  clientsOrMap?: Client[] | Map<string, number | null>
+): HealthScore {
   // [#19] Validação de dados de entrada
   if (!client || typeof client !== 'object') {
     throw new Error('Cliente inválido: deve ser um objeto');
   }
-  
+
   // Validar que campos numéricos são números válidos
   if (client.overdueInstallments !== undefined && (typeof client.overdueInstallments !== 'number' || client.overdueInstallments < 0)) {
     console.warn('overdueInstallments inválido:', client.overdueInstallments);
@@ -28,7 +34,7 @@ export function calculateHealthScore(client: Client, payerNpsMap?: Map<string, n
   if (client.monthsSinceClosing !== undefined && client.monthsSinceClosing !== null && (typeof client.monthsSinceClosing !== 'number' || client.monthsSinceClosing < 0)) {
     console.warn('monthsSinceClosing inválido:', client.monthsSinceClosing);
   }
-  
+
   // Override rule: 3+ parcelas em atraso = Health Score = 0
   if (client.overdueInstallments !== undefined && client.overdueInstallments >= 3) {
     return {
@@ -43,6 +49,19 @@ export function calculateHealthScore(client: Client, payerNpsMap?: Map<string, n
         tenure: 0,
       },
     };
+  }
+
+  // Determinar payerNpsMap: se recebeu array, criar mapa; se recebeu Map, usar diretamente
+  let payerNpsMap: Map<string, number | null> | undefined;
+
+  if (clientsOrMap) {
+    if (Array.isArray(clientsOrMap)) {
+      // Recebeu array de clientes → criar mapa automaticamente
+      payerNpsMap = createPayerNpsMap(clientsOrMap);
+    } else {
+      // Recebeu Map → usar diretamente
+      payerNpsMap = clientsOrMap;
+    }
   }
 
   // Calculate each pillar score (v3)

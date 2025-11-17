@@ -181,7 +181,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
 
   // Calculate health scores for filtered clients
   const healthScores = useMemo(() => {
-    return filteredClients.map(client => calculateHealthScore(client));
+    return filteredClients.map(client => calculateHealthScore(client, filteredClients));
   }, [filteredClients]);
 
   // Calculate statistics
@@ -202,7 +202,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
   // Função para abrir drawer de categoria
   const handleCategoryCardClick = (category: 'Ótimo' | 'Estável' | 'Atenção' | 'Crítico') => {
     const categoryClients = filteredClients.filter(client => {
-      const score = calculateHealthScore(client);
+      const score = calculateHealthScore(client, filteredClients);
       return score.category === category;
     });
 
@@ -352,7 +352,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
         if (client.isActive === false) return false;
         return client.planner === planner;
       });
-      const plannerScores = plannerClients.map(client => calculateHealthScore(client));
+      const plannerScores = plannerClients.map(client => calculateHealthScore(client, filteredClients));
       const avgScore = plannerScores.length > 0 
         ? Math.round(plannerScores.reduce((sum, score) => sum + score.score, 0) / plannerScores.length)
         : 0;
@@ -971,7 +971,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                 </div>
               ) : (
                 categoryDrawerClients.map((client) => {
-                  const healthScore = calculateHealthScore(client);
+                  const healthScore = calculateHealthScore(client, filteredClients);
                   return (
                     <Card 
                       key={client.id} 
@@ -1058,7 +1058,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
                   </CardHeader>
                   <CardContent>
                     {(() => {
-                      const healthScore = calculateHealthScore(viewingClient);
+                      const healthScore = calculateHealthScore(viewingClient, filteredClients);
                       return (
                         <div className="space-y-4">
                           <div className="flex items-center gap-4">

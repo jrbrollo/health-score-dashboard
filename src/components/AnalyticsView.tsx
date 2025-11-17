@@ -45,13 +45,13 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
     const filteredClients = uniqueById(!selectedPlanner ? clients : clients.filter(c => c.planner === selectedPlanner));
-    const healthScores = filteredClients.map(client => calculateHealthScore(client));
-    
+    const healthScores = filteredClients.map(client => calculateHealthScore(client, filteredClients));
+
     // Planner rankings (dinâmico)
     const dynamicPlanners = Array.from(new Set(clients.filter(c => c.planner && c.planner !== '0').map(c => c.planner)));
     const plannerRankings = dynamicPlanners.map(planner => {
       const plannerClients = clients.filter(c => c.planner === planner);
-      const plannerScores = plannerClients.map(c => calculateHealthScore(c));
+      const plannerScores = plannerClients.map(c => calculateHealthScore(c, clients));
       const avgScore = plannerScores.length > 0 
         ? Math.round(plannerScores.reduce((sum, s) => sum + s.score, 0) / plannerScores.length)
         : 0;
@@ -606,7 +606,7 @@ export function AnalyticsView({ clients, selectedPlanner = null, isDarkMode = fa
                   </CardHeader>
                   <CardContent>
                     {(() => {
-                      const healthScore = calculateHealthScore(viewingClient);
+                      const healthScore = calculateHealthScore(viewingClient, clients);
                       return (
                         <div className="space-y-4">
                           <div className="flex items-center gap-4">
@@ -836,7 +836,7 @@ function calculateOpportunities(
   const opportunities: OpportunityClient[] = [];
 
   clients.forEach(client => {
-    const currentScore = calculateHealthScore(client);
+    const currentScore = calculateHealthScore(client, clients);
     let potentialScore = currentScore.score;
     let pointsGain = 0;
 
