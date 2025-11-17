@@ -56,10 +56,12 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // 1. Buscar todos os usuários de liderança (managers, mediators, leaders)
+    // MODO TESTE: Enviando apenas para helio.brollo@braunaplanejamento.com.br
     const { data: users, error: usersError } = await supabase
       .from("user_profiles")
       .select("email, hierarchy_name, role")
-      .in("role", ["leader", "mediator", "manager"]);
+      .in("role", ["leader", "mediator", "manager"])
+      .eq("email", "helio.brollo@braunaplanejamento.com.br"); // Remove esta linha quando tiver domínio próprio
 
     if (usersError) {
       throw new Error(`Erro ao buscar usuários: ${usersError.message}`);
