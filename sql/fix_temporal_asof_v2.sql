@@ -10,7 +10,14 @@
 -- APLICAR NO SUPABASE SQL EDITOR
 -- ========================================
 
--- Substituir função get_temporal_analysis_asof com lógica corrigida
+-- PASSO 1: Deletar TODAS as versões antigas da função
+DROP FUNCTION IF EXISTS get_temporal_analysis_asof(DATE, DATE, TEXT, TEXT[], TEXT[], TEXT[], BOOLEAN, BOOLEAN, BOOLEAN);
+DROP FUNCTION IF EXISTS get_temporal_analysis_asof(DATE, DATE, TEXT, TEXT[], TEXT[], TEXT[]);
+DROP FUNCTION IF EXISTS get_temporal_analysis_asof(DATE, DATE, TEXT);
+DROP FUNCTION IF EXISTS get_temporal_analysis_asof(DATE, DATE);
+DROP FUNCTION IF EXISTS get_temporal_analysis_asof;
+
+-- PASSO 2: Criar função corrigida com lógica de "apenas clientes do dia"
 CREATE OR REPLACE FUNCTION get_temporal_analysis_asof(
   start_date DATE,
   end_date DATE,
@@ -113,6 +120,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+COMMENT ON FUNCTION get_temporal_analysis_asof IS 'Versão corrigida (v2) que mostra apenas clientes ativos em cada dia específico, não um snapshot acumulado';
+
 -- ========================================
 -- VALIDAÇÃO PÓS-APLICAÇÃO
 -- ========================================
@@ -122,7 +131,7 @@ SELECT
   recorded_date,
   total_clients,
   avg_health_score
-FROM get_temporal_analysis_asof('2025-11-13', '2025-11-17', 'all')
+FROM get_temporal_analysis_asof('2025-11-13'::DATE, '2025-11-17'::DATE, 'all'::TEXT)
 ORDER BY recorded_date;
 
 -- Resultado esperado:
@@ -144,7 +153,7 @@ ORDER BY recorded_date;
 --     ORDER BY h.client_id, h.recorded_date DESC
 --   ) s ON true
 --
--- DEPOIS (linhas 49-72 deste arquivo):
+-- DEPOIS (linhas 60-83 deste arquivo):
 --   INNER JOIN health_score_history h
 --     ON h.recorded_date = d.day  -- ✅ CORRETO: apenas clientes do dia
 --
@@ -153,5 +162,3 @@ ORDER BY recorded_date;
 -- - Depois: Mostra 1008 clientes no dia 14/11 (apenas os importados naquele dia)
 -- - Resolve o bug de "histórico muda após novo import"
 -- - Clientes que saíram da base não afetam dias futuros
-
-COMMENT ON FUNCTION get_temporal_analysis_asof IS 'Versão corrigida (v2) que mostra apenas clientes ativos em cada dia específico, não um snapshot acumulado';
