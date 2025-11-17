@@ -350,6 +350,9 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
         }
       }
 
+      // ✨ VALIDAÇÃO DE CÔNJUGES: Verificar se pagantes existem no CSV
+      const spousesWithoutPayer: string[] = [];
+
       for (const row of parsedRows) {
         if (!row.isSpouse || !row.spousePartnerNorm) continue;
         const partnerKey = `${row.spousePartnerNorm}|${row.plannerNorm}`;
@@ -366,9 +369,24 @@ const spousePlaceholders = GENERIC_PLACEHOLDERS;
           // NOVO: Armazenar nome do pagante para herdar NPS
           row.client.spousePartnerName = partner.client.name;
         } else if (row.spousePartnerRaw) {
+          // ⚠️ NOVO: Avisar que pagante não foi encontrado no CSV
+          spousesWithoutPayer.push(`${row.client.name} → Pagante "${row.spousePartnerRaw}" não encontrado`);
           // Se não encontrou o parceiro, usar o nome raw da planilha
           row.client.spousePartnerName = row.spousePartnerRaw;
         }
+      }
+
+      // Adicionar warnings para cônjuges sem pagante encontrado
+      if (spousesWithoutPayer.length > 0) {
+        newWarnings.push(`⚠️ ${spousesWithoutPayer.length} cônjuge(s) sem pagante encontrado no CSV:`);
+        // Mostrar os primeiros 10 para não poluir
+        spousesWithoutPayer.slice(0, 10).forEach(msg => {
+          newWarnings.push(`  • ${msg}`);
+        });
+        if (spousesWithoutPayer.length > 10) {
+          newWarnings.push(`  ... e mais ${spousesWithoutPayer.length - 10} cônjuge(s)`);
+        }
+        newWarnings.push(`💡 Estes cônjuges receberão score baseado apenas em seus próprios dados (NPS = 0 se não tiverem NPS próprio)`);
       }
 
       const finalClients = parsedRows.map(row => row.client);
