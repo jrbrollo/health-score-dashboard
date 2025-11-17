@@ -163,19 +163,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         }
       }
 
-      // Converter IDs para UUID
-      const clientIdsUuid = clientIds.map(id => {
-        const idStr = String(id);
-        // Validar formato UUID
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr)) {
-          console.warn(`⚠️ ID inválido (não é UUID): ${idStr}`);
-          return null;
-        }
-        return idStr;
-      }).filter((id): id is string => id !== null);
-
-      console.log(`🔍 Buscando histórico para ${clientIdsUuid.length} clientes na data ${dateStr} diretamente do banco...`);
-      setLoadingProgress(`Buscando histórico para ${clientIdsUuid.length} clientes...`);
+      console.log(`🔍 Buscando histórico para ${clientIds.length} clientes na data ${dateStr} diretamente do banco...`);
+      setLoadingProgress(`Buscando histórico para ${clientIds.length} clientes...`);
 
       // Query direta na tabela health_score_history
       // Mesma lógica da correção temporal: WHERE recorded_date = date (não <=)
