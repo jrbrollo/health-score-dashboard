@@ -1184,10 +1184,12 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Legenda */}
-      <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+      {movementData.length > 0 && (
+        <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Waves className="h-5 w-5" />
