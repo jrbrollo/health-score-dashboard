@@ -694,7 +694,14 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       
       // Gerar hash para comparação
       const { clientsHash, dateRangeHash } = generateDataHash(filteredClients, dateRange);
-      
+
+      console.log(`🔍 Hash gerado:`, {
+        clientsHash: clientsHash.substring(0, 100),
+        dateRangeHash,
+        cacheHash: dataCacheRef.current.clientsHash ? dataCacheRef.current.clientsHash.substring(0, 100) : 'vazio',
+        equals: dataCacheRef.current.clientsHash === clientsHash
+      });
+
       // Se os dados são os mesmos (mesmo hash), não recarregar
       if (
         dataCacheRef.current.clientsHash === clientsHash &&
