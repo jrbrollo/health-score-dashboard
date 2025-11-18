@@ -133,15 +133,18 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   // Ref para preservar scroll position
   const scrollPositionRef = useRef<number>(0);
 
-  // Filtrar clientes por planejador
+  // Filtrar clientes por planejador (normalizar para lowercase para match)
   const filteredClients = useMemo(() => {
-    return clients.filter(client => {
+    console.log(`🔍 Filtrando clientes em MovementSankey:`, { totalClients: clients.length, manager, mediator, leader });
+    const filtered = clients.filter(client => {
       if (selectedPlanner !== 'all' && client.planner !== selectedPlanner) return false;
-      if (manager !== 'all' && client.manager !== manager) return false;
-      if (mediator !== 'all' && client.mediator !== mediator) return false;
-      if (leader !== 'all' && client.leader !== leader) return false;
+      if (manager !== 'all' && client.manager?.toLowerCase() !== manager.toLowerCase()) return false;
+      if (mediator !== 'all' && client.mediator?.toLowerCase() !== mediator.toLowerCase()) return false;
+      if (leader !== 'all' && client.leader?.toLowerCase() !== leader.toLowerCase()) return false;
       return true;
     });
+    console.log(`✅ Clientes filtrados no MovementSankey: ${filtered.length} de ${clients.length}`);
+    return filtered;
   }, [clients, selectedPlanner, manager, mediator, leader]);
 
   // Buscar histórico de clientes em uma data específica
