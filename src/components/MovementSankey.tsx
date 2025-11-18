@@ -189,21 +189,21 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         .select('*')
         .eq('recorded_date', dateStr);
 
-      // Aplicar filtros de hierarquia
+      // Aplicar filtros de hierarquia (normalizar para lowercase para match com banco)
       if (selectedPlanner !== 'all') {
         query = query.eq('planner', selectedPlanner);
       }
 
       if (manager !== 'all') {
-        query = query.eq('manager', manager);
+        query = query.eq('manager', manager.toLowerCase());
       }
 
       if (mediator !== 'all') {
-        query = query.eq('mediator', mediator);
+        query = query.eq('mediator', mediator.toLowerCase());
       }
 
       if (leader !== 'all') {
-        query = query.eq('leader', leader);
+        query = query.eq('leader', leader.toLowerCase());
       }
 
       // Filtrar planner '0'
