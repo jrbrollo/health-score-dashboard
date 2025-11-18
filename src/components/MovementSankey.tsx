@@ -322,37 +322,18 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
     // SEMPRE buscar histórico do banco primeiro
     endHistory = await loadClientHistoryForDate(endDate, clientIds);
 
-    // Se não houver histórico para a data final (dia sem importação), usar estado atual como fallback
-    if (endHistory.size === 0 && endDate.getTime() === today.getTime()) {
-      console.log('⚠️ Sem histórico para hoje no banco - usando estado atual dos clientes como fallback');
-      endHistory = new Map();
-      filteredClients.forEach(client => {
-        const score = calculateHealthScore(client);
-        endHistory.set(String(client.id), {
-          id: '',
-          clientId: String(client.id),
-          recordedDate: today,
-          clientName: client.name,
-          planner: client.planner || '',
-          healthScore: score.score,
-          healthCategory: score.category,
-          breakdown: score.breakdown,
-          originalData: {
-            lastMeeting: client.lastMeeting || null,
-            hasScheduledMeeting: client.hasScheduledMeeting || false,
-            appUsageStatus: client.appUsage || null,
-            paymentStatusDetail: client.paymentStatus || null,
-            hasReferrals: client.hasNpsReferral || false,
-            npsScoreDetail: client.npsScoreV3 ? String(client.npsScoreV3) : null,
-            ecosystemUsage: client.ecosystemUsage || null,
-          },
-          createdAt: new Date(),
-        });
-      });
-    } else if (endHistory.size > 0) {
+    // CORREÇÃO: Não usar fallback - só mostrar movimentações se houver dados históricos reais
+    if (endHistory.size === 0) {
+      console.log(`⚠️ Sem histórico para ${format(endDate, 'dd/MM/yyyy')} - não é possível calcular movimentações`);
+      setEndDateHistory(new Map());
+      setStartDateHistory(startHistory);
+
+      // Retornar vazio para indicar que não há dados suficientes
+      return [];
+    } else {
       console.log(`✅ Usando histórico do banco para ${format(endDate, 'dd/MM/yyyy')}: ${endHistory.size} clientes encontrados`);
     }
-    
+
     setEndDateHistory(endHistory);
     
     console.log(`📊 Comparando histórico:`);
@@ -908,8 +889,28 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         </CardContent>
       </Card>
 
+      {/* Aviso: Sem dados históricos suficientes */}
+      {!loading && movementData.length === 0 && endDateHistory.size === 0 && (
+        <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+                  Dados históricos insuficientes
+                </h3>
+                <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                  Não há dados históricos disponíveis para a data final selecionada ({format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}).
+                  Por favor, selecione uma data que já tenha importação de planilha realizada, ou aguarde a importação dos dados.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Análise de Tendências */}
-      {trendAnalysis && (
+      {trendAnalysis && movementData.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card 
             className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'} cursor-pointer`}
@@ -989,16 +990,17 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       )}
 
       {/* Fluxo de Movimentos */}
-      <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Waves className="h-5 w-5" />
-            Fluxo de Movimentos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {movementData.map((movement, index) => (
+      {movementData.length > 0 && (
+        <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Waves className="h-5 w-5" />
+              Fluxo de Movimentos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {movementData.map((movement, index) => (
               <div 
                 key={index} 
                 className="flex items-center justify-between p-4 rounded-lg border bg-background/50 cursor-pointer hover:bg-background/70 transition-colors"
@@ -1033,10 +1035,12 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
             ))}
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Análise por Categoria */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {movementData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1109,10 +1113,12 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Distribuição de Movimentos */}
-      <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
+      {movementData.length > 0 && (
+        <Card className={`${isDarkMode ? 'gradient-card-dark' : 'gradient-card-light'} ${isDarkMode ? 'card-hover-dark' : 'card-hover'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Waves className="h-5 w-5" />
@@ -1212,7 +1218,8 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Drawer com lista de clientes */}
       <Drawer open={!!openDrawer} onOpenChange={(open) => !open && setOpenDrawer(null)}>
