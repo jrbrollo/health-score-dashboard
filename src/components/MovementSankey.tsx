@@ -75,6 +75,9 @@ const QUICK_RANGES = [
 ];
 
 const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanner, manager = 'all', mediator = 'all', leader = 'all', isDarkMode = false }) => {
+  // Debug: Log dos props recebidos
+  console.log('🔍 MovementSankey props recebidos:', { manager, mediator, leader, selectedPlanner, totalClients: clients.length });
+
   const [movementData, setMovementData] = useState<MovementData[]>([]);
   const [categoryFlows, setCategoryFlows] = useState<CategoryFlow[]>([]);
   const [trendAnalysis, setTrendAnalysis] = useState<TrendAnalysis | null>(null);

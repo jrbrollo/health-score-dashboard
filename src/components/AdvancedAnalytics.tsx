@@ -35,6 +35,9 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('portfolio');
 
+  // Debug: Log dos props recebidos
+  console.log('🔍 AdvancedAnalytics props:', { manager, mediator, leader, selectedPlanner });
+
   // Metadata dos módulos (sem os componentes para evitar cache)
   const analyticsModules = [
     {
