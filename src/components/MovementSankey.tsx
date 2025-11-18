@@ -18,6 +18,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Label, LabelList, LineChart, Line, Legend, Tooltip as RechartsTooltip } from 'recharts';
 import { Client, Planner } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
+import { normalizeText } from '@/lib/filters';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from './ui/drawer';
 import { HealthScoreBadge } from './HealthScoreBadge';
 import { temporalService } from '@/services/temporalService';
@@ -133,14 +134,35 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   // Ref para preservar scroll position
   const scrollPositionRef = useRef<number>(0);
 
-  // Filtrar clientes por planejador (normalizar para lowercase para match)
+  // Filtrar clientes usando a mesma lógica do Dashboard (normalizeText + flexible matching)
   const filteredClients = useMemo(() => {
     console.log(`🔍 Filtrando clientes em MovementSankey:`, { totalClients: clients.length, manager, mediator, leader });
+
+    // DEBUG: Mostrar amostra dos valores de mediador nos primeiros 5 clientes
+    if (clients.length > 0) {
+      console.log('📋 Amostra de mediators nos clientes recebidos:',
+        clients.slice(0, 5).map(c => ({ name: c.name, mediator: c.mediator, manager: c.manager, leader: c.leader }))
+      );
+    }
+
+    // Helper para comparação flexível (mesmo que Dashboard usa)
+    const flexibleMatch = (clientValue: string | undefined, filterValue: string): boolean => {
+      if (!clientValue) return false;
+      const normalizedClient = normalizeText(clientValue);
+      const normalizedFilter = normalizeText(filterValue);
+      if (!normalizedClient || !normalizedFilter) return false;
+
+      // Comparação flexível: exact match OU startsWith em qualquer direção
+      return normalizedFilter === normalizedClient ||
+             normalizedClient.startsWith(normalizedFilter) ||
+             normalizedFilter.startsWith(normalizedClient);
+    };
+
     const filtered = clients.filter(client => {
       if (selectedPlanner !== 'all' && client.planner !== selectedPlanner) return false;
-      if (manager !== 'all' && client.manager?.toLowerCase() !== manager.toLowerCase()) return false;
-      if (mediator !== 'all' && client.mediator?.toLowerCase() !== mediator.toLowerCase()) return false;
-      if (leader !== 'all' && client.leader?.toLowerCase() !== leader.toLowerCase()) return false;
+      if (manager !== 'all' && !flexibleMatch(client.manager, manager)) return false;
+      if (mediator !== 'all' && !flexibleMatch(client.mediator, mediator)) return false;
+      if (leader !== 'all' && !flexibleMatch(client.leader, leader)) return false;
       return true;
     });
     console.log(`✅ Clientes filtrados no MovementSankey: ${filtered.length} de ${clients.length}`);
@@ -192,21 +214,33 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
         .select('*')
         .eq('recorded_date', dateStr);
 
-      // Aplicar filtros de hierarquia (normalizar para lowercase para match com banco)
+      // Aplicar filtros de hierarquia usando ilike para matching flexível (mesmo que Dashboard)
       if (selectedPlanner !== 'all') {
         query = query.eq('planner', selectedPlanner);
       }
 
       if (manager !== 'all') {
-        query = query.eq('manager', manager.toLowerCase());
+        // Usar ilike para case-insensitive + startsWith matching (mesmo que Dashboard)
+        const normalizedManager = normalizeText(manager);
+        if (normalizedManager) {
+          query = query.ilike('manager', `${normalizedManager}%`);
+        }
       }
 
       if (mediator !== 'all') {
-        query = query.eq('mediator', mediator.toLowerCase());
+        // Usar ilike para case-insensitive + startsWith matching (mesmo que Dashboard)
+        const normalizedMediator = normalizeText(mediator);
+        if (normalizedMediator) {
+          query = query.ilike('mediator', `${normalizedMediator}%`);
+        }
       }
 
       if (leader !== 'all') {
-        query = query.eq('leader', leader.toLowerCase());
+        // Usar ilike para case-insensitive + startsWith matching (mesmo que Dashboard)
+        const normalizedLeader = normalizeText(leader);
+        if (normalizedLeader) {
+          query = query.ilike('leader', `${normalizedLeader}%`);
+        }
       }
 
       // Filtrar planner '0'
