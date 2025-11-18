@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -35,23 +35,21 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('portfolio');
 
-  // useMemo para garantir que os componentes sejam recriados quando os filtros mudam
-  const analyticsModules = useMemo(() => [
+  // Metadata dos módulos (sem os componentes para evitar cache)
+  const analyticsModules = [
     {
       id: 'portfolio',
       title: 'Portfolio Health Metrics',
       description: 'Métricas agregadas da carteira',
-      icon: BarChart3,
-      component: <PortfolioMetrics clients={clients} selectedPlanner={selectedPlanner} manager={manager} mediator={mediator} leader={leader} isDarkMode={isDarkMode} />
+      icon: BarChart3
     },
     {
       id: 'movement',
       title: 'Movement Sankey',
       description: 'Fluxo entre categorias',
-      icon: Waves,
-      component: <MovementSankey clients={clients} selectedPlanner={selectedPlanner} manager={manager} mediator={mediator} leader={leader} isDarkMode={isDarkMode} />
+      icon: Waves
     }
-  ], [clients, selectedPlanner, manager, mediator, leader, isDarkMode]);
+  ];
 
   return (
     <div className="space-y-6">
@@ -96,12 +94,28 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
           })}
         </TabsList>
 
-        {/* Conteúdo dos Módulos */}
-        {analyticsModules.map((module) => (
-          <TabsContent key={module.id} value={module.id} className="space-y-6">
-            {module.component}
-          </TabsContent>
-        ))}
+        {/* Conteúdo dos Módulos - Renderizar diretamente para evitar cache */}
+        <TabsContent value="portfolio" className="space-y-6">
+          <PortfolioMetrics
+            clients={clients}
+            selectedPlanner={selectedPlanner}
+            manager={manager}
+            mediator={mediator}
+            leader={leader}
+            isDarkMode={isDarkMode}
+          />
+        </TabsContent>
+
+        <TabsContent value="movement" className="space-y-6">
+          <MovementSankey
+            clients={clients}
+            selectedPlanner={selectedPlanner}
+            manager={manager}
+            mediator={mediator}
+            leader={leader}
+            isDarkMode={isDarkMode}
+          />
+        </TabsContent>
       </Tabs>
     </div>
   );
