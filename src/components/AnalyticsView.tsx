@@ -847,7 +847,10 @@ function calculateOpportunities(
 
     // Calcular impacto baseado no tipo de insight
     if (insightTitle.includes("Coletar NPS Pendente")) {
-      if (client.npsScoreV3 === null || client.npsScoreV3 === undefined) {
+      // Aplicar mesmos critérios de elegibilidade para NPS
+      if ((client.npsScoreV3 === null || client.npsScoreV3 === undefined) &&
+          client.isSpouse !== true &&  // Cônjuges não recebem pesquisa de NPS
+          (client.monthsSinceClosing ?? 0) >= 6) {  // Apenas clientes com 6+ meses
         // Cliente sem NPS já recebe 10 pontos (neutro padrão)
         // Se coletar e for promotor (9-10), ganha +10 pontos (de 10 para 20)
         // Vamos calcular o melhor cenário (promotor = +10 pontos)
