@@ -164,6 +164,17 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       }
 
       console.log(`🔍 Buscando histórico para ${clientIds.length} clientes na data ${dateStr} diretamente do banco...`);
+
+      // Log dos filtros aplicados
+      const appliedFilters = {
+        date: dateStr,
+        planner: selectedPlanner !== 'all' ? selectedPlanner : 'all',
+        manager: manager !== 'all' ? manager : 'all',
+        mediator: mediator !== 'all' ? mediator : 'all',
+        leader: leader !== 'all' ? leader : 'all'
+      };
+      console.log('🔍 Aplicando filtros de hierarquia:', appliedFilters);
+
       setLoadingProgress(`Buscando histórico para ${clientIds.length} clientes...`);
 
       // Query direta na tabela health_score_history
@@ -196,6 +207,14 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
       query = query.neq('planner', '0');
 
       const { data, error } = await query;
+
+      console.log(`✅ Filtros aplicados: retornou ${data?.length || 0} registros para ${dateStr}`);
+
+      // Debug: mostrar amostra de mediadores nos dados retornados
+      if (data && data.length > 0 && mediator !== 'all') {
+        const mediatorsInData = new Set(data.map(d => d.mediator).filter(Boolean));
+        console.log(`📊 Mediadores encontrados no histórico (${dateStr}):`, Array.from(mediatorsInData));
+      }
 
       if (error) {
         console.error(`❌ Erro ao buscar histórico:`, error);
@@ -287,9 +306,15 @@ const MovementSankey: React.FC<MovementSankeyProps> = ({ clients, selectedPlanne
   // Gerar dados de movimento baseados em comparação temporal real
   const generateMovementData = async (): Promise<MovementData[]> => {
     const movements: MovementData[] = [];
-    
+
+    console.log(`📊 Total de clientes filtrados no estado atual: ${filteredClients.length}`);
+    if (mediator !== 'all') {
+      const mediatorsInFiltered = new Set(filteredClients.map(c => c.mediator).filter(Boolean));
+      console.log(`📊 Mediadores encontrados nos clientes filtrados:`, Array.from(mediatorsInFiltered));
+    }
+
     const clientIds = filteredClients.map(c => String(c.id));
-    
+
     const startDate = new Date(dateRange.from);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(dateRange.to);
