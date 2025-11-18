@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -35,7 +35,8 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('portfolio');
 
-  const analyticsModules = [
+  // useMemo para garantir que os componentes sejam recriados quando os filtros mudam
+  const analyticsModules = useMemo(() => [
     {
       id: 'portfolio',
       title: 'Portfolio Health Metrics',
@@ -50,7 +51,7 @@ const AdvancedAnalytics: React.FC<AdvancedAnalyticsProps> = ({
       icon: Waves,
       component: <MovementSankey clients={clients} selectedPlanner={selectedPlanner} manager={manager} mediator={mediator} leader={leader} isDarkMode={isDarkMode} />
     }
-  ];
+  ], [clients, selectedPlanner, manager, mediator, leader, isDarkMode]);
 
   return (
     <div className="space-y-6">
