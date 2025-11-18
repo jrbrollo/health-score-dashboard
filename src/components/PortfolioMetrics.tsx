@@ -18,6 +18,7 @@ import {
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Client, Planner } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
+import { normalizeText } from '@/lib/filters';
 import { temporalService } from '@/services/temporalService';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { subDays } from 'date-fns';
@@ -93,11 +94,24 @@ const PortfolioMetrics: React.FC<PortfolioMetricsProps> = ({ clients, selectedPl
   };
 
   const filteredClients = useMemo(() => {
+    // Helper para comparação flexível (mesmo que Dashboard e MovementSankey)
+    const flexibleMatch = (clientValue: string | undefined, filterValue: string): boolean => {
+      if (!clientValue) return false;
+      const normalizedClient = normalizeText(clientValue);
+      const normalizedFilter = normalizeText(filterValue);
+      if (!normalizedClient || !normalizedFilter) return false;
+
+      // Comparação flexível: exact match OU startsWith em qualquer direção
+      return normalizedFilter === normalizedClient ||
+             normalizedClient.startsWith(normalizedFilter) ||
+             normalizedFilter.startsWith(normalizedClient);
+    };
+
     return clients.filter(client => {
       if (selectedPlanner !== 'all' && client.planner !== selectedPlanner) return false;
-      if (manager !== 'all' && client.manager !== manager) return false;
-      if (mediator !== 'all' && client.mediator !== mediator) return false;
-      if (leader !== 'all' && client.leader !== leader) return false;
+      if (manager !== 'all' && !flexibleMatch(client.manager, manager)) return false;
+      if (mediator !== 'all' && !flexibleMatch(client.mediator, mediator)) return false;
+      if (leader !== 'all' && !flexibleMatch(client.leader, leader)) return false;
       return true;
     });
   }, [clients, selectedPlanner, manager, mediator, leader]);
