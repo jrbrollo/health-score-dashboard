@@ -777,7 +777,12 @@ function generateInsights(clients: Client[], healthScores: any[], pillarAnalysis
     });
   }
 
-  const noNps = clients.filter(c => c.npsScoreV3 === null || c.npsScoreV3 === undefined).length;
+  // NPS Pendente: apenas clientes elegíveis (6+ meses de relacionamento e não-cônjuges)
+  const noNps = clients.filter(c =>
+    (c.npsScoreV3 === null || c.npsScoreV3 === undefined) &&  // Sem NPS
+    c.isSpouse !== true &&  // Não é cônjuge (cônjuges não recebem pesquisa de NPS)
+    (c.monthsSinceClosing ?? 0) >= 6  // Tem 6+ meses de relacionamento (pesquisa enviada após 6 meses)
+  ).length;
   if (noNps > 0) {
     insights.push({
       type: "action",
