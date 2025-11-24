@@ -3,6 +3,7 @@ import { HealthScoreHistory, TemporalAnalysis, TrendAnalysis, PeriodComparison }
 import { Planner } from '@/types/client';
 import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
 import { executeQueryWithTimeout } from '@/lib/queryUtils';
+import { normalizeText } from '@/lib/filters';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const averageFromRecords = (records: any[], selector: (record: any) => number | null | undefined) => {
@@ -585,22 +586,35 @@ export const temporalService = {
       let filteredData = data ?? [];
 
       if (hierarchyFilters) {
+        // Usar mesma lógica de filtros flexíveis do Dashboard (normalização + startsWith)
         if (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) {
+          const normalizedFilters = hierarchyFilters.managers.map(m => normalizeText(m)).filter(Boolean) as string[];
           filteredData = filteredData.filter(record => {
             if (!record.manager) return Boolean(hierarchyFilters.includeNulls?.manager);
-            return hierarchyFilters.managers!.includes(record.manager);
+            const val = normalizeText(record.manager);
+            if (!val) return false;
+            // Comparação flexível: val === filter OU val começa com filter OU filter começa com val
+            return normalizedFilters.some(filter => val === filter || val.startsWith(filter) || filter.startsWith(val));
           });
         }
         if (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) {
+          const normalizedFilters = hierarchyFilters.mediators.map(m => normalizeText(m)).filter(Boolean) as string[];
           filteredData = filteredData.filter(record => {
             if (!record.mediator) return Boolean(hierarchyFilters.includeNulls?.mediator);
-            return hierarchyFilters.mediators!.includes(record.mediator);
+            const val = normalizeText(record.mediator);
+            if (!val) return false;
+            // Comparação flexível: val === filter OU val começa com filter OU filter começa com val
+            return normalizedFilters.some(filter => val === filter || val.startsWith(filter) || filter.startsWith(val));
           });
         }
         if (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0) {
+          const normalizedFilters = hierarchyFilters.leaders.map(l => normalizeText(l)).filter(Boolean) as string[];
           filteredData = filteredData.filter(record => {
             if (!record.leader) return Boolean(hierarchyFilters.includeNulls?.leader);
-            return hierarchyFilters.leaders!.includes(record.leader);
+            const val = normalizeText(record.leader);
+            if (!val) return false;
+            // Comparação flexível: val === filter OU val começa com filter OU filter começa com val
+            return normalizedFilters.some(filter => val === filter || val.startsWith(filter) || filter.startsWith(val));
           });
         }
       }
@@ -694,22 +708,35 @@ export const temporalService = {
       let filteredData = data ?? [];
 
       if (hierarchyFilters) {
+        // Usar mesma lógica de filtros flexíveis do Dashboard (normalização + startsWith)
         if (hierarchyFilters.managers && hierarchyFilters.managers.length > 0) {
+          const normalizedFilters = hierarchyFilters.managers.map(m => normalizeText(m)).filter(Boolean) as string[];
           filteredData = filteredData.filter(record => {
             if (!record.manager) return Boolean(hierarchyFilters.includeNulls?.manager);
-            return hierarchyFilters.managers!.includes(record.manager);
+            const val = normalizeText(record.manager);
+            if (!val) return false;
+            // Comparação flexível: val === filter OU val começa com filter OU filter começa com val
+            return normalizedFilters.some(filter => val === filter || val.startsWith(filter) || filter.startsWith(val));
           });
         }
         if (hierarchyFilters.mediators && hierarchyFilters.mediators.length > 0) {
+          const normalizedFilters = hierarchyFilters.mediators.map(m => normalizeText(m)).filter(Boolean) as string[];
           filteredData = filteredData.filter(record => {
             if (!record.mediator) return Boolean(hierarchyFilters.includeNulls?.mediator);
-            return hierarchyFilters.mediators!.includes(record.mediator);
+            const val = normalizeText(record.mediator);
+            if (!val) return false;
+            // Comparação flexível: val === filter OU val começa com filter OU filter começa com val
+            return normalizedFilters.some(filter => val === filter || val.startsWith(filter) || filter.startsWith(val));
           });
         }
         if (hierarchyFilters.leaders && hierarchyFilters.leaders.length > 0) {
+          const normalizedFilters = hierarchyFilters.leaders.map(l => normalizeText(l)).filter(Boolean) as string[];
           filteredData = filteredData.filter(record => {
             if (!record.leader) return Boolean(hierarchyFilters.includeNulls?.leader);
-            return hierarchyFilters.leaders!.includes(record.leader);
+            const val = normalizeText(record.leader);
+            if (!val) return false;
+            // Comparação flexível: val === filter OU val começa com filter OU filter começa com val
+            return normalizedFilters.some(filter => val === filter || val.startsWith(filter) || filter.startsWith(val));
           });
         }
       }
