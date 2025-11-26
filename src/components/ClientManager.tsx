@@ -235,7 +235,7 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
 
   // Filtrar clientes (combinando filtros de auth e filtros do usuário)
   const filteredClients = useMemo(() => {
-    // Começar com filtros de autenticação
+    // Começar com filtros de autenticação (SEMPRE aplicados)
     let baseFilters: HierarchyFilters = authFilters || {
       selectedPlanner: null,
       managers: [],
@@ -243,18 +243,26 @@ export function ClientManager({ clients, selectedPlanner, onBack, isDarkMode = f
       leaders: [],
     };
 
-    // Aplicar filtros adicionais do usuário (se permitido pelo role)
-    const userFilters: HierarchyFilters = {
-      selectedPlanner: profile?.role === 'manager' ? (filterPlanner === 'all' ? null : filterPlanner) : baseFilters.selectedPlanner,
-      managers: profile?.role === 'manager' && filterManager !== 'all' ? [filterManager] : baseFilters.managers,
-      mediators: profile?.role === 'manager' && filterMediator !== 'all' ? [filterMediator] : baseFilters.mediators,
-      leaders: profile?.role === 'manager' && filterLeader !== 'all' ? [filterLeader] : baseFilters.leaders,
-    };
+    // Aplicar filtros de autenticação primeiro (restrição de segurança)
+    let filtered = applyHierarchyFilters(clients, baseFilters);
 
-    // Se não for gerente, usar apenas filtros de auth
-    const finalFilters = profile?.role === 'manager' ? userFilters : baseFilters;
-
-    let filtered = applyHierarchyFilters(clients, finalFilters);
+    // Depois aplicar filtros adicionais do usuário (refinar dentro da hierarquia permitida)
+    if (filterPlanner !== 'all') {
+      const plannerFilter: HierarchyFilters = { selectedPlanner: filterPlanner };
+      filtered = applyHierarchyFilters(filtered, plannerFilter);
+    }
+    if (filterManager !== 'all') {
+      const managerFilter: HierarchyFilters = { managers: [filterManager] };
+      filtered = applyHierarchyFilters(filtered, managerFilter);
+    }
+    if (filterMediator !== 'all') {
+      const mediatorFilter: HierarchyFilters = { mediators: [filterMediator] };
+      filtered = applyHierarchyFilters(filtered, mediatorFilter);
+    }
+    if (filterLeader !== 'all') {
+      const leaderFilter: HierarchyFilters = { leaders: [filterLeader] };
+      filtered = applyHierarchyFilters(filtered, leaderFilter);
+    }
 
     if (debouncedSearchTerm) {
       filtered = filtered.filter(c => c.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
