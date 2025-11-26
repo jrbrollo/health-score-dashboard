@@ -916,7 +916,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
           </TabsContent>
 
           <TabsContent value="temporal">
-            <TemporalAnalysisComponent 
+            <TemporalAnalysisComponent
               isDarkMode={isDarkMode}
               selectedPlanner={selectedPlanner}
               selectedManager={selectedManager}
@@ -924,6 +924,7 @@ export function Dashboard({ clients, onBulkImport, onDeleteClient, onManageClien
               selectedLeader={selectedLeader}
               currentClientCount={filteredClients.length}
               filteredClients={filteredClients}
+              authFilters={authFilters}
             />
           </TabsContent>
 

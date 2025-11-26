@@ -13,6 +13,7 @@ import { Client } from '@/types/client';
 import { calculateHealthScore } from '@/utils/healthScore';
 import { AnalysisInfoTooltip } from './AnalysisInfoTooltip';
 import { MIN_HISTORY_DATE, clampToMinHistoryDate } from '@/lib/constants';
+import { HierarchyFilters } from '@/lib/filters';
 
 interface TemporalAnalysisProps {
   isDarkMode?: boolean;
@@ -22,6 +23,7 @@ interface TemporalAnalysisProps {
   selectedLeader?: string | "all";
   currentClientCount?: number;
   filteredClients?: Client[];
+  authFilters?: HierarchyFilters | null;
 }
 
 const DEFAULT_DAYS = 30;
@@ -39,6 +41,7 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
   selectedLeader = 'all',
   currentClientCount = 0,
   filteredClients = [],
+  authFilters = null,
 }) => {
   const [analysisData, setAnalysisData] = useState<TemporalAnalysis[]>([]);
   const [trendData, setTrendData] = useState<TrendAnalysis | null>(null);
@@ -194,13 +197,16 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       const mediatorFilter = selectedMediator !== 'all' ? [selectedMediator] : undefined;
       const leaderFilter = selectedLeader !== 'all' ? [selectedLeader] : undefined;
 
-      const hierarchyFilters = managerFilter || mediatorFilter || leaderFilter
-        ? {
-            managers: managerFilter,
-            mediators: mediatorFilter,
-            leaders: leaderFilter,
-          }
-        : undefined;
+      // Combinar filtros de autenticação (authFilters) com filtros manuais
+      // authFilters tem prioridade (restrições de segurança)
+      const hierarchyFilters: HierarchyFilters | undefined =
+        authFilters || managerFilter || mediatorFilter || leaderFilter
+          ? {
+              managers: managerFilter || authFilters?.managers,
+              mediators: mediatorFilter || authFilters?.mediators,
+              leaders: leaderFilter || authFilters?.leaders,
+            }
+          : undefined;
 
       // Timeout de segurança: 90 segundos (aumentado de 30s para dar margem ao RPC que pode demorar até 60s)
       const timeoutPromise = new Promise<never>((_, reject) => {
