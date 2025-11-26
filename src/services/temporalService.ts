@@ -188,38 +188,48 @@ export const temporalService = {
       const mediatorsParam = hierarchyFilters?.mediators && hierarchyFilters.mediators.length > 0 
         ? hierarchyFilters.mediators 
         : null;
-      const leadersParam = hierarchyFilters?.leaders && hierarchyFilters.leaders.length > 0 
-        ? hierarchyFilters.leaders 
+      const leadersParam = hierarchyFilters?.leaders && hierarchyFilters.leaders.length > 0
+        ? hierarchyFilters.leaders
         : null;
-      
+
+      const rpcParams = {
+        start_date: startDateStr,
+        end_date: endDateStr,
+        planner_filter: planner ?? 'all',
+        managers: managersParam,
+        mediators: mediatorsParam,
+        leaders: leadersParam,
+        include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
+        include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
+        include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
+      };
+
+      console.log('🔧 Parâmetros enviados para RPC get_temporal_analysis_asof:', rpcParams);
+
       const { data, error } = await executeQueryWithTimeout(
-        () => supabase.rpc('get_temporal_analysis_asof', {
-          start_date: startDateStr,
-          end_date: endDateStr,
-          planner_filter: planner ?? 'all',
-          managers: managersParam,
-          mediators: mediatorsParam,
-          leaders: leadersParam,
-          include_null_manager: hierarchyFilters?.includeNulls?.manager ?? false,
-          include_null_mediator: hierarchyFilters?.includeNulls?.mediator ?? false,
-          include_null_leader: hierarchyFilters?.includeNulls?.leader ?? false,
-        }),
+        () => supabase.rpc('get_temporal_analysis_asof', rpcParams),
         60000 // 60 segundos para análise temporal
       );
       
       if (error) {
         console.error('❌ Erro na chamada RPC get_temporal_analysis_asof:', error);
-        console.error('Parâmetros:', {
-          start_date: startDateStr,
-          end_date: endDateStr,
-          planner_filter: planner ?? 'all',
-          managers: hierarchyFilters?.managers ?? null,
-          mediators: hierarchyFilters?.mediators ?? null,
-          leaders: hierarchyFilters?.leaders ?? null,
+        console.error('❌ Detalhes do erro:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
         });
       }
 
+      console.log('📦 Resposta da RPC:', {
+        hasError: !!error,
+        dataLength: data?.length ?? 0,
+        dataIsArray: Array.isArray(data),
+        firstRecord: data?.[0]
+      });
+
       if (error || !data) {
+        console.log('⚠️ Fallback para calculatePlannerAnalysis devido a erro ou falta de dados');
         return this.calculatePlannerAnalysis(safeStartDate, safeEndDate, planner ?? 'all', hierarchyFilters);
       }
 
