@@ -16,19 +16,17 @@
 -- Criar extensão unaccent se não existir (para remover acentos)
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
--- Dropar função antiga se existir (necessário para alterar assinatura)
-DROP FUNCTION IF EXISTS normalize_text(text);
-
 -- Função auxiliar para normalizar texto (lowercase + sem acentos)
-CREATE OR REPLACE FUNCTION normalize_text(text_value TEXT)
+-- Usar mesmo nome de parâmetro da função existente para evitar erro de assinatura
+CREATE OR REPLACE FUNCTION normalize_text(input_text TEXT)
 RETURNS TEXT AS $$
 BEGIN
-  IF text_value IS NULL OR TRIM(text_value) = '' THEN
+  IF input_text IS NULL OR TRIM(input_text) = '' THEN
     RETURN NULL;
   END IF;
 
   -- Normalizar: lowercase + sem acentos + trim
-  RETURN LOWER(TRIM(unaccent(text_value)));
+  RETURN LOWER(TRIM(unaccent(input_text)));
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
