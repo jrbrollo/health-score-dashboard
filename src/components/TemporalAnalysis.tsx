@@ -197,14 +197,23 @@ const TemporalAnalysisComponent: React.FC<TemporalAnalysisProps> = ({
       const mediatorFilter = selectedMediator !== 'all' ? [selectedMediator] : undefined;
       const leaderFilter = selectedLeader !== 'all' ? [selectedLeader] : undefined;
 
+      // CORREÇÃO: Verificar se authFilters realmente tem filtros ativos
+      // Administrador retorna arrays vazios, que devem ser tratados como "sem filtros"
+      const hasAuthFilters = authFilters && (
+        (authFilters.managers && authFilters.managers.length > 0) ||
+        (authFilters.mediators && authFilters.mediators.length > 0) ||
+        (authFilters.leaders && authFilters.leaders.length > 0) ||
+        authFilters.selectedPlanner
+      );
+
       // Combinar filtros de autenticação (authFilters) com filtros manuais
       // authFilters tem prioridade (restrições de segurança)
       const hierarchyFilters: HierarchyFilters | undefined =
-        authFilters || managerFilter || mediatorFilter || leaderFilter
+        hasAuthFilters || managerFilter || mediatorFilter || leaderFilter
           ? {
-              managers: managerFilter || authFilters?.managers,
-              mediators: mediatorFilter || authFilters?.mediators,
-              leaders: leaderFilter || authFilters?.leaders,
+              managers: managerFilter || (hasAuthFilters ? authFilters?.managers : undefined),
+              mediators: mediatorFilter || (hasAuthFilters ? authFilters?.mediators : undefined),
+              leaders: leaderFilter || (hasAuthFilters ? authFilters?.leaders : undefined),
             }
           : undefined;
 
