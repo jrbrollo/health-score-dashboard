@@ -16,6 +16,9 @@
 -- Criar extensão unaccent se não existir (para remover acentos)
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
+-- Dropar função antiga se existir (necessário para alterar assinatura)
+DROP FUNCTION IF EXISTS normalize_text(text);
+
 -- Função auxiliar para normalizar texto (lowercase + sem acentos)
 CREATE OR REPLACE FUNCTION normalize_text(text_value TEXT)
 RETURNS TEXT AS $$
